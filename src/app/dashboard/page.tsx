@@ -7,21 +7,31 @@ export default function Dashboard({ children }: { children: React.ReactNode }) {
     return(
         <>
 
-            <header className="flex items-center justify-center pt-16 pb-4">
+            <header>
             <div className="min-h-screen flex flex-col gap-16 min-h-0">
                 <h1 className="bg-gray-800 text-white p-4">
-                    Teacher's Dashboard
+                    Teacher's Dashboard (Child component)
                     </h1>
                 </div>
                 </header>
-            <SidebarProvider>
+
+        </>
+    );
+    
+}
+
+{/* <SidebarProvider>
                 <AppSidebar />
                 <main>
                 <SidebarTrigger />
                 {children}
                 </main>
-            </SidebarProvider>
-        </>
-    );
-    
-}
+            </SidebarProvider> */}
+
+        //     <SidebarProvider defaultOpen={true}>
+        //     <AppSidebar />
+        //     <main>
+        //         <SidebarTrigger />
+        //         {children}
+        //     </main>
+        // </SidebarProvider>
