@@ -24,6 +24,7 @@ import {
   SidebarFooter,
   SidebarHeader,
   SidebarRail,
+  SidebarTrigger,
 } from "@/components/ui/sidebar"
 
 import mascot from '../../public/assets/img/Mascout 9ldpi.png'
@@ -91,11 +92,6 @@ const data = {
       title: "Log Out",
       url: "#",
       icon: LogOut,
-    },
-    {
-      title: "",
-      url: "#",
-      icon: ChevronLeft,
     }
   ],
 }
@@ -104,17 +100,18 @@ export function SidebarLeft({
   ...props
 }: React.ComponentProps<typeof Sidebar>) {
   return (
-    <Sidebar collapsible="icon" className="border-r-0 rounded-lg" {...props}>
-      <SidebarHeader className="items-center">
-        <NavLogo items={data.dashLogo} className="w-4/5 mx-auto pt-4" />
+    <Sidebar collapsible="icon" className="border-r-0" {...props}>
+      <SidebarHeader className="items-center mb-4">
+        <NavLogo items={data.dashLogo} />
       </SidebarHeader>
-      <SidebarContent className="pl-10 pt-10">
-      <NavMain items={data.navMain} />
-      <NavSecondary items={data.navSecondary} className="mt-auto" />
-
+      <SidebarContent className="pl-4 pt-10 mb-4">
+        <NavMain items={data.navMain} />
+      </SidebarContent>
+      <SidebarContent className="pl-4 mb-4">
+        <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
-      
+      <SidebarTrigger />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>
