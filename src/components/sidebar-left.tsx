@@ -45,39 +45,39 @@ const data = {
       icon: Home,
       isActive: true,
     },
-    {
-      title: "Search",
-      url: "#",
-      icon: Search,
-    },  
+    // {
+    //   title: "Search",
+    //   url: "#",
+    //   icon: Search,
+    // },  
     {
       title: "Classes",
-      url: "#",
+      url: "/dashboard/classes",
       icon: NotebookPen,
     },
     {
       title: "Calendar",
-      url: "#",
+      url: "/dashboard/calendar",
       icon: Calendar,
     },
     {
       title: "Bank Accounts",
-      url: "#",
+      url: "/dashboard/bank-accounts",
       icon: CreditCard ,
     },
     {
       title: "Bills",
-      url: "#",
+      url: "/dashboard/bills",
       icon: ReceiptText,
     },
     {
       title: "Storefront",
-      url: "#",
+      url: "/dashboard/storefront",
       icon: Store,
     },
     {
       title: "Lesson Plans",
-      url: "#",
+      url: "/dashboard/lesson-plans",
       icon: BookOpenCheck,
     },
     
