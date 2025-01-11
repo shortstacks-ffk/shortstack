@@ -28,9 +28,7 @@ import {
 
 import mascot from '../../public/assets/img/Mascout 9ldpi.png'
 import simple_logo from '../../public/assets/img/logo simple - greenldpi.png'
-// import { title } from "process"
 
-// This is sample data.
 const data = {
   dashLogo: [{
          
