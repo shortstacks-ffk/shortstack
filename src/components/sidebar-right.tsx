@@ -1,11 +1,12 @@
 import * as React from "react"
-import { Plus } from "lucide-react"
+import { ChevronRight } from "lucide-react"
 
 import { Calendars } from "@/components/calendars"
 import { DatePicker } from "@/components/date-picker"
 import { NavUser } from "@/components/nav-user"
 import {
   Sidebar,
+  SidebarTrigger,
   SidebarContent,
   SidebarFooter,
   SidebarHeader,
@@ -57,14 +58,7 @@ export function SidebarRight({
         <Calendars calendars={data.calendars} />
       </SidebarContent>
       <SidebarFooter>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton>
-              <Plus />
-              <span>New Calendar</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+      <ChevronRight />
       </SidebarFooter>
     </Sidebar>
   )
