@@ -1,6 +1,8 @@
 "use client"
 
 import { type LucideIcon } from "lucide-react"
+import { usePathname } from "next/navigation"
+import Link from "next/link"
 
 import {
   SidebarMenu,
@@ -18,15 +20,16 @@ export function NavMain({
     isActive?: boolean
   }[]
 }) {
+  const pathname = usePathname()
   return (
     <SidebarMenu>
       {items.map((item) => (
         <SidebarMenuItem key={item.title}>
-          <SidebarMenuButton asChild isActive={item.isActive}>
-            <a href={item.url}>
+          <SidebarMenuButton asChild isActive={pathname === item.url}>
+            <Link href={item.url}>
               <item.icon />
               <span>{item.title}</span>
-            </a>
+            </Link>
           </SidebarMenuButton>
         </SidebarMenuItem>
       ))}
