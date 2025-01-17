@@ -5,6 +5,14 @@ import { Plus } from "lucide-react"
 
 import SearchBar from "@/components/search-bar"
 
+// notification UI in dashboard
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import { Bell } from 'lucide-react';
+
 import { useRouter } from "next/navigation"
 
 import '../../../public/styles/icons.css'
@@ -41,6 +49,17 @@ export default function Page() {
         <header className="sticky top-0 flex h-14 shrink-0 items-center gap-2 bg-background">
           <div className="flex flex-1 items-center gap-2 px-3 rounded-half mx-auto bg-muted/50 pt-8 pl-8">
             <SearchBar />
+            <Popover>
+              <PopoverTrigger><Bell /></PopoverTrigger>
+              <PopoverContent>
+              <h1>Event Notifications here </h1>
+              <hr />
+              <ul>
+                <ol>Jane Doe just finished assignment 1</ol>
+                <ol>Do not forget to grade student assignment</ol>
+              </ul>
+              </PopoverContent>
+            </Popover>
           </div>
         </header>
     <div className="flex flex-1 flex-col gap-10 p-4">
