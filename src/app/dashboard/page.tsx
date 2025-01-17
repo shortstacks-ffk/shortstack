@@ -40,9 +40,14 @@ export default function Page() {
             <SearchBar />
             <Popover>
               <PopoverTrigger><Bell /></PopoverTrigger>
-              <PopoverContent>Event Notification here</PopoverContent>
-              <PopoverContent>Jane Doe just finished assignment 1</PopoverContent>
-              <PopoverContent>Do not forget to grade student assignment</PopoverContent>
+              <PopoverContent>
+              <h1>Event Notifications here </h1>
+              <hr />
+              <ul>
+                <ol>Jane Doe just finished assignment 1</ol>
+                <ol>Do not forget to grade student assignment</ol>
+              </ul>
+              </PopoverContent>
             </Popover>
           </div>
         </header>
