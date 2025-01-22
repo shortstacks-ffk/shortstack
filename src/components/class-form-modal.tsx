@@ -34,6 +34,7 @@ interface ClassFormModalProps {
   onSubmit: (data: ClassFormData) => void;
 }
 
+
 export function ClassFormModal({
   isOpen,
   onClose,
@@ -48,6 +49,27 @@ export function ClassFormModal({
     grade: "1st", // default value
   });
 
+  const [disableValidation, setDisableValidation] = useState(false);
+
+  // Function to reset the form
+const resetForm = () => {
+  setFormData({
+    name: "",
+    studentCount: 0,
+    frequency: "daily", // default value, or empty if optional
+    day: "monday", // default value, or empty if optional
+    time: "12:00", // default value, you can adjust it
+    grade: "1st", // default value
+  });
+};
+
+const handleClose = () => {
+  setDisableValidation(true); // Disable validation
+  resetForm(); // Reset the form
+  onClose(); // Close the modal
+  setTimeout(() => setDisableValidation(false), 0); // Re-enable validation
+};
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSubmit(formData);
@@ -61,6 +83,7 @@ export function ClassFormModal({
     }); // Reset form
     onClose();
   };
+
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -185,12 +208,20 @@ export function ClassFormModal({
             </div>
           </div>
           <DialogFooter>
+            <div className="flex justify-between space-x-2">
+            <Button
+              className="bg-white text-limeGreen px-4 py-2 rounded border border-limeGreen"
+              onClick={handleClose}
+            >
+              Cancel
+            </Button>
             <Button
               className="bg-limeGreen text-white px-4 py-2 rounded"
               type="submit"
             >
               Add Class
             </Button>
+            </div>
           </DialogFooter>
         </form>
       </DialogContent>
