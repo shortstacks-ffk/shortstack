@@ -38,52 +38,55 @@ export function ClassGrid({ classes, onAddClass }: ClassGridProps) {
       </div>
 
       <div className="max-w-4xl mx-auto w-full">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {classes.length === 0 ? (
-            <Card className="border-4 border-solid border-gray-400 w-[250px] h-[250px] rounded-xl bg-muted/80 flex flex-col justify-center border-r-1 items-center">
-              <CardContent className="flex flex-col items-center justify-center w-full h-full pt-10">
-                <div
-                  className="rounded-full bg-primary/35 p-2 text-primary/40 p-2 w-[80px] h-[80px] mx-2 my-2 cursor-pointer hover:bg-primary/50 transition-colors duration-300"
-                  onClick={onAddClass}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => e.key === "Enter" && onAddClass()}
-                >
-                  {" "}
-                  <Plus className="mx-2 my-2 w-12 h-12 object-center" />{" "}
-                </div>
-              </CardContent>
-              <CardContent className="relative flex flex-col items-center">
-                <div className="w-[130px] h-[20px] rounded-xl bg-primary/10 text-primary/60 px-7">
-                  {" "}
-                  Add Class
+        <div
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {classes.map((classItem, index) => (
+            <Card
+              key={classItem.id}
+              className={`grid-column w-[250px] h-[250px] rounded-xl  flex flex-col ${
+                index % 3 === 0
+                  ? "bg-[#f8f8f8]"
+                  : index % 3 === 1
+                  ? "bg-[#e6f7ff]"
+                  : "bg-[#e9fbe6]"
+              }`}
+            >
+              <CardHeader>
+                <CardTitle>{classItem.name}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex justify-between items-center mt-12">
+                  <div className="flex items-center space-x-2">
+                    <FaClock className="text-xl text-gray-500" />
+                    <p className="text-sm text-gray-600">{classItem.time}</p>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <FaCalendarAlt className="text-xl text-gray-500" />
+                    <p className="text-sm text-gray-600">{classItem.day}</p>
+                  </div>
                 </div>
               </CardContent>
             </Card>
-          ) : (
-            classes.map((classItem) => (
-              <Card
-                className=" w-[250px] h-[250px] rounded-xl  flex flex-col"
-                key={classItem.id}
+          ))}
+          {/* Add Class Card */}
+          <Card className="border-4 border-solid border-gray-400 w-[250px] h-[250px] rounded-xl bg-muted/80 flex flex-col justify-center items-center">
+            <CardContent className="flex flex-col items-center justify-center w-full h-full pt-10">
+              <div
+                className="rounded-full bg-primary/35 p-2 text-primary/40 w-[80px] h-[80px] mx-2 my-2 cursor-pointer hover:bg-primary/50 transition-colors duration-300"
+                onClick={onAddClass}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => e.key === "Enter" && onAddClass()}
               >
-                <CardHeader>
-                  <CardTitle>{classItem.name}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex justify-between items-center mt-12">
-                    <div className="flex items-center space-x-2">
-                      <FaClock className="text-xl text-gray-500" />
-                      <p className="text-sm text-gray-600">{classItem.time}</p>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <FaCalendarAlt className="text-xl text-gray-500" />
-                      <p className="text-sm text-gray-600">{classItem.day}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
-          )}
+                <Plus className="mx-2 my-2 w-12 h-12 object-center" />
+              </div>
+            </CardContent>
+            <CardContent className="relative flex flex-col items-center">
+              <div className="w-[130px] h-[20px] rounded-xl bg-primary/10 text-primary/60 px-7">
+                Add Class
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>
