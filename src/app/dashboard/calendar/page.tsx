@@ -1,55 +1,44 @@
+"use client";
 import { SidebarLeft } from "@/components/sidebar-left";
-import { SidebarRight } from "@/components/sidebar-right";
-import { Plus } from "lucide-react";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbList,
-  BreadcrumbPage,
-} from "@/components/ui/breadcrumb";
+import { Card } from "@/components/ui/card"
+import { useState } from "react";
+import { Calendar } from "@/components/ui/calendar"
 
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 
-import { Separator } from "@/components/ui/separator";
-import {
-  SidebarInset,
-  SidebarProvider,
-  SidebarTrigger,
-} from "@/components/ui/sidebar";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+
+// This is sample data.S
+const data = {
+  user: {
+    name: "Bob Teacher",
+    email: "bobteacher@example.com",
+    avatar: "/avatars/shadcn.jpg",
+  },
+  calendars: [
+    {
+      name: "My Calendars",
+      items: ["Personal", "Work", "Family"],
+    },
+  ],
+};
 
 export default function Page() {
+  const [date, setDate] = useState<Date | undefined>(new Date())
   return (
     <SidebarProvider>
       <SidebarLeft />
       <SidebarInset>
-        <header className="sticky top-0 flex h-14 shrink-0 items-center gap-2 bg-background">
-          <div className="flex flex-1 items-center gap-2 px-3">
-            <Separator orientation="vertical" className="mr-2 h-4" />
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem>
-                  <BreadcrumbPage className="line-clamp-1">
-                    Calendar
-                  </BreadcrumbPage>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
-          </div>
-        </header>
-        <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-gray-50">
-          <h1 className="text-4xl font-bold text-green-500">Calendar</h1>
-          <p className="mt-4 text-lg text-gray-600">Welcome to Calendar</p>
+        <div className="h-screen w-screen flex items-center justify-center bg-gray-50">
+          <Card className="p-6 shadow-lg">
+            <Calendar
+              mode="single"
+              selected={date}
+              onSelect={setDate}
+               className="w-[800px] h-[600px] rounded-md"
+            />
+          </Card>
         </div>
       </SidebarInset>
-      <SidebarRight />
     </SidebarProvider>
   );
 }
