@@ -5,17 +5,6 @@
 body {
   font-family: Roboto , Helvetica, sans-serif;
 }
-.grid-column:nth-child(1) {
-  background-color: var(--bg-color-col-1, #009245);
-}
-
-.grid-column:nth-child(2) {
-  background-color: var(--bg-color-col-2, #F57600);
-}
-
-.grid-column:nth-child(3) {
-  background-color: var(--bg-color-col-3, #E63A93);
-}
 
 @layer base {
   :root {

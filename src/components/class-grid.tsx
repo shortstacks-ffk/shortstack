@@ -19,7 +19,12 @@ interface ClassGridProps {
   onAddClass: () => void;
 }
 
+
 export function ClassGrid({ classes, onAddClass }: ClassGridProps) {
+  const getColumnIndex = (index, totalItems) => {
+    const row = Math.floor(index / 3);
+    return index - (row * 3);
+  };
   return (
     <div className="flex flex-col min-h-screen px-20 p-4 bg-gray-50">
       <div className="flex justify-between items-center max-w-4xl mx-auto w-full mb-8 mt-[15%]">
@@ -44,25 +49,25 @@ export function ClassGrid({ classes, onAddClass }: ClassGridProps) {
             <Card
               key={classItem.id}
               className={`grid-column w-[250px] h-[250px] rounded-xl  flex flex-col ${
-                index % 3 === 0
-                  ? "bg-[#f8f8f8]"
-                  : index % 3 === 1
-                  ? "bg-[#e6f7ff]"
-                  : "bg-[#e9fbe6]"
+                getColumnIndex(index, classes.length) === 0
+                  ? "bg-[#009245]"
+                  : getColumnIndex(index, classes.length) === 1
+                  ? "bg-[#F57600]"
+                  : "bg-[#E63A93]"
               }`}
             >
               <CardHeader>
-                <CardTitle>{classItem.name}</CardTitle>
+                <CardTitle className="text-white">{classItem.name}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="flex justify-between items-center mt-12">
                   <div className="flex items-center space-x-2">
-                    <FaClock className="text-xl text-gray-500" />
-                    <p className="text-sm text-gray-600">{classItem.time}</p>
+                    <FaClock className="text-xl text-white" />
+                    <p className="text-sm text-white">{classItem.time}</p>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <FaCalendarAlt className="text-xl text-gray-500" />
-                    <p className="text-sm text-gray-600">{classItem.day}</p>
+                    <FaCalendarAlt className="text-xl text-white" />
+                    <p className="text-sm text-white">{classItem.day}</p>
                   </div>
                 </div>
               </CardContent>
