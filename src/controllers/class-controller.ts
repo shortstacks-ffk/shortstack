@@ -11,8 +11,7 @@ export class ClassController {
         return this.model.getClasses();
     }
 
-    createClass(): Class {
-        const className = `Class ${this.model.getClasses().length + 1}`;
-        return this.model.addClass(className);
-    }
+    createClass(classData: Omit<Class, 'id'>): Class {
+        return this.model.addClass(classData);
+      }
 }
