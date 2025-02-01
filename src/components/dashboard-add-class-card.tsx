@@ -5,7 +5,7 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
+} from "@/src/components/ui/card"
 import { Plus } from "lucide-react"
 
 const DashboardAddClassCard = () => {
@@ -17,8 +17,8 @@ const DashboardAddClassCard = () => {
                 <Plus className="mx-2 my-2 w-12 h-12 object-center"/>
               </div>
             </CardContent>
-            <CardContent className="relative flex flex-col items-center">
-              <div className="w-[130px] h-[20px] rounded-xl bg-primary/10 text-primary/60 px-7"> Add Class</div>
+            <CardContent>
+              <div className="items-center justify-center w-full h-full w-[130px] h-[20px] rounded-xl bg-primary/10 text-primary/60 px-7"> Add Class</div>
             </CardContent>
           </Card>
    );

@@ -1,14 +1,14 @@
-import { SidebarLeft } from "@/components/sidebar-left";
-import { SidebarRight } from "@/components/sidebar-right";
+import { SidebarLeft } from "@/src/components/sidebar-left";
+import { SidebarRight } from "@/src/components/sidebar-right";
 import { Plus } from "lucide-react";
 import {
   Breadcrumb,
   BreadcrumbItem,
   BreadcrumbList,
   BreadcrumbPage,
-} from "@/components/ui/breadcrumb";
+} from "@/src/components/ui/breadcrumb";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@/src/components/ui/button";
 import {
   Card,
   CardContent,
@@ -16,14 +16,14 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
+} from "@/src/components/ui/card";
 
-import { Separator } from "@/components/ui/separator";
+import { Separator } from "@/src/components/ui/separator";
 import {
   SidebarInset,
   SidebarProvider,
   SidebarTrigger,
-} from "@/components/ui/sidebar";
+} from "@/src/components/ui/sidebar";
 
 export default function Page() {
   return (

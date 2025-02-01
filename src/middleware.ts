@@ -8,7 +8,7 @@ const isPublicRoute = createRouteMatcher([
   '/login',
 ]);
 
-// const isProtectedRoute = createRouteMatcher(['/teacher/dashboard(.*)']);
+// const isProtectedRoute = createRouteMatcher(['/dashboard(.*)']);
 
 export default clerkMiddleware(async (auth, request) => {
   if (!isPublicRoute(request)) {

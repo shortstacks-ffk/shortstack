@@ -2,7 +2,7 @@ import {
     Popover,
     PopoverContent,
     PopoverTrigger,
-  } from "@/components/ui/popover"
+  } from "@/src/components/ui/popover"
   import { Bell } from 'lucide-react'
 
 const Notification = () => {

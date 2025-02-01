@@ -31,7 +31,7 @@ export default function TeacherSignInPage() {
                   footer: "hidden",
                 },
               }}
-            //   fallbackRedirectUrl="/teacher/dashboard"
+            //   fallbackRedirectUrl="/dashboard"
             routing="hash"
             signUpUrl="/teacher"
           />
