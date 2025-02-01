@@ -1,13 +1,17 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
-// import ClerkProvider from '@clerk/nextjs';
-// Will get back to this on a different branch
+import { Inter } from "next/font/google"
+import { MainLayoutLogo } from "@/src/components/MainLayoutLogo"
+import "./globals.css"
+import { ClerkProvider } from '@clerk/nextjs';
+
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
 });
+
+const inter = Inter({ subsets: ["latin"] })
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
@@ -25,14 +29,22 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    // <ClerkProvider>
-      <html lang="en">
-        <body
-          className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-        >
-          {children}
-        </body>
-      </html>
-    // </ClerkProvider>
+    <ClerkProvider>
+    <html lang="en">
+      <body className={`${inter.className}`}>
+        <div className="flex flex-col min-h-screen">
+          <header>
+            <div className="max-w-7xl mx-auto p-auto flex items-center justify-between">
+              <MainLayoutLogo />
+              {/* Add any additional header content here */}
+            </div>
+          </header>
+          <main className="flex-grow max-w-7xl mx-auto px-4 py-2">
+            {children}
+          </main>
+        </div>
+      </body>
+    </html>
+    </ClerkProvider>
   );
 }
