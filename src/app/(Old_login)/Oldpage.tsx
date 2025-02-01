@@ -3,7 +3,7 @@ import Image from "next/image";
 import login_mascout from "../../../public/assets/img/Login Mascout 2ldpi.png";
 import main_logo from "../../../public/assets/img/Main Primary Logo - Colorfu Black Greenldpi.png";
 
-import { LoginForm } from "@/components/login-form";
+import { LoginForm } from "@/src/components/login-form";
 
 export default function LoginPage() {
   return (

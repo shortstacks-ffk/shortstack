@@ -15,9 +15,9 @@ import {
   ChevronLeft
 } from "lucide-react"
 
-import { NavMain } from "@/components/nav-main"
-import { NavLogo } from "@/components/nav-logo"
-import { NavSecondary } from "@/components/nav-secondary"
+import { NavMain } from "@/src/components/nav-main"
+import { NavLogo } from "@/src/components/nav-logo"
+import { NavSecondary } from "@/src/components/nav-secondary"
 import {
   Sidebar,
   SidebarContent,
@@ -25,7 +25,7 @@ import {
   SidebarHeader,
   SidebarRail,
   SidebarTrigger,
-} from "@/components/ui/sidebar"
+} from "@/src/components/ui/sidebar"
 
 import mascot from '../../public/assets/img/Mascout 9ldpi.png'
 import simple_logo from '../../public/assets/img/logo simple - greenldpi.png'
