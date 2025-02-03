@@ -8,11 +8,16 @@ import { Label } from "@/src/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/src/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle } from "@/src/components/ui/card"
 import { Popover, PopoverContent, PopoverTrigger } from "@/src/components/ui/popover"
-import addClass from "@/src/src/app/actions/addClass"
+import addClass from "@/src/app/actions/addClass"
 import { toast } from "react-toastify"
 import { useRef } from 'react';
+import { on } from "events"
 
-const AddClass = () => {
+type AddClassProps = {
+    onSuccess?: () => void;
+  };
+
+const AddClass = ({ onSuccess }: AddClassProps) => {
   const formRef = useRef<HTMLFormElement>(null);
   const [selectedEmoji, setSelectedEmoji] = useState("📚")
 
@@ -24,6 +29,7 @@ const AddClass = () => {
     } else {
         toast.success("Class added successfully");
         formRef.current?.reset();
+        onSuccess?.();
     }
 
   }
@@ -33,7 +39,7 @@ const AddClass = () => {
   }
 
   return (
-    <Card className="w-full max-w-2xl mx-auto">
+    <Card className="w-full h-full max-w-2xl mx-auto">
       <CardHeader>
         <CardTitle>Add Class</CardTitle>
       </CardHeader>
