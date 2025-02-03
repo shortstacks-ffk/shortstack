@@ -32,17 +32,16 @@ export default function RootLayout({
     <ClerkProvider>
     <html lang="en">
       <body className={`${inter.className}`}>
-        <div className="flex flex-col min-h-screen">
-          <header>
-            <div className="max-w-7xl mx-auto p-auto flex items-center justify-between">
+          
+          <header className="absolute top-0 left-0 w-1/2 h-20 flex items-center pr-6 pt-2">
+            <div className="max-w-7xl w-full p-4 flex items-center justify-start">
               <MainLayoutLogo />
               {/* Add any additional header content here */}
             </div>
           </header>
-          <main className="flex-grow max-w-7xl mx-auto px-4 py-2">
+          <main>
             {children}
           </main>
-        </div>
       </body>
     </html>
     </ClerkProvider>

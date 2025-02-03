@@ -1,5 +1,3 @@
-import { SidebarLeft } from "@/src/components/sidebar-left";
-import { SidebarRight } from "@/src/components/sidebar-right";
 import { Plus } from "lucide-react";
 import {
   Breadcrumb,
@@ -28,7 +26,6 @@ import {
 export default function Page() {
   return (
     <SidebarProvider>
-      <SidebarLeft />
       <SidebarInset>
         <header className="sticky top-0 flex h-14 shrink-0 items-center gap-2 bg-background">
           <div className="flex flex-1 items-center gap-2 px-3">
@@ -49,7 +46,6 @@ export default function Page() {
           <p className="mt-4 text-lg text-gray-600">Welcome to Calendar</p>
         </div>
       </SidebarInset>
-      <SidebarRight />
     </SidebarProvider>
   );
 }
