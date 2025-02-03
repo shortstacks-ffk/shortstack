@@ -1,14 +1,15 @@
-import { SignUp } from "@clerk/nextjs"
-import Image from "next/image"
-import Link from "next/link"
-import login_mascout from "@/public/assets/img/Mascout 2ldpi.png"
+import { SignUp } from "@clerk/nextjs";
+import Image from "next/image";
+import Link from "next/link";
+import login_mascout from "@/public/assets/img/Mascout 2ldpi.png";
 
 export default function TeacherSignUpPage() {
   return (
-    <div className="flex min-h-[calc(100vh-88px)]">
+    <div className="flex min-h-[calc(120vh-100px)] overflow-y-auto">
       {/* Left side - Sign Up Form */}
-      <div className="flex-1 flex flex-col items-start justify-center max-w-xl px-8 py-12 mx-auto">
-        <h1 className="text-[40px] font-bold mb-4">Create Account</h1>
+
+      <div className="flex-1 flex flex-col items-start justify-center max-w-xl px-8 py-12 mx-auto mt-6">
+       <h1 className="text-[40px] font-bold mb-4">Create Account</h1>
 
         <p className="text-gray-600 mb-8">
           Do you have an account?{" "}
@@ -42,7 +43,7 @@ export default function TeacherSignUpPage() {
           className="mt-6 text-center w-full py-4 px-6 border-2 border-[#99D420] text-[#99D420] font-semibold rounded-full hover:bg-gray-50 transition-colors"
         >
           Go Back
-        </Link>
+        </Link> 
       </div>
 
       {/* Right side - Mascot and Text */}
@@ -55,14 +56,16 @@ export default function TeacherSignUpPage() {
             height={300}
             className="mx-auto mb-12"
           />
-          <h2 className="text-4xl font-bold mb-6">Introducing a new learning experience</h2>
+          <h2 className="text-4xl font-bold mb-6">
+            Introducing a new learning experience
+          </h2>
           <p className="text-xl">
-            Empower your kids to save smart, spend wisely, and grow their money skills with our fun, interactive app.
-            Let's build strong financial habits together!
+            Empower your kids to save smart, spend wisely, and grow their money
+            skills with our fun, interactive app. Let's build strong financial
+            habits together!
           </p>
         </div>
-        <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-[#89C410] to-transparent" />
       </div>
     </div>
-  )
+  );
 }
