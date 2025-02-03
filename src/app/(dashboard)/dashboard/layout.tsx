@@ -1,4 +1,4 @@
-"use client"
+// "use client"
 import { SidebarLeft } from "@/src/components/sidebar-left"
 // import { SidebarRight } from "@/src/components/sidebar-right"
 import { SidebarProvider, SidebarInset } from "@/src/components/ui/sidebar"
