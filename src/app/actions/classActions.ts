@@ -1,63 +1,155 @@
-// Will get back to this to complete CRUD here
-
-
 'use server';
 
 import { db } from "@/src/lib/db";
 import { revalidatePath } from "next/cache";
-import { auth } from "@clerk/nextjs/server"
+import { auth } from "@clerk/nextjs/server";
+import { checkUser } from "@/src/lib/checkUser";
 
-export const getClasses = async () => {
-  const { userId } = await auth();
-
-  if (!userId) return []
-
-  try {
-    return await db.class.findMany({
-      where: { userId },
-      orderBy: { updatedAt: 'desc' },
-      take: 3
-    })
-  } catch (error) {
-    console.error("Error fetching classes:", error)
-    return []
-  }
+// Types
+interface ClassData {
+  name: string;
+  emoji: string;
+  cadence?: string;
+  day?: string;
+  time?: string;
+  grade?: string;
+  numberOfStudents?: number;
 }
 
-export const deleteClass = async (classId: string) => {
-  try {
-    await db.class.delete({
-      where: { id: classId }
+interface ClassResponse {
+  success: boolean;
+  data?: any;
+  error?: string;
+}
+
+// Function to generate a random 6-character alphanumeric code
+const generateUniqueClassCode = async (userId: string): Promise<string> => {
+  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  const codeLength = 6;
+
+  while (true) {
+    let code = '';
+    for (let i = 0; i < codeLength; i++) {
+      const randomIndex = Math.floor(Math.random() * characters.length);
+      code += characters[randomIndex];
+    }
+    
+    // Check uniqueness only for the current user's classes
+    const existingClass = await db.class.findFirst({
+      where: { 
+        AND: [
+          { code },
+          { userId }
+        ]
+      }
     });
-    revalidatePath('/dashboard');
-    return { success: true };
-  } catch (error) {
-    console.error("Delete error:", error);
-    return { success: false };
+
+    if (!existingClass) {
+      return code;
+    }
   }
 };
 
-export const updateClass = async (classId: string, data: {
-  name: string;
-  emoji: string;
-  cadence: string;
-  day: string;
-  time: string;
-  grade: string;
-  numberOfStudents: number;
-}) => {
+// Create class
+export async function createClass(formData: FormData): Promise<ClassResponse> {
   try {
-    await db.class.update({
-      where: { id: classId },
+    // First ensure user exists in our database
+    const dbUser = await auth();
+    if (!dbUser) {
+      return { success: false, error: "User not found" };
+    }
+
+    const code = await generateUniqueClassCode(dbUser.id);
+    
+    const data = {
+      name: formData.get('name') as string,
+      emoji: formData.get('emoji') as string,
+      cadence: formData.get('cadence') as string,
+      day: formData.get('day') as string,
+      time: formData.get('time') as string,
+      grade: formData.get('grade') as string,
+      numberOfStudents: Number(formData.get('numberOfStudents')),
+      code,
+      userId: dbUser.userId // Use the database user ID
+    };
+
+    // Verify all required fields are present
+    if (!data.name || !data.emoji) {
+      return { success: false, error: "Missing required fields" };
+    }
+
+    const newClass = await db.class.create({
+      data
+    });
+
+    revalidatePath('/dashboard');
+    return { success: true, data: newClass };
+  } catch (error) {
+    console.error("Create class error:", error);
+    return { success: false, error: "Failed to create class" };
+  }
+}
+
+// Get classes
+export async function getClasses(): Promise<ClassResponse> {
+  try {
+    const { userId } = await auth();
+    if (!userId) {
+      return { success: false, error: "Unauthorized" };
+    }
+
+    const classes = await db.class.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    return { success: true, data: classes };
+  } catch (error: any) {
+    console.error("Get classes error:", error?.message || 'Unknown error');
+    return { success: false, error: "Failed to fetch classes" };
+  }
+}
+
+// Update class
+export async function updateClass(id: string, data: ClassData): Promise<ClassResponse> {
+  try {
+    const { userId } = await auth();
+    if (!userId) {
+      return { success: false, error: "Unauthorized" };
+    }
+
+    const updatedClass = await db.class.update({
+      where: { id, userId },
       data: {
         ...data,
         numberOfStudents: Number(data.numberOfStudents)
       }
     });
+
+    revalidatePath('/dashboard');
+    return { success: true, data: updatedClass };
+  } catch (error: any) {
+    console.error("Update class error:", error?.message || 'Unknown error');
+    return { success: false, error: "Failed to update class" };
+  }
+}
+
+// Delete class
+export async function deleteClass(id: string): Promise<ClassResponse> {
+  try {
+    const { userId } = await auth();
+    if (!userId) {
+      return { success: false, error: "Unauthorized" };
+    }
+
+    await db.class.delete({
+      where: { id, userId }
+    });
+
     revalidatePath('/dashboard');
     return { success: true };
-  } catch (error) {
-    console.error("Update error:", error);
-    return { success: false };
+  } catch (error: any) {
+    console.error("Delete class error:", error?.message || 'Unknown error');
+    return { success: false, error: "Failed to delete class" };
   }
-};
+}

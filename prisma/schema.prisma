@@ -22,23 +22,39 @@ model User {
 
 // class
 
+
 model Class {
-  id String @id @default(uuid())
-  name String @unique
-  code Int @unique
-  numberOfStudents Int
-  cadence String
-  day String
-  time String
-  grade String
-  emoji String  @default("📚") 
-  // relation to teacher
+  id              String    @id @default(cuid())
+  name            String
+  emoji           String
+  code            String    @unique    // Make sure this is String
+  cadence         String?
+  day             String?
+  time            String?
+  grade           String?
+  numberOfStudents Int?     // maximum capacity
+  students        Student[] // relation to students
+   // relation to teacher
   userId String
   user User @relation(fields: [userId], references: [clerkUserId], onDelete: Cascade)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
   @@index([userId])
 }
 
-// student
-// let's get back to this later
+model Student {
+  id          String   @id @default(cuid())
+  firstName   String
+  lastName    String
+  schoolName  String
+  username    String   @unique
+  password    String   // Note: Ensure proper hashing in implementation
+  classId     String
+  class       Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([classId])
+  @@index([username])
+}

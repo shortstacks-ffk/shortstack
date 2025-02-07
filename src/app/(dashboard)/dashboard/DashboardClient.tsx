@@ -9,9 +9,14 @@ interface DashboardClientProps {
   classes: Array<{
     id: string
     name: string
-    code: number
+    code: string
     emoji: string
     colorClass: string
+    cadence?: string
+    day?: string
+    time?: string
+    grade?: string
+    numberOfStudents?: number
   }>
 }
 
@@ -35,12 +40,18 @@ const DashboardClient = ({ classes }: DashboardClientProps) => {
         <div className="flex gap-4">
           {classes.map((cls) => (
             <ClassCard
-              key={cls.id}
-              emoji={cls.emoji}
-              name={cls.name}
-              code={cls.code}
-              colorClass={cls.colorClass}
-            />
+            key={cls.id}
+            id={cls.id}
+            emoji={cls.emoji}
+            name={cls.name}
+            code={cls.code}
+            colorClass={cls.colorClass}
+            cadence={cls.cadence}
+            day={cls.day}
+            time={cls.time}
+            grade={cls.grade}
+            numberOfStudents={cls.numberOfStudents}
+          />
           ))}
           {classes.length < 3 && <DashboardAddClassCard />}
         </div>

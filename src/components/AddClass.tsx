@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef } from "react"
 import EmojiPicker, { type EmojiClickData } from "emoji-picker-react"
 import { Button } from "@/src/components/ui/button"
 import { Input } from "@/src/components/ui/input"
@@ -8,30 +8,37 @@ import { Label } from "@/src/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/src/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle } from "@/src/components/ui/card"
 import { Popover, PopoverContent, PopoverTrigger } from "@/src/components/ui/popover"
-import addClass from "@/src/app/actions/addClass"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/src/components/ui/dialog"
+import { createClass } from "@/src/app/actions/classActions"
 import { toast } from "react-toastify"
-import { useRef } from 'react';
-import { on } from "events"
 
 type AddClassProps = {
-    onSuccess?: () => void;
-  };
+  isOpen?: boolean;
+  onClose?: () => void;
+  onSuccess?: () => void;
+};
 
-const AddClass = ({ onSuccess }: AddClassProps) => {
+const AddClass = ({ isOpen, onClose, onSuccess }: AddClassProps) => {
   const formRef = useRef<HTMLFormElement>(null);
   const [selectedEmoji, setSelectedEmoji] = useState("📚")
 
   const clientAction = async (formData: FormData) => {
-    const { data, error } = await addClass(formData);
+    try {
+      const result = await createClass(formData);
 
-    if (error) {
-      toast.error(error);
-    } else {
-        toast.success("Class added successfully");
+      if (!result.success) {
+        toast.error(result.error || "Failed to create class");
+      } else {
+        toast.success(`Class created successfully! Class code: ${result.data.code}`);
         formRef.current?.reset();
+        setSelectedEmoji("📚"); // Reset emoji
         onSuccess?.();
+        onClose?.();
+      }
+    } catch (error) {
+      toast.error("Failed to create class");
+      console.error("Create class error:", error);
     }
-
   }
 
   const onEmojiClick = (emojiData: EmojiClickData) => {
@@ -39,43 +46,33 @@ const AddClass = ({ onSuccess }: AddClassProps) => {
   }
 
   return (
-    <Card className="w-full h-full max-w-2xl mx-auto">
-      <CardHeader>
-        <CardTitle>Add Class</CardTitle>
-      </CardHeader>
-      <CardContent>
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Add New Class</DialogTitle>
+        </DialogHeader>
         <form ref={formRef} action={clientAction} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="code">Class Code</Label>
-              <Input id="code" name="code" placeholder="2612021" required />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="numberOfStudents">Number of Students</Label>
-              <Input id="numberOfStudents" name="numberOfStudents" type="number" placeholder="Number of students" required />
-              {/* <Select name="numberOfStudents" defaultValue="1">
-                <SelectTrigger>
-                  <SelectValue placeholder="Select number" />
-                </SelectTrigger>
-                <SelectContent>
-                  {[...Array(30)].map((_, i) => (
-                    <SelectItem key={i + 1} value={(i + 1).toString()}>
-                      {i + 1}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select> */}
-            </div>
-
             <div className="space-y-2">
               <Label htmlFor="name">Class Name</Label>
               <Input id="name" name="name" placeholder="Class Name" required />
             </div>
 
             <div className="space-y-2">
+              <Label htmlFor="numberOfStudents">Maximum Number of Students</Label>
+              <Input 
+                id="numberOfStudents" 
+                name="numberOfStudents" 
+                type="number" 
+                min="1"
+                placeholder="Maximum capacity" 
+                required 
+              />
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="cadence">Cadence</Label>
-              <Select name="cadence" defaultValue="Daily">
+              <Select name="cadence" defaultValue="Weekly">
                 <SelectTrigger>
                   <SelectValue placeholder="Select cadence" />
                 </SelectTrigger>
@@ -83,19 +80,20 @@ const AddClass = ({ onSuccess }: AddClassProps) => {
                   <SelectItem value="Daily">Daily</SelectItem>
                   <SelectItem value="Weekly">Weekly</SelectItem>
                   <SelectItem value="Biweekly">Biweekly</SelectItem>
+                  <SelectItem value="Monthly">Monthly</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="day">Day</Label>
-              <Select name="day" defaultValue="Thursday">
+              <Select name="day" defaultValue="Monday">
                 <SelectTrigger>
                   <SelectValue placeholder="Select day" />
                 </SelectTrigger>
                 <SelectContent>
-                  {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"].map((day) => (
-                    <SelectItem key={day} value={day}>
+                  {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map((day) => (
+                    <SelectItem key={day} value={day.toLowerCase()}>
                       {day}
                     </SelectItem>
                   ))}
@@ -105,19 +103,25 @@ const AddClass = ({ onSuccess }: AddClassProps) => {
 
             <div className="space-y-2">
               <Label htmlFor="time">Time</Label>
-              <Input id="time" name="time" type="time" defaultValue="09:00" required />
+              <Input 
+                id="time" 
+                name="time" 
+                type="time" 
+                defaultValue="09:00" 
+                required 
+              />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="grade">Grade</Label>
-              <Select name="grade" defaultValue="10th Grade">
+              <Select name="grade" defaultValue="9th">
                 <SelectTrigger>
                   <SelectValue placeholder="Select grade" />
                 </SelectTrigger>
                 <SelectContent>
-                  {["9th Grade", "10th Grade", "11th Grade", "12th Grade"].map((grade) => (
+                  {["9th", "10th", "11th", "12th"].map((grade) => (
                     <SelectItem key={grade} value={grade}>
-                      {grade}
+                      {grade} Grade
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -134,23 +138,31 @@ const AddClass = ({ onSuccess }: AddClassProps) => {
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-80 p-0">
-                  <EmojiPicker onEmojiClick={onEmojiClick} autoFocusSearch={false} />
+                  <EmojiPicker 
+                    onEmojiClick={onEmojiClick} 
+                    autoFocusSearch={false} 
+                  />
                 </PopoverContent>
               </Popover>
             </div>
           </div>
 
           <div className="flex justify-end space-x-4 mt-6">
-            <Button variant="outline" type="button">
-              Skip
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={onClose}
+            >
+              Cancel
             </Button>
-            <Button type="submit">Save & Continue</Button>
+            <Button type="submit">
+              Create Class
+            </Button>
           </div>
         </form>
-      </CardContent>
-    </Card>
+      </DialogContent>
+    </Dialog>
   )
 }
 
 export default AddClass
-

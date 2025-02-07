@@ -1,11 +1,16 @@
-
 import { getClasses } from "@/src/app/actions/classActions"
-import DashboardClient from "./DashboardClient"
 import { getRandomColorClass } from "@/src/lib/colorUtils"
+import DashboardClient from "./DashboardClient"
 
 export default async function DashboardPage() {
-  const classes = await getClasses()
-  const classesWithColors = classes.map(cls => ({
+  const response = await getClasses()
+  
+  if (!response.success || !response.data) {
+    // Handle error case - you might want to show an error message
+    return <div>Failed to load classes</div>
+  }
+
+  const classesWithColors = response.data.map((cls: { id: string }) => ({
     ...cls,
     colorClass: getRandomColorClass(cls.id)
   }))
