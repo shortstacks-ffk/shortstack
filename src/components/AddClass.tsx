@@ -1,6 +1,8 @@
 "use client"
 
+
 import { useState, useRef } from "react"
+
 import EmojiPicker, { type EmojiClickData } from "emoji-picker-react"
 import { Button } from "@/src/components/ui/button"
 import { Input } from "@/src/components/ui/input"
@@ -8,6 +10,7 @@ import { Label } from "@/src/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/src/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle } from "@/src/components/ui/card"
 import { Popover, PopoverContent, PopoverTrigger } from "@/src/components/ui/popover"
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/src/components/ui/dialog"
 import { createClass } from "@/src/app/actions/classActions"
 import { toast } from "react-toastify"
@@ -19,10 +22,12 @@ type AddClassProps = {
 };
 
 const AddClass = ({ isOpen, onClose, onSuccess }: AddClassProps) => {
+
   const formRef = useRef<HTMLFormElement>(null);
   const [selectedEmoji, setSelectedEmoji] = useState("📚")
 
   const clientAction = async (formData: FormData) => {
+
     try {
       const result = await createClass(formData);
 
@@ -73,6 +78,7 @@ const AddClass = ({ isOpen, onClose, onSuccess }: AddClassProps) => {
             <div className="space-y-2">
               <Label htmlFor="cadence">Cadence</Label>
               <Select name="cadence" defaultValue="Weekly">
+
                 <SelectTrigger>
                   <SelectValue placeholder="Select cadence" />
                 </SelectTrigger>
@@ -88,10 +94,12 @@ const AddClass = ({ isOpen, onClose, onSuccess }: AddClassProps) => {
             <div className="space-y-2">
               <Label htmlFor="day">Day</Label>
               <Select name="day" defaultValue="Monday">
+
                 <SelectTrigger>
                   <SelectValue placeholder="Select day" />
                 </SelectTrigger>
                 <SelectContent>
+
                   {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map((day) => (
                     <SelectItem key={day} value={day.toLowerCase()}>
                       {day}
