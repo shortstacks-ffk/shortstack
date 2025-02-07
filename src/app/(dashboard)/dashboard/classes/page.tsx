@@ -2,9 +2,11 @@
 
 import { useState, useRef } from "react";
 import { ClassController } from "@/src/controllers/class-controller";
-import { Class } from "@/src/models/class-model";
+import { Class } from "@/models/class-model";
 import { ClassFormModal } from "@/src/components/class-form-modal";
 import { ClassGrid } from "@/src/components/class-grid";
+import { SidebarLeft } from "@/src/components/sidebar-left";
+import { SidebarRight } from "@/src/components/sidebar-right";
 
 import { SidebarInset, SidebarProvider } from "@/src/components/ui/sidebar";
 
@@ -21,6 +23,7 @@ export default function Page() {
 
   return (
     <SidebarProvider>
+      <SidebarLeft />
       <SidebarInset>
       <ClassGrid 
           classes={classes} 

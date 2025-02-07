@@ -1,19 +1,14 @@
-'use client'
-import Image from "next/image";
-import Link from "next/link";
-import login_mascout from "@/public/assets/img/Mascout 2ldpi.png";
-
-
-import * as Clerk from '@clerk/elements/common'
-import * as SignUp from '@clerk/elements/sign-up'
+import { SignUp } from "@clerk/nextjs"
+import Image from "next/image"
+import Link from "next/link"
+import login_mascout from "@/public/assets/img/Mascout 2ldpi.png"
 
 export default function TeacherSignUpPage() {
   return (
-    <div className="flex min-h-[calc(120vh-100px)] overflow-y-auto">
+    <div className="flex min-h-[calc(100vh-88px)]">
       {/* Left side - Sign Up Form */}
-
-      <div className="flex-1 flex flex-col items-start justify-center max-w-xl px-8 py-12 mx-auto mt-6">
-       <h1 className="text-[40px] font-bold mb-4">Create Account</h1>
+      <div className="flex-1 flex flex-col items-start justify-center max-w-xl px-8 py-12 mx-auto">
+        <h1 className="text-[40px] font-bold mb-4">Create Account</h1>
 
         <p className="text-gray-600 mb-8">
           Do you have an account?{" "}
@@ -22,50 +17,7 @@ export default function TeacherSignUpPage() {
           </Link>
         </p>
 
-         <SignUp.Root>
-                  <SignUp.Step name="start" className="w-full">
-                    <div className="space-y-4">
-                    <Clerk.Field name="identifier" className="space-y-2">
-                      <Clerk.Label className="text-sm font-medium text-zinc-950">Email</Clerk.Label>
-                      <Clerk.Input
-                        type="text"
-                        required
-                        className="w-full rounded-md bg-white px-3.5 py-2 text-sm outline-none ring-1 ring-inset ring-zinc-300 hover:ring-zinc-400 focus:ring-[1.5px] focus:ring-zinc-950 data-[invalid]:ring-red-400"
-                      />
-                      <Clerk.FieldError className="block text-sm text-red-400" />
-                    </Clerk.Field>
-                    <Clerk.Field name="password" className="space-y-2">
-                      <Clerk.Label className="text-sm  font-medium text-zinc-950">Password</Clerk.Label>
-                      <Clerk.Input
-                        type="password"
-                        required
-                        className="w-full rounded-md bg-white px-3.5 py-2 text-sm outline-none ring-1 ring-inset ring-zinc-300 hover:ring-zinc-400 focus:ring-[1.5px] focus:ring-zinc-950 data-[invalid]:ring-red-400"
-                      />
-                      <Clerk.FieldError className="block text-sm text-red-400" />
-                    </Clerk.Field>
-
-                    <Clerk.Field name="password" className="space-y-2">
-                      <Clerk.Label className="text-sm  font-medium text-zinc-950">Password verification</Clerk.Label>
-                      <Clerk.Input
-                        type="password"
-                        required
-                        className="w-full rounded-md bg-white px-3.5 py-2 text-sm outline-none ring-1 ring-inset ring-zinc-300 hover:ring-zinc-400 focus:ring-[1.5px] focus:ring-zinc-950 data-[invalid]:ring-red-400"
-                      />
-                      <Clerk.FieldError className="block text-sm text-red-400" />
-                    </Clerk.Field>
-        
-                  <SignUp.Action
-                    submit
-                    className="w-full rounded-xl bg-[#93D404] hover:bg-[#86BF09] px-4 py-3 text-center text-sm font-medium text-white shadow outline-none focus-visible:outline-[1.5px] active:text-white/70"
-                  >
-                    Continue
-                  </SignUp.Action>
-        
-                  </div>
-                  </SignUp.Step>
-                </SignUp.Root> 
-
-        {/* <div className="w-full">
+        <div className="w-full">
           <SignUp
             appearance={{
               elements: {
@@ -83,14 +35,14 @@ export default function TeacherSignUpPage() {
             routing="hash"
             signInUrl="/teacher/sign-in"
           />
-        </div> */}
+        </div>
 
         <Link
           href="/"
           className="mt-6 text-center w-full py-4 px-6 border-2 border-[#99D420] text-[#99D420] font-semibold rounded-full hover:bg-gray-50 transition-colors"
         >
           Go Back
-        </Link> 
+        </Link>
       </div>
 
       {/* Right side - Mascot and Text */}
@@ -103,16 +55,14 @@ export default function TeacherSignUpPage() {
             height={300}
             className="mx-auto mb-12"
           />
-          <h2 className="text-4xl font-bold mb-6">
-            Introducing a new learning experience
-          </h2>
+          <h2 className="text-4xl font-bold mb-6">Introducing a new learning experience</h2>
           <p className="text-xl">
-            Empower your kids to save smart, spend wisely, and grow their money
-            skills with our fun, interactive app. Let's build strong financial
-            habits together!
+            Empower your kids to save smart, spend wisely, and grow their money skills with our fun, interactive app.
+            Let's build strong financial habits together!
           </p>
         </div>
+        <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-[#89C410] to-transparent" />
       </div>
     </div>
-  );
+  )
 }
