@@ -23,17 +23,3 @@ export const ClassCard = ({ emoji, name, code, colorClass }: ClassCardProps) => 
     </Card>
   )
 }
-
-// 'use client'
-
-// import { Card } from "@/src/components/ui/card"
-
-// export const ClassCard = () => {
-//   return (
-//     <Card className="w-[250px] h-[250px] rounded-xl flex flex-col justify-center items-center">
-//       <div className="text-4xl mb-4"> Emoji</div>
-//       <h3 className="text-xl font-semibold"> Class name</h3>
-//       <p className="text-muted-foreground"> Class Code</p>
-//     </Card>
-//   )
-// }

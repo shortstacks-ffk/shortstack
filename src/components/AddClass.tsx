@@ -53,7 +53,8 @@ const AddClass = ({ onSuccess }: AddClassProps) => {
 
             <div className="space-y-2">
               <Label htmlFor="numberOfStudents">Number of Students</Label>
-              <Select name="numberOfStudents" defaultValue="1">
+              <Input id="numberOfStudents" name="numberOfStudents" type="number" placeholder="Number of students" required />
+              {/* <Select name="numberOfStudents" defaultValue="1">
                 <SelectTrigger>
                   <SelectValue placeholder="Select number" />
                 </SelectTrigger>
@@ -64,7 +65,7 @@ const AddClass = ({ onSuccess }: AddClassProps) => {
                     </SelectItem>
                   ))}
                 </SelectContent>
-              </Select>
+              </Select> */}
             </div>
 
             <div className="space-y-2">
