@@ -10,11 +10,11 @@ export const getRandomColorClass = (seed: string) => {
     'bg-teal-100'
   ];
   
-  // Add console.log to debug
-  // console.log('Seed:', seed);
+  // Use the class code, get the ASCII value of each character and sum them up
+  // Then use the modulo operator to get the index of the color
+  // Then return the color
   const hash = seed.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
   const selectedColor = colors[hash % colors.length];
-  // console.log('Selected color:', selectedColor);
-  
+
   return selectedColor;
 }
