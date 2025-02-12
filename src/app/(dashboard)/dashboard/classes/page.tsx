@@ -1,40 +1,30 @@
-"use client";
+import { getClasses } from "@/src/app/actions/classActions";
+import { getRandomColorClass } from "@/src/lib/colorUtils";
+import DashboardAddClassCard from "@/src/components/dashboard-add-class-card";
+import { ClassCard } from "@/src/components/ClassCard";
 
-import { useState, useRef } from "react";
-import { ClassController } from "@/src/controllers/class-controller";
-import { Class } from "@/models/class-model";
-import { ClassFormModal } from "@/src/components/class-form-modal";
-import { ClassGrid } from "@/src/components/class-grid";
-import { SidebarLeft } from "@/src/components/sidebar-left";
-import { SidebarRight } from "@/src/components/sidebar-right";
+export default async function ClassesPage() {
+  const response = await getClasses();
 
-import { SidebarInset, SidebarProvider } from "@/src/components/ui/sidebar";
+  if (!response.success || !response.data) {
+    return <div>Failed to load classes</div>;
+  }
 
-export default function Page() {
-  const controllerRef = useRef<ClassController>(new ClassController());
-  const [classes, setClasses] = useState<Class[]>([]);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-
-  const handleAddClass = (formData: Omit<Class, "id">) => {
-    const controller = controllerRef.current;
-    const newClass = controller.createClass(formData);
-    setClasses((prevClasses) => [...prevClasses, newClass]);
-  };
+  // Assign each class a unique color based on its id.
+  const classesWithColors = response.data.map((cls) => ({
+    ...cls,
+    colorClass: getRandomColorClass(cls.id)
+  }));
 
   return (
-    <SidebarProvider>
-      <SidebarLeft />
-      <SidebarInset>
-      <ClassGrid 
-          classes={classes} 
-          onAddClass={() => setIsModalOpen(true)} 
-        />
-        <ClassFormModal
-          isOpen={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
-          onSubmit={handleAddClass}
-        />
-      </SidebarInset>
-    </SidebarProvider>
+    <main className="container mx-auto p-4">
+      <h1 className="text-3xl font-bold mb-4">My Classes</h1>
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+        {classesWithColors.map((cls) => (
+          <ClassCard  key={cls.id} {...cls} />
+        ))}
+        <DashboardAddClassCard  />
+      </div>
+    </main>
   );
 }

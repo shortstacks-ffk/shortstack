@@ -37,7 +37,7 @@ const DashboardClient = ({ classes }: DashboardClientProps) => {
       </header>
       <main className="flex flex-col p-4">
         <h1 className="text-2xl font-semibold my-4 py-4">Most Recent</h1>
-        <div className="flex gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
           {classes.map((cls) => (
             <ClassCard
             key={cls.id}

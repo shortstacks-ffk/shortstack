@@ -111,15 +111,21 @@ export function EditClassForm({ isOpen, onClose, classData }: EditClassFormProps
             />
           </div>
 
-          <div className="grid gap-2">
-            <label htmlFor="grade">Grade</label>
-            <Input
-              id="grade"
-              placeholder="Grade"
-              value={formData.grade}
-              onChange={(e) => setFormData({ ...formData, grade: e.target.value })}
-            />
-          </div>
+          <div className="space-y-2">
+              <label htmlFor="grade">Grade</label>
+              <Select name="grade" defaultValue="9th">
+                <SelectTrigger>
+                  <SelectValue placeholder="Select grade" />
+                </SelectTrigger>
+                <SelectContent>
+                  {["9th", "10th", "11th", "12th"].map((grade) => (
+                    <SelectItem key={grade} value={grade}>
+                      {grade} Grade
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
           <div className="grid gap-2">
             <label htmlFor="students">Number of Students</label>
