@@ -1,4 +1,6 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
+import { checkUser } from '@/src/lib/checkUser';
+
 
 const isPublicRoute = createRouteMatcher([
   '/teacher(.*)', // Exclude the /teacher catch-all route from protection
@@ -13,6 +15,9 @@ const isPublicRoute = createRouteMatcher([
 export default clerkMiddleware(async (auth, request) => {
   if (!isPublicRoute(request)) {
     await auth.protect();
+    if (auth.userId) {
+      await checkUser();
+    }
   }
 
 });

@@ -130,12 +130,15 @@ export function EditClassForm({ isOpen, onClose, classData }: EditClassFormProps
           <div className="grid gap-2">
             <label htmlFor="students">Number of Students</label>
             <Input
-              id="students"
-              type="number"
-              placeholder="Number of Students"
-              value={formData.numberOfStudents}
-              onChange={(e) => setFormData({ ...formData, numberOfStudents: parseInt(e.target.value) })}
-            />
+  id="students"
+  type="number"
+  placeholder="Number of Students"
+  value={formData.numberOfStudents || ''}  // Add empty string fallback
+  onChange={(e) => setFormData({ 
+    ...formData, 
+    numberOfStudents: e.target.value ? parseInt(e.target.value) : 0 
+  })}
+/>
           </div>
         </div>
         <div className="flex justify-end gap-4">

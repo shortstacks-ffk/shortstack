@@ -1,8 +1,15 @@
 import { getClasses } from "@/src/app/actions/classActions"
 import { getRandomColorClass } from "@/src/lib/colorUtils"
 import DashboardClient from "./DashboardClient"
+import { checkUser } from "@/src/lib/checkUser";
+import { redirect } from "next/navigation";
 
 export default async function DashboardPage() {
+  const user = await checkUser();
+  
+  if (!user) {
+    redirect('/teacher/login');
+  }
   const response = await getClasses()
   
   if (!response.success || !response.data) {
