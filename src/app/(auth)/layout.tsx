@@ -29,8 +29,8 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-  // Ensure user is in database when app loads
-  await checkUser();
+  // // Ensure user is in database when app loads
+  // await checkUser();
 
 
 
@@ -44,7 +44,7 @@ export default async function RootLayout({
               {/* Add any additional header content here */}
             </div>
           </header>
-          <main className="flex-grow max-w-7xl mx-auto px-4 py-2">
+          <main className={`${geistMono.variable}flex-grow max-w-7xl mx-auto px-4 py-2`}>
             {children}
           </main>
         </div>
