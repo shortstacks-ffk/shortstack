@@ -1,0 +1,14 @@
+ ⨯ TypeError: The "payload" argument must be of type object. Received null
+    at error (src/app/actions/studentActions.ts:141:12)
+  139 |     return { success: true, data: student };
+  140 |   } catch (error) {
+> 141 |     console.error("Create student error:", error);
+      |            ^
+  142 |     return { success: false, error: "Failed to create student" };
+  143 |   }
+  144 | } {
+  code: 'ERR_INVALID_ARG_TYPE',
+  digest: '3720443950'
+}
+
+I think the issue is to check if the user is logged in.

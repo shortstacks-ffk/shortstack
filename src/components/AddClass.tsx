@@ -8,7 +8,6 @@ import { Button } from "@/src/components/ui/button"
 import { Input } from "@/src/components/ui/input"
 import { Label } from "@/src/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/src/components/ui/select"
-import { Card, CardContent, CardHeader, CardTitle } from "@/src/components/ui/card"
 import { Popover, PopoverContent, PopoverTrigger } from "@/src/components/ui/popover"
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/src/components/ui/dialog"

@@ -2,8 +2,12 @@ import { getClasses } from "@/src/app/actions/classActions";
 import { getRandomColorClass } from "@/src/lib/colorUtils";
 import DashboardAddClassCard from "@/src/components/dashboard-add-class-card";
 import { ClassCard } from "@/src/components/ClassCard";
+// import { useRouter } from "next/router";
+
+
 
 export default async function ClassesPage() {
+
   const response = await getClasses();
 
   if (!response.success || !response.data) {
@@ -21,7 +25,7 @@ export default async function ClassesPage() {
       <h1 className="text-3xl font-bold mb-4">My Classes</h1>
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
         {classesWithColors.map((cls) => (
-          <ClassCard  key={cls.id} {...cls} />
+          <ClassCard key={cls.id} {...cls} />
         ))}
         <DashboardAddClassCard  />
       </div>

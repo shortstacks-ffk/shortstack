@@ -17,7 +17,7 @@ import {
 
 import { NavMain } from "@/src/components/nav-main"
 import { NavLogo } from "@/src/components/nav-logo"
-import { NavSecondary } from "@/src/components/nav-secondary"
+
 import {
   Sidebar,
   SidebarContent,
@@ -81,18 +81,6 @@ const data = {
     },
     
   ],
-  navSecondary: [
-    {
-      title: "Settings",
-      url: "#",
-      icon: Settings,
-    },
-    {
-      title: "Log Out",
-      url: "#",
-      icon: LogOut,
-    }
-  ],
 }
 
 export function SidebarLeft({
@@ -105,9 +93,6 @@ export function SidebarLeft({
       </SidebarHeader>
       <SidebarContent className="pl-4 pt-10 mb-4">
         <NavMain items={data.navMain} />
-      </SidebarContent>
-      <SidebarContent className="pl-4 mb-4">
-        <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
       <SidebarTrigger />

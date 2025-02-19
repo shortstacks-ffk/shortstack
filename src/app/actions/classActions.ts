@@ -3,7 +3,6 @@
 import { db } from "@/src/lib/db";
 import { revalidatePath } from "next/cache";
 import { auth } from "@clerk/nextjs/server";
-import { checkUser } from "@/src/lib/checkUser";
 
 // Types
 interface ClassData {
@@ -82,12 +81,14 @@ export async function createClass(formData: FormData): Promise<ClassResponse> {
       data
     });
 
-    revalidatePath('/dashboard');
-    return { success: true, data: newClass };
-  } catch (error) {
-    console.error("Create class error:", error);
-    return { success: false, error: "Failed to create class" };
-  }
+  // Update revalidation path
+  revalidatePath('/dashboard/classes', 'page');
+  revalidatePath('/dashboard', 'page');
+  return { success: true, data: newClass };
+} catch (error) {
+  console.error("Create class error:", error);
+  return { success: false, error: "Failed to create class" };
+}
 }
 
 // Get classes
@@ -110,6 +111,27 @@ export async function getClasses(): Promise<ClassResponse> {
   }
 }
 
+// Get Class By ID
+export const getClassByID = async (id: string) => {
+
+  try {
+
+    const { userId } = await auth();
+    if (!userId) {
+      return { success: false, error: "Unauthorized" };
+    }
+
+    const classData = await db.class.findUnique({
+      where: { id }
+    });
+    return classData;
+  } catch (err) {
+    console.error(err);
+    return null;
+  }
+
+}
+
 // Update class
 export async function updateClass(id: string, data: ClassData): Promise<ClassResponse> {
   try {
@@ -126,7 +148,8 @@ export async function updateClass(id: string, data: ClassData): Promise<ClassRes
       }
     });
 
-    revalidatePath('/dashboard');
+    revalidatePath('/dashboard/classes', 'page');
+    revalidatePath('/dashboard', 'page');
     return { success: true, data: updatedClass };
   } catch (error: any) {
     console.error("Update class error:", error?.message || 'Unknown error');
@@ -146,10 +169,41 @@ export async function deleteClass(id: string): Promise<ClassResponse> {
       where: { id, userId }
     });
 
-    revalidatePath('/dashboard');
+    revalidatePath('/dashboard/classes');
     return { success: true };
   } catch (error: any) {
     console.error("Delete class error:", error?.message || 'Unknown error');
     return { success: false, error: "Failed to delete class" };
+  }
+}
+
+
+// This function fetches class data by class code which helps the user go into the class specific page
+
+export async function getClassData(classId: string) {
+  try {
+    const { userId } = await auth();
+    if (!userId) return null;
+
+    const classData = await db.class.findUnique({
+      where: { code: classId },
+      include: {
+        students: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            username: true,
+            schoolName: true,
+            progress: true
+          }
+        }
+      }
+    });
+
+    return classData;
+  } catch (error) {
+    console.error('Error fetching class data:', error);
+    return null;
   }
 }
