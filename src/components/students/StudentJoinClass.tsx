@@ -6,9 +6,9 @@ import {
 } from "@/src/components/ui/card"
 import { Plus } from "lucide-react"
 import { useState } from "react"
-import AddClass from "@/src/components/AddClass"
+import { StudentJoinClassDialog } from "@/src/components/students/StudentJoinClassDialog"
 
-const DashboardAddClassCard = () => {
+const StudentJoinClass = () => {
 
   const [isOpen, setIsOpen] = useState(false)
 
@@ -26,12 +26,12 @@ const DashboardAddClassCard = () => {
         </CardContent>
         <CardContent>
           <div className="items-center justify-center w-full h-full w-[130px] h-[20px] rounded-xl bg-primary/10 text-primary/60 px-7">
-            Add Class
+            Join a Class
           </div>
         </CardContent>
       </Card>
 
-      <AddClass 
+      <StudentJoinClassDialog 
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}
         onSuccess={() => setIsOpen(false)}
@@ -40,4 +40,4 @@ const DashboardAddClassCard = () => {
   );
 }
  
-export default DashboardAddClassCard;
+export default StudentJoinClass;

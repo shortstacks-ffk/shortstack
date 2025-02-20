@@ -193,8 +193,7 @@ export async function getClassData(classId: string) {
             id: true,
             firstName: true,
             lastName: true,
-            username: true,
-            schoolName: true,
+            schoolEmail: true,
             progress: true
           }
         }

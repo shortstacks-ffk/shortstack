@@ -47,8 +47,7 @@ model Student {
   id          String   @id @default(cuid())
   firstName   String
   lastName    String
-  schoolName  String?
-  username    String   @unique
+  schoolEmail String   @unique
   password    String   // Note: Ensure proper hashing in implementation
   classId     String
   progress    Int      @default(0)
@@ -57,5 +56,5 @@ model Student {
   updatedAt   DateTime @updatedAt
 
   @@index([classId])
-  @@index([username])
+  @@index([schoolEmail])
 }
