@@ -4,7 +4,7 @@ import { useState, FormEvent } from 'react';
 import { Input } from '@/src/components/ui/input';
 import { Label } from '@/src/components/ui/label';
 import { Button } from '@/src/components/ui/button';
-import { useToast } from "@/src/components/ui/use-toast";
+import { useToast } from "@/src/hooks/use-toast";
 import { joinClass } from '@/src/app/actions/studentActions';
 
 interface StudentJoinClassDialogProps {

@@ -33,6 +33,11 @@ const StudentGuestPage = () => {
       }
 
       // If authentication succeeds, redirect to dashboard.
+      // REVISIT THIS IMPLEMENTATION: It is important to note that
+      // this is not the best way to handle authentication. You should
+      // use a library like NextAuth.js or Auth0 for a more secure
+      // authentication flow. Such that the user cannot access the redirect URL
+      // without being authenticated.
       router.push('/student/dashboard');
     } catch (err) {
       console.error('Login error:', err);

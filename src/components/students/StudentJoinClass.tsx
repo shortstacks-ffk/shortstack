@@ -1,43 +1,74 @@
-'use client'
+'use client';
 
-import {
-  Card,
-  CardContent,
-} from "@/src/components/ui/card"
-import { Plus } from "lucide-react"
-import { useState } from "react"
-import { StudentJoinClassDialog } from "@/src/components/students/StudentJoinClassDialog"
+import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { Input } from '@/src/components/ui/input';
+import { Label } from '@/src/components/ui/label';
+import { Button } from '@/src/components/ui/button';
+import { useToast } from '@/src/hooks/use-toast';
 
-const StudentJoinClass = () => {
+export function StudentJoinClass() {
+  const [classCode, setClassCode] = useState('');
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
+  const router = useRouter();
 
-  const [isOpen, setIsOpen] = useState(false)
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
 
-  return ( 
-    <>
-      <Card 
-        className="border-4 border-solid border-gray-400 w-[250px] h-[250px] rounded-xl bg-muted/80 flex flex-col justify-center border-r-1 items-center cursor-pointer"
-        onClick={() => setIsOpen(true)}
-      >
-        <CardContent className="flex flex-col items-center justify-center w-full h-full pt-10">
-          <div className="rounded-full bg-primary/35 p-2 text-primary/40 w-[80px] h-[80px] mx-2 my-2 hover:bg-primary/50 transition-colors duration-300">
-            <Plus className="mx-2 my-2 w-12 h-12 object-center"/>
-          </div>
+    if (!classCode.trim()) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Please enter a class code.' });
+      return;
+    }
 
-        </CardContent>
-        <CardContent>
-          <div className="items-center justify-center w-full h-full w-[130px] h-[20px] rounded-xl bg-primary/10 text-primary/60 px-7">
-            Join a Class
-          </div>
-        </CardContent>
-      </Card>
+    setLoading(true);
+    try {
+      const res = await fetch('/api/student/join-class', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ classCode }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast({ 
+          variant: 'destructive', 
+          title: 'Error', 
+          description: data.error || 'Invalid class code.'
+        });
+        setLoading(false);
+        return;
+      }
+      toast({ title: 'Success', description: 'Class joined successfully.' });
+      // Redirect to the class's page, adjust the path as needed
+      router.push(`/student/dashboard/classes/${classCode}`);
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Unable to join class.' });
+      console.error('Join class error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      <StudentJoinClassDialog 
-        isOpen={isOpen}
-        onClose={() => setIsOpen(false)}
-        onSuccess={() => setIsOpen(false)}
-      />
-    </>
+  return (
+    <div className="p-4">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <Label htmlFor="classCode" className="block text-sm font-medium mb-1">
+            Enter class code
+          </Label>
+          <Input
+            id="classCode"
+            name="classCode"
+            placeholder="e.g. ABC123"
+            value={classCode}
+            onChange={(e) => setClassCode(e.target.value)}
+            className="w-full p-2 border rounded"
+          />
+        </div>
+        <Button type="submit" disabled={loading} className="w-full">
+          {loading ? 'Joining…' : 'Join Class'}
+        </Button>
+      </form>
+    </div>
   );
 }
- 
-export default StudentJoinClass;

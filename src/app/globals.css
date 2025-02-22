@@ -86,3 +86,16 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+
+
+/* For the student sidebar */
+@layer utilities {
+  .bg-sidebar-custom {
+    background-color: #f1faf3;
+  }
+
+  .active-nav-item {
+    background-color: #e5f5e9;
+  }
+}
