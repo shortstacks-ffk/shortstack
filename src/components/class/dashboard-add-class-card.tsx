@@ -42,7 +42,7 @@ import {
 } from "@/src/components/ui/card"
 import { Plus } from "lucide-react"
 import { useState } from "react"
-import AddClass from "@/src/components/AddClass"
+import AddClass from "@/src/components/class/AddClass"
 
 const DashboardAddClassCard = () => {
 

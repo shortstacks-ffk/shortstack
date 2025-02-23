@@ -10,7 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/src/components/ui/card";
-import { Class } from "@/models/class-model";
+import { Class } from "@/src/models/class-model";
 import { FaClock, FaCalendarAlt } from "react-icons/fa";
 import { Plus } from "lucide-react";
 

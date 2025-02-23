@@ -1,7 +1,7 @@
 import { getClasses } from "@/src/app/actions/classActions";
 import { getRandomColorClass } from "@/src/lib/colorUtils";
-import DashboardAddClassCard from "@/src/components/dashboard-add-class-card";
-import { ClassCard } from "@/src/components/ClassCard";
+import DashboardAddClassCard from "@/src/components/class/dashboard-add-class-card";
+import { ClassCard } from "@/src/components/class/ClassCard";
 // import { useRouter } from "next/router";
 
 

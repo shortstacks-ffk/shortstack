@@ -34,6 +34,7 @@ model Class {
   grade           String?
   numberOfStudents Int?     // maximum capacity
   students        Student[] // relation to students
+  bills           Bill[]    // relation to bills
    // relation to teacher
   userId String
   user User @relation(fields: [userId], references: [clerkUserId], onDelete: Cascade)
@@ -52,10 +53,58 @@ model Student {
   password    String   // Note: Ensure proper hashing in implementation
   classId     String
   progress    Int      @default(0)
+  bills       StudentBill[]
   class       Class    @relation(fields: [classId], references: [code], onDelete: Cascade)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   @@index([classId])
   @@index([username])
+}
+
+
+//Bill
+model Bill {
+  id          String      @id @default(cuid())
+  title       String
+  amount      Float
+  dueDate     DateTime
+  description String?
+  frequency   BillFrequency
+  status      BillStatus  @default(PENDING)
+  class       Class[]     
+  students    StudentBill[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model StudentBill {
+  id          String    @id @default(cuid())
+  billId      String
+  studentId   String
+  isPaid      Boolean   @default(false)
+  paidAt      DateTime?
+  bill        Bill      @relation(fields: [billId], references: [id], onDelete: Cascade)
+  student     Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([billId, studentId])
+  @@index([billId])
+  @@index([studentId])
+}
+
+enum BillStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+enum BillFrequency {
+  ONCE
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+  QUARTERLY
+  YEARLY
 }

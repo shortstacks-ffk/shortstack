@@ -1,9 +1,9 @@
 "use client"
 import SearchBar from "@/src/components/search-bar"
 import Notification from "@/src/components/notification"
-import DashboardAddClassCard from "@/src/components/dashboard-add-class-card"
+import DashboardAddClassCard from "@/src/components/class/dashboard-add-class-card"
 import { SignInButton, SignedIn, SignedOut, UserButton } from "@clerk/nextjs"
-import { ClassCard } from "@/src/components/ClassCard"
+import { ClassCard } from "@/src/components/class/ClassCard"
 
 interface DashboardClientProps {
   classes: Array<{
