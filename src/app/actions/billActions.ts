@@ -15,6 +15,15 @@ interface BillData {
   status?: "PENDING" | "ACTIVE" | "COMPLETED" | "CANCELLED";
 }
 
+interface UpdateBillData {
+  title: string;
+  amount: number;
+  dueDate: string;
+  description?: string;
+  frequency: string;
+  status: string;
+}
+
 interface BillResponse {
   success: boolean;
   data?: any;
@@ -186,6 +195,41 @@ export async function updatePaymentStatus(
   } catch (error) {
     console.error("Error al actualizar estado de pago:", error);
     return { success: false, error: "Error al actualizar el estado de pago" };
+  }
+}
+// Update Bill
+export async function updateBill(
+  id: string, 
+  data: UpdateBillData
+): Promise<BillResponse> {
+  try {
+    const { userId } = await auth();
+    if (!userId) {
+      return { success: false, error: "User not authorized" };
+    }
+
+    // Validate required fields
+    if (!data.title || !data.amount || !data.dueDate || !data.frequency || !data.status) {
+      return { success: false, error: "Missing required fields" };
+    }
+
+    const updatedBill = await db.bill.update({
+      where: { id },
+      data: {
+        title: data.title,
+        amount: data.amount,
+        dueDate: new Date(data.dueDate),
+        description: data.description,
+        frequency: data.frequency,
+        status: data.status
+      }
+    });
+
+    revalidatePath("/dashboard/bills");
+    return { success: true, data: updatedBill };
+  } catch (error) {
+    console.error("Update bill error:", error);
+    return { success: false, error: "Failed to update bill" };
   }
 }
 
