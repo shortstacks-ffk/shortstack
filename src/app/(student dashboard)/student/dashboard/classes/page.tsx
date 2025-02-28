@@ -1,15 +1,14 @@
 'use client';
 
 import React from 'react';
-import { StudentJoinClass } from "@/src/components/students/StudentJoinClass"
-
+import { StudentJoinClassDialog } from '@/src/components/students/StudentJoinClassDialog';
 
 const StudentClassPage = () => {
-    return (
-      <div>
-        <StudentJoinClass />
-      </div>
-    );
-  };
-  
-  export default StudentClassPage;
+  return (
+    <div className="p-4">
+      <StudentJoinClassDialog />
+    </div>
+  );
+};
+
+export default StudentClassPage;

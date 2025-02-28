@@ -32,13 +32,13 @@ model Class {
   day             String?
   time            String?
   grade           String?
-  numberOfStudents Int?     // maximum capacity
   students        Student[] // relation to students
    // relation to teacher
   userId String
   user User @relation(fields: [userId], references: [clerkUserId], onDelete: Cascade)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  lessonPlans      LessonPlan[] // tie lesson plans to a class
 
   @@index([userId])
 }
@@ -57,4 +57,43 @@ model Student {
 
   @@index([classId])
   @@index([schoolEmail])
+}
+
+
+model LessonPlan {
+  id          String       @id @default(cuid())
+  name        String       @unique
+  description String?
+  classId     String
+  class       Class        @relation(fields: [classId], references: [code], onDelete: Cascade)
+  files       File[]       @relation("LessonPlanFiles")
+  assignments Assignment[] @relation("LessonPlanAssignments")
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model File {
+  id          String       @id @default(cuid())
+  name        String
+  fileType    String
+  activity    String?
+  size        Int
+  url         String
+  classId     String
+  lessonPlans LessonPlan[] @relation("LessonPlanFiles")
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model Assignment {
+  id          String       @id @default(cuid())
+  name        String
+  fileType    String
+  activity    String?
+  dueDate     DateTime?
+  size        Int
+  classId     String
+  lessonPlans LessonPlan[] @relation("LessonPlanAssignments")
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 }

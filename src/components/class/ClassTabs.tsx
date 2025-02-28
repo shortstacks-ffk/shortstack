@@ -2,6 +2,8 @@
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { StudentList } from '../students/StudentList';
+// import { LessonPlans} from '@/src/components/class/LessonPlans';
+import LessonPlansList  from '@/src/components/lesson_plans/LessonPlansList';
 
 interface ClassTabsProps {
   classData: {
@@ -31,9 +33,7 @@ export default function ClassTabs({ classData }: ClassTabsProps) {
       </TabsContent>
 
       <TabsContent value="lessonPlans">
-        <div className="flex items-center justify-center h-32 bg-muted/50 rounded-md">
-          Lesson Plans feature coming soon
-        </div>
+        <LessonPlansList classCode={classData.code} cName={classData.name} />
       </TabsContent>
 
       <TabsContent value="gradebook">
