@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import { Card } from "@/src/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/src/components/ui/dropdown-menu";
 import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
-import { EditClassForm } from "@/src/components/class/EditClassForm";
+import { EditClassForm } from "./EditClassForm";
 import { getRandomColorClass } from "@/src/lib/colorUtils";
 import { deleteClass } from "@/src/app/actions/classActions"
 import { useRouter } from "next/navigation";

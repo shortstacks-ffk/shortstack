@@ -7,32 +7,38 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Teacher's login
 model User {
-  id          String   @id @default(uuid())
-  clerkUserId String   @unique
-  email       String   @unique
-  name        String?
-  imageURL    String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  classes     Class[]
+  id String @id @default(uuid())
+  clerkUserId String @unique
+  email String @unique
+  name String?
+  imageURL String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  classes Class[]
 }
 
+// class
+
+
 model Class {
-  id         String       @id @default(cuid())
-  name       String
-  emoji      String
-  code       String       @unique
-  cadence    String?
-  day        String?
-  time       String?
-  grade      String?
-  userId     String
-  createdAt  DateTime     @default(now())
-  updatedAt  DateTime     @updatedAt
-  user       User         @relation(fields: [userId], references: [clerkUserId], onDelete: Cascade)
-  LessonPlan LessonPlan[]
-  students   Student[]
+  id              String    @id @default(cuid())
+  name            String
+  emoji           String
+  code            String    @unique    // Make sure this is String
+  cadence         String?
+  day             String?
+  time            String?
+  grade           String?
+  students        Student[] // relation to students
+  bills         Bill[]    // relation to bills
+   // relation to teacher
+  userId String
+  user User @relation(fields: [userId], references: [clerkUserId], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  lessonPlans      LessonPlan[] // tie lesson plans to a class
 
   @@index([userId])
 }
@@ -41,46 +47,105 @@ model Student {
   id          String   @id @default(cuid())
   firstName   String
   lastName    String
-  password    String
+  schoolEmail String   @unique
+  password    String   // Note: Ensure proper hashing in implementation
   classId     String
+  bills       StudentBill[]
   progress    Int      @default(0)
+  class       Class    @relation(fields: [classId], references: [code], onDelete: Cascade)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  schoolEmail String   @unique
-  class       Class    @relation(fields: [classId], references: [code], onDelete: Cascade)
 
   @@index([classId])
   @@index([schoolEmail])
 }
 
-model Assignment {
-  id          String       @id
-  name        String
-  description String?
-  dueDate     DateTime?
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime
-  LessonPlan  LessonPlan[] @relation("LessonPlanAssignments")
-}
-
-model File {
-  id          String       @id
-  name        String
-  description String?
-  url         String?
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime
-  LessonPlan  LessonPlan[] @relation("LessonPlanFiles")
-}
 
 model LessonPlan {
-  id          String       @id
+  id          String       @id @default(cuid())
   name        String       @unique
   description String?
   classId     String
+  class       Class        @relation(fields: [classId], references: [code], onDelete: Cascade)
+  files       File[]       @relation("LessonPlanFiles")
+  assignments Assignment[] @relation("LessonPlanAssignments")
   createdAt   DateTime     @default(now())
-  updatedAt   DateTime
-  Class       Class        @relation(fields: [classId], references: [code], onDelete: Cascade)
-  Assignment  Assignment[] @relation("LessonPlanAssignments")
-  File        File[]       @relation("LessonPlanFiles")
+  updatedAt   DateTime     @updatedAt
+}
+
+model File {
+  id          String       @id @default(cuid())
+  name        String
+  fileType    String
+  activity    String?
+  size        Int
+  url         String
+  classId     String
+  lessonPlans LessonPlan[] @relation("LessonPlanFiles")
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model Assignment {
+  id          String       @id @default(cuid())
+  name        String
+  fileType    String
+  activity    String?
+  dueDate     DateTime?
+  size        Int
+  classId     String
+  lessonPlans LessonPlan[] @relation("LessonPlanAssignments")
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+
+
+//Bill
+model Bill {
+  id          String      @id @default(cuid())
+  title       String
+  amount      Float
+  dueDate     DateTime
+  description String?
+  frequency   BillFrequency
+  status      BillStatus  @default(PENDING)
+  class       Class[]     
+  students    StudentBill[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+
+
+model StudentBill {
+  id          String    @id @default(cuid())
+  billId      String
+  studentId   String
+  isPaid      Boolean   @default(false)
+  paidAt      DateTime?
+  bill        Bill      @relation(fields: [billId], references: [id], onDelete: Cascade)
+  student     Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([billId, studentId])
+  @@index([billId])
+  @@index([studentId])
+}
+
+
+enum BillStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+enum BillFrequency {
+  ONCE
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+  QUARTERLY
+  YEARLY
 }
