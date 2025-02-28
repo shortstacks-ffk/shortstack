@@ -4,7 +4,6 @@ import { Card } from "@/src/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/src/components/ui/dropdown-menu";
 import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { EditClassForm } from "./EditClassForm";
-import { getRandomColorClass } from "@/src/lib/colorUtils";
 import { deleteClass } from "@/src/app/actions/classActions"
 import { useRouter } from "next/navigation";
    
@@ -13,7 +12,7 @@ interface ClassCardProps {
   emoji: string;
   name: string;
   code: string;
-  colorClass?: string;
+  backgroundColor: string;
   cadence?: string;
   day?: string;
   time?: string;
@@ -21,10 +20,10 @@ interface ClassCardProps {
   numberOfStudents?: number;
 }
 
-export const ClassCard = ({ id, emoji, name, code, colorClass, ...props }: ClassCardProps) => {
+export const ClassCard = ({ id, emoji, name, code, backgroundColor, ...props }: ClassCardProps) => {
 const router = useRouter();
 const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
-const computedColor = getRandomColorClass(id);
+
 
   // When clicking the card (excluding the dropdown), push to the class detail route.
   const handleCardClick = (e: React.MouseEvent) => {
@@ -53,7 +52,7 @@ return (
     {/* Use an inner container that has the dynamic background */}
     <div
         onClick={handleCardClick} 
-        className={`${computedColor} w-full h-full rounded-xl flex flex-col justify-center items-center cursor-pointer`}>
+        className={`${backgroundColor} w-full h-full rounded-xl flex flex-col justify-center items-center cursor-pointer`}>
       <div className="absolute top-2 right-2 dropdown-menu" onClick={e => e.stopPropagation()}>
         <DropdownMenu>
           <DropdownMenuTrigger>

@@ -5,7 +5,6 @@ import { Card } from "@/src/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/src/components/ui/dropdown-menu";
 import { MoreHorizontal, Pencil, Trash2, CreditCard } from "lucide-react";
 import { EditBillForm } from "@/src/components/bills/EditBillForm";
-import { getRandomColorClass } from "@/src/lib/colorUtils";
 import { deleteBill } from "@/src/app/actions/billActions"
 import { useRouter } from "next/navigation";
 
@@ -17,13 +16,12 @@ interface BillCardProps {
   frequency: string;
   status: string;
   description?: string;
-  colorClass?: string;
+  backgroundColor: string;
 }
 
-export const BillCard = ({ id, title, amount, dueDate, frequency, status, description, colorClass }: BillCardProps) => {
+export const BillCard = ({ id, title, amount, dueDate, frequency, status, description, backgroundColor }: BillCardProps) => {
   const router = useRouter();
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
-  const computedColor = getRandomColorClass(id);
 
   const handleCardClick = (e: React.MouseEvent) => {
     if (
@@ -63,8 +61,7 @@ export const BillCard = ({ id, title, amount, dueDate, frequency, status, descri
   return (
     <Card className="bg-transparent w-[250px] h-[250px] rounded-xl relative">
       <div
-        onClick={handleCardClick}
-        className={`${computedColor} w-full h-full rounded-xl flex flex-col justify-center items-center cursor-pointer p-4`}
+        className={`${backgroundColor} w-full h-full rounded-xl flex flex-col justify-center items-center cursor-pointer p-4`}
       >
         <div className="absolute top-2 right-2 dropdown-menu" onClick={e => e.stopPropagation()}>
           <DropdownMenu>
