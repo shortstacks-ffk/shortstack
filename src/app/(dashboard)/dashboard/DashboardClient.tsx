@@ -16,7 +16,6 @@ interface DashboardClientProps {
     day?: string
     time?: string
     grade?: string
-    numberOfStudents?: number
   }>
 }
 
@@ -50,7 +49,6 @@ const DashboardClient = ({ classes }: DashboardClientProps) => {
             day={cls.day}
             time={cls.time}
             grade={cls.grade}
-            numberOfStudents={cls.numberOfStudents}
           />
           ))}
           {classes.length < 3 && <DashboardAddClassCard />}

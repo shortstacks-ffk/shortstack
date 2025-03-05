@@ -1,14 +1,27 @@
- ⨯ TypeError: The "payload" argument must be of type object. Received null
-    at error (src/app/actions/studentActions.ts:141:12)
-  139 |     return { success: true, data: student };
-  140 |   } catch (error) {
-> 141 |     console.error("Create student error:", error);
-      |            ^
-  142 |     return { success: false, error: "Failed to create student" };
-  143 |   }
-  144 | } {
-  code: 'ERR_INVALID_ARG_TYPE',
-  digest: '3720443950'
-}
+Thank you! Superhelpful!
 
-I think the issue is to check if the user is logged in.
+Next, I would like to update the code and implement other functionalities.
+
+I want to change the student data and form. 
+First, it should have username and expect an email. 
+And the email should be the student school email, 
+and this should be reflected in the form. Remove the school name. 
+I am using prisma. When the teacher clicks add student, 
+it should send an email of the login to the student's email. 
+The email should greet the student by their name 
+and provide their password and instructions on how to find 
+and login into the class. When the student clicks on the guest 
+page that they are a student, then a login form display entailing 
+their school email and password, after logging in, 
+it takes the student to the student dashboard, 
+different from teacher's. When the student clicks on 
+the classes page, it populates the classes they have already 
+joined by their class code and with a add button to 
+add more or the first if none has been added. 
+When the student clicks to add a new class, 
+it pops up a dialog for the student to enter the class code, 
+when the student hit enter, it displays the class that 
+belongs to that code and a join button on the class, 
+and if the code is wrong it says error. 
+When the student clicks join, it automatically takes 
+the student to the student view class page.

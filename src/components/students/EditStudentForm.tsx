@@ -83,13 +83,8 @@ export function EditStudentForm({
         />
       </div>
       <div>
-        <Label htmlFor="username">Username</Label>
-        <Input 
-          id="username" 
-          name="username" 
-          defaultValue={student.username}
-          required 
-        />
+        <Label htmlFor="schoolEmail">School Email</Label>
+        <Input id="schoolEmail" name="schoolEmail" type="email" placeholder="example@school.edu" required />
       </div>
       <div>
         <Label htmlFor="password">New Password (Optional)</Label>

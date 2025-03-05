@@ -12,7 +12,6 @@ interface ClassData {
   day?: string;
   time?: string;
   grade?: string;
-  numberOfStudents?: number;
 }
 
 interface ClassResponse {
@@ -67,7 +66,6 @@ export async function createClass(formData: FormData): Promise<ClassResponse> {
       day: formData.get('day') as string,
       time: formData.get('time') as string,
       grade: formData.get('grade') as string,
-      numberOfStudents: Number(formData.get('numberOfStudents')),
       code,
       userId: dbUser.userId // Use the database user ID
     };
@@ -143,8 +141,7 @@ export async function updateClass(id: string, data: ClassData): Promise<ClassRes
     const updatedClass = await db.class.update({
       where: { id, userId },
       data: {
-        ...data,
-        numberOfStudents: Number(data.numberOfStudents)
+        ...data
       }
     });
 
@@ -193,8 +190,7 @@ export async function getClassData(classId: string) {
             id: true,
             firstName: true,
             lastName: true,
-            username: true,
-            schoolName: true,
+            schoolEmail: true,
             progress: true
           }
         }

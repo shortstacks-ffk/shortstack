@@ -63,18 +63,6 @@ const AddClass = ({ isOpen, onClose, onSuccess }: AddClassProps) => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="numberOfStudents">Maximum Number of Students</Label>
-              <Input 
-                id="numberOfStudents" 
-                name="numberOfStudents" 
-                type="number" 
-                min="1"
-                placeholder="Maximum capacity" 
-                required 
-              />
-            </div>
-
-            <div className="space-y-2">
               <Label htmlFor="cadence">Cadence</Label>
               <Select name="cadence" defaultValue="Weekly">
 

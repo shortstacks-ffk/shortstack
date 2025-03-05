@@ -129,7 +129,6 @@ export function StudentList({ classCode, maxStudents }: StudentListProps) {
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Username</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">School</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Progress</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
               </tr>
@@ -138,8 +137,7 @@ export function StudentList({ classCode, maxStudents }: StudentListProps) {
               {students.map((student) => (
                 <tr key={student.id}>
                   <td className="px-6 py-4">{student.firstName} {student.lastName}</td>
-                  <td className="px-6 py-4">{student.username}</td>
-                  <td className="px-6 py-4">{student.schoolName}</td>
+                  <td className="px-6 py-4">{student.schoolEmail}</td>
                   <td className="px-6 py-4">{student.progress}%</td>
                   <td className="px-6 py-4 space-x-2">
                     <button
