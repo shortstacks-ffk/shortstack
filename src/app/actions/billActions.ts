@@ -7,6 +7,7 @@ import { auth } from "@clerk/nextjs/server";
 // Types
 interface BillData {
   title: string;
+  emoji: string;
   amount: number;
   dueDate: Date;
   description?: string;
@@ -35,11 +36,12 @@ export async function createBill(formData: FormData): Promise<BillResponse> {
   try {
     const { userId } = await auth();
     if (!userId) {
-      return { success: false, error: "Usuario no autorizado" };
+      return { success: false, error: "User not found" };
     }
 
     const data = {
       title: formData.get("title") as string,
+      emoji: formData.get("emoji") as string,
       amount: parseFloat(formData.get("amount") as string),
       dueDate: new Date(formData.get("dueDate") as string),
       description: formData.get("description") as string,
@@ -47,8 +49,8 @@ export async function createBill(formData: FormData): Promise<BillResponse> {
       status: "PENDING" as const,
     };
 
-    if (!data.title || !data.amount || !data.dueDate || !data.frequency) { 
-      return { success: false, error: "Faltan campos requeridos" };
+    if (!data.title ||!data.emoji || !data.amount || !data.dueDate || !data.frequency) { 
+      return { success: false, error: "Missing required fields" };
     }
 
     const newBill = await db.bill.create({ data });
@@ -56,8 +58,8 @@ export async function createBill(formData: FormData): Promise<BillResponse> {
     revalidatePath("/dashboard/bills");
     return { success: true, data: newBill };
   } catch (error) {
-    console.error("Error al crear factura:", error);
-    return { success: false, error: "Error al crear la factura" };
+    console.error("Create class error:", error);
+    return { success: false, error: "Failed to create bill" };
   }
 }
 
@@ -69,7 +71,7 @@ export async function assignBillToClass(
   try {
     const { userId } = await auth();
     if (!userId) {
-      return { success: false, error: "Usuario no autorizado" };
+      return { success: false, error: "User not found" };
     }
 
     // Verificar que la clase pertenece al usuario
@@ -78,7 +80,7 @@ export async function assignBillToClass(
     });
 
     if (!classExists) {
-      return { success: false, error: "Clase no encontrada" };
+      return { success: false, error: "Class not found" };
     }
 
     
@@ -114,8 +116,41 @@ export async function assignBillToClass(
     revalidatePath("/dashboard/classes");
     return { success: true };
   } catch (error) {
-    console.error("Error al asignar factura:", error);
-    return { success: false, error: "Error al asignar la factura" };
+    console.error("Error fetching bill:", error);
+    return { success: false, error: "Failed to fetch bill details" };
+  }
+}
+
+//Get a single Bill
+export async function getBill(billId: string): Promise<BillResponse> {
+  try {
+    const { userId } = await auth();
+    if (!userId) {
+      return { success: false, error: "User not found" };
+    }
+
+    const bill = await db.bill.findUnique({
+      where: { id: billId },
+      include: {
+        class: {
+          select: {
+            id: true,
+            name: true,
+            emoji: true,
+            code: true,
+          },
+        },
+      },
+    });
+
+    if (!bill) {
+      return { success: false, error: "Bill not found" };
+    }
+
+    return { success: true, data: bill };
+  } catch (error) {
+    console.error("Error fetching bill:", error);
+    return { success: false, error: "Failed to fetch bill details" };
   }
 }
 
@@ -127,7 +162,7 @@ export async function getBills(filters?: {
   try {
     const { userId } = await auth();
     if (!userId) {
-      return { success: false, error: "Usuario no autorizado" };
+      return { success: false, error: "User not found" };
     }
 
     let whereClause = {};
@@ -160,8 +195,8 @@ export async function getBills(filters?: {
 
     return { success: true, data: bills };
   } catch (error) {
-    console.error("Error al obtener facturas:", error);
-    return { success: false, error: "Error al obtener las facturas" };
+    console.error("Error fetching bill:", error);
+    return { success: false, error: "Failed to fetch bill details" };
   }
 }
 
@@ -174,7 +209,7 @@ export async function updatePaymentStatus(
   try {
     const { userId } = await auth();
     if (!userId) {
-      return { success: false, error: "Usuario no autorizado" };
+      return { success: false, error: "User not found" };
     }
 
     const updatedStudentBill = await db.studentBill.update({
@@ -193,8 +228,8 @@ export async function updatePaymentStatus(
     revalidatePath("/dashboard/bills");
     return { success: true, data: updatedStudentBill };
   } catch (error) {
-    console.error("Error al actualizar estado de pago:", error);
-    return { success: false, error: "Error al actualizar el estado de pago" };
+    console.error("Error updating the bill:", error);
+    return { success: false, error: "Failed to update the bill" };
   }
 }
 // Update Bill
@@ -238,7 +273,7 @@ export async function deleteBill(id: string): Promise<BillResponse> {
   try {
     const { userId } = await auth();
     if (!userId) {
-      return { success: false, error: "Usuario no autorizado" };
+      return { success: false, error: "User not authorized" };
     }
 
     await db.bill.delete({
@@ -248,7 +283,7 @@ export async function deleteBill(id: string): Promise<BillResponse> {
     revalidatePath("/dashboard/bills");
     return { success: true };
   } catch (error) {
-    console.error("Error al eliminar factura:", error);
-    return { success: false, error: "Error al eliminar la factura" };
+    console.error("Error deleting bill:", error);
+    return { success: false, error: "Failed to delete bill" };
   }
 }

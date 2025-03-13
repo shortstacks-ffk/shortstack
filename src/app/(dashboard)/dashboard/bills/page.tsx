@@ -23,7 +23,16 @@ export default async function BillsPage() {
   }
 
   // Reverse the array so newest items are at the end
-  const sortedBills = [...response.data].reverse();
+  const sortedBills = [...response.data].sort((a, b) => {
+    //First compare by frequency
+    if(a.frequency !== "ONCE" && b.frequency === "ONCE") return -1;
+    if(a.frequency === "ONCE" && b.frequency !== "ONCE") return 1;
+
+    //If frequencies are the same, sort by due date
+    const dateA = new Date(a.dueDate).getTime();
+    const dateB = new Date(b.dueDate).getTime();
+    return dateA - dateB;
+  });
   return (
     <main className="container mx-auto p-4">
       <h1 className="text-3xl font-bold mb-4">Bills</h1>

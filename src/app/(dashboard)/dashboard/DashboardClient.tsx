@@ -16,6 +16,7 @@ interface DashboardClientProps {
     day?: string
     time?: string
     grade?: string
+    backgroundColor: string
     numberOfStudents?: number
   }>
 }
@@ -45,7 +46,7 @@ const DashboardClient = ({ classes }: DashboardClientProps) => {
             emoji={cls.emoji}
             name={cls.name}
             code={cls.code}
-            colorClass={cls.colorClass}
+            backgroundColor={cls.backgroundColor}
             cadence={cls.cadence}
             day={cls.day}
             time={cls.time}

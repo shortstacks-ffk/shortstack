@@ -61,6 +61,7 @@ export const BillCard = ({ id, title, amount, dueDate, frequency, status, descri
   return (
     <Card className="bg-transparent w-[250px] h-[250px] rounded-xl relative">
       <div
+        onClick={handleCardClick}
         className={`${backgroundColor} w-full h-full rounded-xl flex flex-col justify-center items-center cursor-pointer p-4`}
       >
         <div className="absolute top-2 right-2 dropdown-menu" onClick={e => e.stopPropagation()}>
