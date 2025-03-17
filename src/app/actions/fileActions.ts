@@ -6,9 +6,12 @@ import { revalidatePath } from 'next/cache';
 
 interface FileData {
   name: string;
-  description?: string;
-  url?: string;
-  // Optionally associate with lessonPlans
+  fileType: string;
+  activity?: string;
+  size: number;
+  url: string;
+  classId: string;
+  // Optionally associate with lesson plans (by their IDs)
   lessonPlanIds?: string[];
 }
 
@@ -18,23 +21,24 @@ interface FileResponse {
   error?: string;
 }
 
-// Create
+// Create a file using the required fields from the dialog form.
 export async function createFile(data: FileData): Promise<FileResponse> {
   try {
     const { userId } = await auth();
-    if (!userId) {
-      return { success: false, error: 'Unauthorized' };
-    }
+    if (!userId) return { success: false, error: 'Unauthorized' };
 
-    if (!data.name) {
-      return { success: false, error: 'File name is required' };
+    if (!data.name || !data.fileType || !data.url || !data.size || !data.classId) {
+      return { success: false, error: 'Missing required fields' };
     }
 
     const createdFile = await db.file.create({
       data: {
         name: data.name,
-        description: data.description,
+        fileType: data.fileType,
+        activity: data.activity,
+        size: data.size,
         url: data.url,
+        classId: data.classId,
         lessonPlans: data.lessonPlanIds
           ? {
               connect: data.lessonPlanIds.map((id) => ({ id })),
@@ -51,22 +55,18 @@ export async function createFile(data: FileData): Promise<FileResponse> {
   }
 }
 
-// Get single file
+// Get a single file by ID including its related lesson plans.
 export async function getFileByID(id: string): Promise<FileResponse> {
   try {
     const { userId } = await auth();
-    if (!userId) {
-      return { success: false, error: 'Unauthorized' };
-    }
+    if (!userId) return { success: false, error: 'Unauthorized' };
 
     const file = await db.file.findUnique({
       where: { id },
       include: { lessonPlans: true },
     });
 
-    if (!file) {
-      return { success: false, error: 'File not found' };
-    }
+    if (!file) return { success: false, error: 'File not found' };
 
     return { success: true, data: file };
   } catch (error: any) {
@@ -75,17 +75,16 @@ export async function getFileByID(id: string): Promise<FileResponse> {
   }
 }
 
-// Get all files
+// Get all files and include their associated lesson plans.
 export async function getFiles(): Promise<FileResponse> {
   try {
     const { userId } = await auth();
-    if (!userId) {
-      return { success: false, error: 'Unauthorized' };
-    }
+    if (!userId) return { success: false, error: 'Unauthorized' };
 
     const files = await db.file.findMany({
       include: { lessonPlans: true },
     });
+
     return { success: true, data: files };
   } catch (error: any) {
     console.error('Get files error:', error?.message || 'Unknown error');
@@ -93,20 +92,26 @@ export async function getFiles(): Promise<FileResponse> {
   }
 }
 
-// Update
+// Update a file by ID using the required fields.
+// Update a file by ID using the required fields.
 export async function updateFile(id: string, data: FileData): Promise<FileResponse> {
   try {
     const { userId } = await auth();
-    if (!userId) {
-      return { success: false, error: 'Unauthorized' };
+    if (!userId) return { success: false, error: 'Unauthorized' };
+
+    if (!data.name || !data.fileType || !data.url || !data.size || !data.classId) {
+      return { success: false, error: 'Missing required fields' };
     }
 
     const updatedFile = await db.file.update({
       where: { id },
       data: {
         name: data.name,
-        description: data.description,
+        fileType: data.fileType,
+        activity: data.activity,
+        size: data.size,
         url: data.url,
+        classId: data.classId,
         lessonPlans: data.lessonPlanIds
           ? {
               set: data.lessonPlanIds.map((lpId) => ({ id: lpId })),
@@ -119,18 +124,68 @@ export async function updateFile(id: string, data: FileData): Promise<FileRespon
     revalidatePath('/dashboard/classes');
     return { success: true, data: updatedFile };
   } catch (error: any) {
-    console.error('Update file error:', error?.message || 'Unknown error');
+    console.error('Update file error:', error);
     return { success: false, error: 'Failed to update file' };
   }
 }
 
-// Delete
+
+// To assign to other class via lesson plans
+
+interface CopyFileParams {
+  sourceFileId: string;
+  targetLessonPlanId: string;
+  targetClassId: string;
+}
+
+export async function copyFileToLessonPlan({
+  sourceFileId,
+  targetLessonPlanId,
+  targetClassId
+}: CopyFileParams): Promise<FileResponse> {
+  try {
+    const { userId } = await auth();
+    if (!userId) return { success: false, error: 'Unauthorized' };
+
+    // Get the source file
+    const sourceFile = await db.file.findUnique({
+      where: { id: sourceFileId }
+    });
+
+    if (!sourceFile) {
+      return { success: false, error: 'Source file not found' };
+    }
+
+    // Create a new file record with the same details but new connections
+    const newFile = await db.file.create({
+      data: {
+        name: sourceFile.name,
+        fileType: sourceFile.fileType,
+        activity: sourceFile.activity,
+        size: sourceFile.size,
+        url: sourceFile.url,
+        classId: targetClassId,
+        lessonPlans: {
+          connect: { id: targetLessonPlanId }
+        }
+      },
+      include: { lessonPlans: true },
+    });
+
+    revalidatePath('/dashboard/classes');
+    return { success: true, data: newFile };
+  } catch (error: any) {
+    console.error('Copy file error:', error);
+    return { success: false, error: 'Failed to copy file to lesson plan' };
+  }
+}
+
+
+// Delete a file by ID.
 export async function deleteFile(id: string): Promise<FileResponse> {
   try {
     const { userId } = await auth();
-    if (!userId) {
-      return { success: false, error: 'Unauthorized' };
-    }
+    if (!userId) return { success: false, error: 'Unauthorized' };
 
     await db.file.delete({
       where: { id },
