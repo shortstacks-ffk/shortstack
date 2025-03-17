@@ -1,4 +1,3 @@
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -33,6 +32,8 @@ model Class {
   time            String?
   grade           String?
   students        Student[] // relation to students
+  bills         Bill[]    // relation to bills
+  storeItems    StoreItem[] // relation to store items
    // relation to teacher
   userId String
   user User @relation(fields: [userId], references: [clerkUserId], onDelete: Cascade)
@@ -50,6 +51,8 @@ model Student {
   schoolEmail String   @unique
   password    String   // Note: Ensure proper hashing in implementation
   classId     String
+  bills       StudentBill[]
+  purchases   StudentPurchase[]
   progress    Int      @default(0)
   class       Class    @relation(fields: [classId], references: [code], onDelete: Cascade)
   createdAt   DateTime @default(now())
@@ -96,4 +99,96 @@ model Assignment {
   lessonPlans LessonPlan[] @relation("LessonPlanAssignments")
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
+}
+
+
+
+//Bill
+model Bill {
+  id          String      @id @default(cuid())
+  title       String
+  emoji       String
+  amount      Float
+  dueDate     DateTime
+  description String?
+  frequency   BillFrequency
+  status      BillStatus  @default(PENDING)
+  class       Class[]     
+  students    StudentBill[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+
+
+model StudentBill {
+  id          String    @id @default(cuid())
+  billId      String
+  studentId   String
+  isPaid      Boolean   @default(false)
+  paidAt      DateTime?
+  bill        Bill      @relation(fields: [billId], references: [id], onDelete: Cascade)
+  student     Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([billId, studentId])
+  @@index([billId])
+  @@index([studentId])
+}
+
+model StoreItem {
+  id          String    @id @default(cuid())
+  name        String
+  emoji       String
+  price       Float
+  description String?
+  quantity    Int       @default(0)
+  isAvailable Boolean   @default(true)
+  classId     String?
+  class       Class?     @relation(fields: [classId], references: [code], onDelete: Cascade)
+  purchases   StudentPurchase[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([classId])
+}
+
+model StudentPurchase {
+  id          String    @id @default(cuid())
+  itemId      String
+  studentId   String
+  quantity    Int       @default(1)
+  totalPrice  Float
+  status      PurchaseStatus @default(PENDING)
+  item        StoreItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  student     Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  purchasedAt DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([itemId, studentId])
+  @@index([itemId])
+  @@index([studentId])
+}
+
+enum PurchaseStatus {
+  PENDING
+  PAID
+  CANCELLED
+}
+
+
+enum BillStatus {
+  PENDING
+  ACTIVE
+  PAID
+  CANCELLED
+}
+enum BillFrequency {
+  ONCE
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+  QUARTERLY
+  YEARLY
 }

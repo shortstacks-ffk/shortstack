@@ -1,55 +1,44 @@
-import { SidebarLeft } from "@/src/components/sidebar-left";
-import { SidebarRight } from "@/src/components/sidebar-right";
-import { Plus } from "lucide-react";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbList,
-  BreadcrumbPage,
-} from "@/src/components/ui/breadcrumb";
+import DashboardAddStoreItemCard from "@/src/components/storefront/dashboardAddStoreItemCard";
+import { getStoreItems } from "@/src/app/actions/storeFrontActions";
+import { StoreItemCard } from "@/src/components/storefront/StoreItemCard";
+import { Store } from "lucide-react";
 
-import { Button } from "@/src/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/src/components/ui/card";
+export default async function StoreFrontPage() {
+  const getColumnColor = (index: number) => {
+    switch (index % 3) {
+      case 0:
+        return "bg-green-200";
+      case 1:
+        return "bg-emerald-200";
+      case 2:
+        return "bg-teal-200";
+      default:
+        return "bg-blue-200";
+    }
+  };
+  const response = await getStoreItems();
+  if (!response.success || !response.data) {
+    return <div>Failed to load classes</div>;
+  }
 
-import { Separator } from "@/src/components/ui/separator";
-import {
-  SidebarInset,
-  SidebarProvider,
-  SidebarTrigger,
-} from "@/src/components/ui/sidebar";
+    // Reverse the array so newest items are at the end
+    const sortedStoreItems = [...response.data].reverse();
 
-export default function Page() {
   return (
-    <SidebarProvider>
-      <SidebarLeft />
-      <SidebarInset>
-        <header className="sticky top-0 flex h-14 shrink-0 items-center gap-2 bg-background">
-          <div className="flex flex-1 items-center gap-2 px-3">
-            <Separator orientation="vertical" className="mr-2 h-4" />
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem>
-                  <BreadcrumbPage className="line-clamp-1">
-                    Storefront
-                  </BreadcrumbPage>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
-          </div>
-        </header>
-        <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-gray-50">
-          <h1 className="text-4xl font-bold text-green-500">Storefront</h1>
-          <p className="mt-4 text-lg text-gray-600">Welcome to Storefront</p>
+    <main className="container mx-auto p-4">
+      <h1 className="text-3xl font-bold mb-4">Storefront</h1>
+      <div className="max-w-4xl ml-0 mr-auto w-full">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {sortedStoreItems.map((storeItem, index) => (
+            <StoreItemCard
+              key={storeItem.id}
+              {...storeItem}
+              backgroundColor={getColumnColor(index)}
+            />
+          ))}
+      <DashboardAddStoreItemCard />
         </div>
-      </SidebarInset>
-      <SidebarRight />
-    </SidebarProvider>
+        </div>
+    </main>
   );
 }
