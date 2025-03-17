@@ -71,20 +71,16 @@ export function AddStudentForm({
       <div className="grid grid-cols-2 gap-4">
         <div>
           <Label htmlFor="firstName">First Name</Label>
-          <Input id="firstName" name="firstName" required />
+          <Input id="firstName" name="firstName" placeholder='John' required />
         </div>
         <div>
           <Label htmlFor="lastName">Last Name</Label>
-          <Input id="lastName" name="lastName" required />
+          <Input id="lastName" name="lastName" placeholder='Doe' required />
         </div>
       </div>
       <div>
-        <Label htmlFor="schoolName">School Name</Label>
-        <Input id="schoolName" name="schoolName" required />
-      </div>
-      <div>
-        <Label htmlFor="username">Username</Label>
-        <Input id="username" name="username" required />
+        <Label htmlFor="schoolEmail">School Email</Label>
+        <Input id="schoolEmail" name="schoolEmail" type="email" placeholder="example@school.edu" required />
       </div>
       <div>
         <Label htmlFor="password">Password</Label>

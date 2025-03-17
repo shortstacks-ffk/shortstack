@@ -5,6 +5,7 @@ import { MainLayoutLogo } from "@/src/components/MainLayoutLogo"
 import "@/src/app/globals.css"
 import { ClerkProvider } from '@clerk/nextjs';
 import { checkUser } from '@/src/lib/checkUser'
+import { Toaster }  from "@/src/components/ui/toaster"
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -46,6 +47,7 @@ export default async function RootLayout({
           </header>
           <main className={`${geistMono.variable}flex-grow max-w-7xl mx-auto px-4 py-2`}>
             {children}
+            <Toaster />
           </main>
         </div>
       </body>

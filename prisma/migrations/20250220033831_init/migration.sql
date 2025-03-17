@@ -34,8 +34,7 @@ CREATE TABLE "Student" (
     "id" TEXT NOT NULL,
     "firstName" TEXT NOT NULL,
     "lastName" TEXT NOT NULL,
-    "schoolName" TEXT NOT NULL,
-    "username" TEXT NOT NULL,
+    "schoolEmail" TEXT NOT NULL,
     "password" TEXT NOT NULL,
     "classId" TEXT NOT NULL,
     "progress" INTEGER NOT NULL DEFAULT 0,
@@ -58,13 +57,13 @@ CREATE UNIQUE INDEX "Class_code_key" ON "Class"("code");
 CREATE INDEX "Class_userId_idx" ON "Class"("userId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Student_username_key" ON "Student"("username");
+CREATE UNIQUE INDEX "Student_schoolEmail_key" ON "Student"("schoolEmail");
 
 -- CreateIndex
 CREATE INDEX "Student_classId_idx" ON "Student"("classId");
 
 -- CreateIndex
-CREATE INDEX "Student_username_idx" ON "Student"("username");
+CREATE INDEX "Student_schoolEmail_idx" ON "Student"("schoolEmail");
 
 -- AddForeignKey
 ALTER TABLE "Class" ADD CONSTRAINT "Class_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("clerkUserId") ON DELETE CASCADE ON UPDATE CASCADE;
