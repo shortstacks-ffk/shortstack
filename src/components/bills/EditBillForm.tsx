@@ -111,7 +111,7 @@ export function EditBillForm({ isOpen, onClose, billData }: EditBillFormProps) {
               <SelectContent>
                 <SelectItem value="PENDING">Pending</SelectItem>
                 <SelectItem value="ACTIVE">Active</SelectItem>
-                <SelectItem value="COMPLETED">Completed</SelectItem>
+                <SelectItem value="PAID">Paid</SelectItem>
                 <SelectItem value="CANCELLED">Cancelled</SelectItem>
               </SelectContent>
             </Select>
