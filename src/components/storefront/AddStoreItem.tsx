@@ -3,42 +3,45 @@
 import { useState, useRef } from "react"
 import EmojiPicker, { type EmojiClickData } from "emoji-picker-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/src/components/ui/popover"
-
 import { Button } from "@/src/components/ui/button"
 import { Input } from "@/src/components/ui/input"
 import { Label } from "@/src/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/src/components/ui/select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/src/components/ui/dialog"
-import { createBill } from "@/src/app/actions/billActions"
+import { createStoreItem } from "@/src/app/actions/storeFrontActions"
 import { toast } from "react-toastify"
 import { Textarea } from "@/src/components/ui/textarea"
+import { Switch } from "@/src/components/ui/switch"
 
-type AddBillProps = {
+type AddStoreItemProps = {
   isOpen?: boolean;
   onClose?: () => void;
   onSuccess?: () => void;
+  classId: string;
 };
 
-const AddBill = ({ isOpen, onClose, onSuccess }: AddBillProps) => {
+const AddStoreItem = ({ isOpen, onClose, onSuccess, classId }: AddStoreItemProps) => {
   const formRef = useRef<HTMLFormElement>(null);
-  const [selectedEmoji, setSelectedEmoji] = useState("📚")
+  const [selectedEmoji, setSelectedEmoji] = useState("🛍️")
 
   const clientAction = async (formData: FormData) => {
     try {
-      const result = await createBill(formData);
+      // Add classId to formData
+      formData.append("classId", classId);
+      
+      const result = await createStoreItem(formData);
 
       if (!result.success) {
-        toast.error(result.error || "Failed to create bill");
+        toast.error(result.error || "Failed to create store item");
       } else {
-        toast.success("Bill created successfully!");
+        toast.success("Store item created successfully!");
         formRef.current?.reset();
-        setSelectedEmoji("📚"); // Reset emoji
+        setSelectedEmoji("🛍️"); // Reset emoji
         onSuccess?.();
         onClose?.();
       }
     } catch (error) {
-      toast.error("Failed to create bill");
-      console.error("Create bill error:", error);
+      toast.error("Failed to create store item");
+      console.error("Create store item error:", error);
     }
   }
 
@@ -50,20 +53,20 @@ const AddBill = ({ isOpen, onClose, onSuccess }: AddBillProps) => {
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Add New Bill</DialogTitle>
+          <DialogTitle>Add New Store Item</DialogTitle>
         </DialogHeader>
         <form ref={formRef} action={clientAction} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="title">Title</Label>
-              <Input id="title" name="title" placeholder="Bill Name" required />
+              <Label htmlFor="name">Item Name</Label>
+              <Input id="name" name="name" placeholder="Item Name" required />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="amount">Amount</Label>
+              <Label htmlFor="price">Price</Label>
               <Input 
-                id="amount" 
-                name="amount" 
+                id="price" 
+                name="price" 
                 type="number" 
                 min="0"
                 step="0.01"
@@ -73,30 +76,28 @@ const AddBill = ({ isOpen, onClose, onSuccess }: AddBillProps) => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="dueDate">Due Date</Label>
+              <Label htmlFor="quantity">Quantity Available</Label>
               <Input 
-                id="dueDate" 
-                name="dueDate" 
-                type="date" 
+                id="quantity" 
+                name="quantity" 
+                type="number" 
+                min="0"
+                step="1"
+                defaultValue="1"
                 required 
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="frequency">Frequency</Label>
-              <Select name="frequency" defaultValue="ONCE">
-                <SelectTrigger>
-                  <SelectValue placeholder="Select Frequency" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ONCE">Once</SelectItem>
-                  <SelectItem value="WEEKLY">Weekly</SelectItem>
-                  <SelectItem value="BIWEEKLY">Bi-Weekly</SelectItem>
-                  <SelectItem value="MONTHLY">Monthly</SelectItem>
-                  <SelectItem value="QUARTERLY">Quarterly</SelectItem>
-                  <SelectItem value="YEARLY">Yearly</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label htmlFor="isAvailable">Available for Purchase</Label>
+              <div className="flex items-center space-x-2">
+                <Switch 
+                  id="isAvailable" 
+                  name="isAvailable"
+                  defaultChecked
+                />
+                <Label htmlFor="isAvailable">Available</Label>
+              </div>
             </div>
 
             <div className="col-span-2 space-y-2">
@@ -104,12 +105,13 @@ const AddBill = ({ isOpen, onClose, onSuccess }: AddBillProps) => {
               <Textarea 
                 id="description" 
                 name="description" 
-                placeholder="Bill Description"
+                placeholder="Item Description"
                 className="min-h-[100px]"
               />
             </div>
+
             <div className="space-y-2">
-              <Label>Bill Emoji</Label>
+              <Label>Item Emoji</Label>
               <input type="hidden" name="emoji" value={selectedEmoji} />
               <Popover>
                 <PopoverTrigger asChild>
@@ -136,7 +138,7 @@ const AddBill = ({ isOpen, onClose, onSuccess }: AddBillProps) => {
               Cancel
             </Button>
             <Button type="submit">
-              Create Bill
+              Create Item
             </Button>
           </div>
         </form>
@@ -145,4 +147,4 @@ const AddBill = ({ isOpen, onClose, onSuccess }: AddBillProps) => {
   )
 }
 
-export default AddBill
+export default AddStoreItem

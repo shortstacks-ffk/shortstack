@@ -5,15 +5,14 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@clerk/nextjs/server";
 
 // Types
-interface BillData {
+interface CreateBillData {
   title: string;
-  emoji: string;
+  emoji: string;  // Added this as it's required in schema
   amount: number;
   dueDate: Date;
   description?: string;
-  frequency: string;
-  classId?: string;
-  status?: "PENDING" | "ACTIVE" | "COMPLETED" | "CANCELLED";
+  frequency: "ONCE" | "WEEKLY" | "BIWEEKLY" | "MONTHLY" | "QUARTERLY" | "YEARLY";
+  classIds?: string[];  // Added to handle class assignments
 }
 
 interface UpdateBillData {
@@ -36,29 +35,39 @@ export async function createBill(formData: FormData): Promise<BillResponse> {
   try {
     const { userId } = await auth();
     if (!userId) {
-      return { success: false, error: "User not found" };
+      return { success: false, error: "Not authorized" };
     }
 
-    const data = {
+    const data: CreateBillData = {
       title: formData.get("title") as string,
-      emoji: formData.get("emoji") as string,
+      emoji: formData.get("emoji") as string || "💰", // Default emoji if none provided
       amount: parseFloat(formData.get("amount") as string),
       dueDate: new Date(formData.get("dueDate") as string),
       description: formData.get("description") as string,
-      frequency: formData.get("frequency") as string,
-      status: "PENDING" as const,
+      frequency: formData.get("frequency") as CreateBillData["frequency"],
     };
 
-    if (!data.title ||!data.emoji || !data.amount || !data.dueDate || !data.frequency) { 
+    // Get class IDs if provided
+    const classIds = formData.getAll("classIds") as string[];
+
+    // Validate required fields
+    if (!data.title || !data.amount || !data.dueDate || !data.frequency) {
       return { success: false, error: "Missing required fields" };
     }
 
-    const newBill = await db.bill.create({ data });
+    const newBill = await db.bill.create({
+      data: {
+        ...data,
+        class: {
+          connect: classIds.map(id => ({ code: id }))
+        }
+      }
+    });
 
     revalidatePath("/dashboard/bills");
     return { success: true, data: newBill };
   } catch (error) {
-    console.error("Create class error:", error);
+    console.error("Create bill error:", error);
     return { success: false, error: "Failed to create bill" };
   }
 }

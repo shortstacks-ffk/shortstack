@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 
 interface BillCardProps {
   id: string;
+  emoji: string;
   title: string;
   amount: number;
   dueDate: Date;
@@ -19,7 +20,7 @@ interface BillCardProps {
   backgroundColor: string;
 }
 
-export const BillCard = ({ id, title, amount, dueDate, frequency, status, description, backgroundColor }: BillCardProps) => {
+export const BillCard = ({ id, title, emoji, amount, dueDate, frequency, status, description, backgroundColor }: BillCardProps) => {
   const router = useRouter();
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
 
@@ -82,10 +83,7 @@ export const BillCard = ({ id, title, amount, dueDate, frequency, status, descri
           </DropdownMenu>
         </div>
 
-        <div className="text-4xl mb-4">
-          <CreditCard className="h-8 w-8" />
-        </div>
-        
+        <div className="text-4xl mb-4">{emoji}</div>
         <h3 className="text-xl font-semibold text-center">{title}</h3>
         <p className="text-lg font-bold text-primary mt-2">{formatCurrency(amount)}</p>
         <p className="text-sm text-muted-foreground mt-1">Due Date: {formatDate(dueDate)}</p>

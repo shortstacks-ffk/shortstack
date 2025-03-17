@@ -6,9 +6,9 @@ import {
 } from "@/src/components/ui/card"
 import { Plus } from "lucide-react"
 import { useState } from "react"
-import AddBill from "@/src/components/bills/AddBill"
+import AddStoreItem from "@/src/components/storefront/AddStoreItem"
 
-const DashboardAddBillCard = () => {
+const DashboardStoreItemCard = () => {
 
   const [isOpen, setIsOpen] = useState(false)
 
@@ -26,12 +26,12 @@ const DashboardAddBillCard = () => {
         </CardContent>
         <CardContent>
           <div className="items-center justify-center w-full h-full w-[130px] h-[20px] rounded-xl bg-primary/10 text-primary/60 px-7">
-            Create a Bill
+            Add an Item
           </div>
         </CardContent>
       </Card>
 
-      <AddBill 
+      <AddStoreItem
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}
         onSuccess={() => setIsOpen(false)}
@@ -40,4 +40,4 @@ const DashboardAddBillCard = () => {
   );
 }
  
-export default DashboardAddBillCard;
+export default DashboardStoreItemCard;
