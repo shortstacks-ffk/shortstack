@@ -4,6 +4,7 @@ import { Inter } from "next/font/google"
 import { MainLayoutLogo } from "@/src/components/MainLayoutLogo"
 import "@/src/app/globals.css"
 import { ClerkProvider } from '@clerk/nextjs';
+// import SessionProvider from '@/src/app/components/providers/SessionProvider';
 import { checkUser } from '@/src/lib/checkUser'
 import { Toaster }  from "@/src/components/ui/toaster"
 
@@ -36,6 +37,9 @@ export default async function RootLayout({
 
 
     <ClerkProvider>
+      {/* <SessionProvider> */}
+
+     
     <html lang="en">
       <body className={`${inter.className}`}>
         <div className="flex flex-col min-h-screen">
@@ -52,6 +56,7 @@ export default async function RootLayout({
         </div>
       </body>
     </html>
+    {/* </SessionProvider> */}
     </ClerkProvider>
   );
 }
