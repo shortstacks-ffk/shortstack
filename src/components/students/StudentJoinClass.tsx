@@ -1,74 +1,78 @@
 'use client';
 
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import { Input } from '@/src/components/ui/input';
-import { Label } from '@/src/components/ui/label';
 import { Button } from '@/src/components/ui/button';
-import { useToast } from '@/src/hooks/use-toast';
+import { toast } from 'react-hot-toast';
+import { useRouter } from 'next/navigation';
 
 export function StudentJoinClass() {
   const [classCode, setClassCode] = useState('');
   const [loading, setLoading] = useState(false);
-  const { toast } = useToast();
   const router = useRouter();
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
+    
     if (!classCode.trim()) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Please enter a class code.' });
+      toast.error('Please enter a class code');
       return;
     }
-
+    
     setLoading(true);
+    
     try {
-      const res = await fetch('/api/student/join-class', {
+      const response = await fetch('/api/student/join-class', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ classCode }),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ classCode: classCode.trim() }),
       });
-      const data = await res.json();
-      if (!res.ok) {
-        toast({ 
-          variant: 'destructive', 
-          title: 'Error', 
-          description: data.error || 'Invalid class code.'
-        });
-        setLoading(false);
+      
+      const data = await response.json();
+      
+      if (!response.ok || !data.success) {
+        toast.error(data.error || 'Failed to join class');
         return;
       }
-      toast({ title: 'Success', description: 'Class joined successfully.' });
-      // Redirect to the class's page, adjust the path as needed
-      router.push(`/student/dashboard/classes/${classCode}`);
+      
+      toast.success(data.message || 'Successfully joined class');
+      setClassCode('');
+      
+      // Refresh the page or redirect to dashboard
+      router.refresh();
+      router.push('/student/dashboard');
     } catch (error) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Unable to join class.' });
-      console.error('Join class error:', error);
+      console.error('Error joining class:', error);
+      toast.error('An unexpected error occurred');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="p-4">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <Label htmlFor="classCode" className="block text-sm font-medium mb-1">
-            Enter class code
-          </Label>
-          <Input
-            id="classCode"
-            name="classCode"
-            placeholder="e.g. ABC123"
-            value={classCode}
-            onChange={(e) => setClassCode(e.target.value)}
-            className="w-full p-2 border rounded"
-          />
-        </div>
-        <Button type="submit" disabled={loading} className="w-full">
-          {loading ? 'Joining…' : 'Join Class'}
-        </Button>
-      </form>
-    </div>
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="space-y-2">
+        <label htmlFor="classCode" className="block text-sm font-medium">
+          Enter Class Code
+        </label>
+        <Input
+          id="classCode"
+          value={classCode}
+          onChange={(e) => setClassCode(e.target.value)}
+          placeholder="Enter the code provided by your teacher"
+          required
+        />
+      </div>
+      
+      <Button 
+        type="submit" 
+        disabled={loading || !classCode.trim()}
+        className="w-full"
+      >
+        {loading ? 'Joining...' : 'Join Class'}
+      </Button>
+    </form>
   );
 }
