@@ -51,24 +51,34 @@ interface LessonPlanDetailProps {
 
   // Save handler: update via action function and update state.
   async function handleSave() {
-    const res = await updateLessonPlan(planId, {
-      name: form.name,
-      description: form.description,
-    });
-    if (res.success) {
-      setLessonPlan(res.data);
-      // Update form state with saved content.
-      setForm({
-        name: res.data.name,
-        description: res.data.description || '',
+    try {
+      // Make a copy of files and assignments before updating
+      const currentFiles = lessonPlan.files || [];
+      const currentAssignments = lessonPlan.assignments || [];
+      
+      const res = await updateLessonPlan(planId, {
+        name: form.name,
+        description: form.description,
       });
-      setEditMode(false);
-      setError(null);
-    } else {
-      setError(res.error);
+      
+      if (res.success) {
+        // Update lesson plan but preserve files and assignments
+        setLessonPlan({
+          ...res.data,
+          files: currentFiles,
+          assignments: currentAssignments
+        });
+        setEditMode(false);
+        setError(null);
+      } else {
+        setError(res.error);
+      }
+    } catch (error: any) {
+      setError(error.message || 'Failed to update lesson plan');
     }
   }
 
+  
   // Cancel editing: reset form to last saved values.
   function handleCancel() {
     if (lessonPlan) {
@@ -155,7 +165,17 @@ interface LessonPlanDetailProps {
                 }
               />
             </div>
-            <FileTable files={lessonPlan.files || []} />
+            {/* File Table */}
+            <FileTable 
+              files={lessonPlan.files || []} 
+              onUpdate={async () => {
+                // Refetch the lesson plan to update the UI
+                const res = await getLessonPlanByID(planId);
+                if (res.success) {
+                  setLessonPlan(res.data);
+                }
+              }}
+            />
           </AccordionContent>
         </AccordionItem>
 
