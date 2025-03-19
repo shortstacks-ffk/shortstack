@@ -1,9 +1,9 @@
 "use client"
 import SearchBar from "@/src/components/search-bar"
 import Notification from "@/src/components/notification"
-import DashboardAddClassCard from "@/src/components/dashboard-add-class-card"
+import DashboardAddClassCard from "@/src/components/class/dashboard-add-class-card"
 import { SignInButton, SignedIn, SignedOut, UserButton } from "@clerk/nextjs"
-import { ClassCard } from "@/src/components/ClassCard"
+import { ClassCard } from "@/src/components/class/ClassCard"
 
 interface DashboardClientProps {
   classes: Array<{
@@ -16,6 +16,8 @@ interface DashboardClientProps {
     day?: string
     time?: string
     grade?: string
+    backgroundColor: string
+    numberOfStudents?: number
   }>
 }
 
@@ -44,7 +46,7 @@ const DashboardClient = ({ classes }: DashboardClientProps) => {
             emoji={cls.emoji}
             name={cls.name}
             code={cls.code}
-            colorClass={cls.colorClass}
+            backgroundColor={cls.backgroundColor}
             cadence={cls.cadence}
             day={cls.day}
             time={cls.time}
