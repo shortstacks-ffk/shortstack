@@ -35,6 +35,7 @@ model Class {
   students        Student[] // relation to students
   bills         Bill[]    // relation to bills
   storeItems    StoreItem[] // relation to store items
+   // relation to teacher
   userId String
   user User @relation(fields: [userId], references: [clerkUserId], onDelete: Cascade) // relation to teacher
   createdAt DateTime @default(now())
