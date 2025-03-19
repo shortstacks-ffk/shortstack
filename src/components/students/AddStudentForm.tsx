@@ -3,16 +3,17 @@
 import { useState } from 'react';
 import { Input } from '@/src/components/ui/input';
 import { Label } from '@/src/components/ui/label';
-import { useToast } from "@/src/hooks/use-toast"
-import { toast as sonnerToast } from "@/src/components/ui/toast"
+import { Button } from '@/src/components/ui/button';
+import { Checkbox } from '@/src/components/ui/checkbox';
+import { toast } from 'react-hot-toast';
 import { createStudent } from '@/src/app/actions/studentActions';
 
 interface AddStudentFormProps {
-    classCode: string;
-    maxStudents: number;
-    currentStudentCount: number;
-    onClose: () => void;
-    }
+  classCode: string;
+  maxStudents: number;
+  currentStudentCount: number;
+  onClose: () => void;
+}
 
 export function AddStudentForm({
   classCode,
@@ -21,16 +22,12 @@ export function AddStudentForm({
   onClose
 }: AddStudentFormProps) {
   const [loading, setLoading] = useState(false);
-  const { toast } = useToast();
+  const [generatePassword, setGeneratePassword] = useState(true);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (currentStudentCount >= maxStudents) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Maximum number of students reached"
-      });
+      toast.error('Maximum number of students reached');
       return;
     }
 
@@ -38,69 +35,103 @@ export function AddStudentForm({
     try {
       const form = e.target as HTMLFormElement;
       const formData = new FormData(form);
+      
+      // Add flag for password generation
+      formData.append('generatePassword', generatePassword.toString());
+      
       const result = await createStudent(formData, classCode);
 
       if (!result.success) {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: result.error || 'Failed to add student'
-        });
+        toast.error(result.error || 'Failed to add student');
         return;
       }
 
-      toast({
-        title: "Success",
-        description: "Student added successfully"
-      });
+      toast.success('Student added successfully');
       form.reset();
       onClose();
     } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to add student"
-      });
+      console.error('Error adding student:', error);
+      toast.error('An unexpected error occurred');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
+    <form onSubmit={handleSubmit} className="space-y-4 mt-2">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <Label htmlFor="firstName">First Name</Label>
-          <Input id="firstName" name="firstName" placeholder='John' required />
+          <Input 
+            id="firstName" 
+            name="firstName" 
+            required 
+          />
         </div>
         <div>
           <Label htmlFor="lastName">Last Name</Label>
-          <Input id="lastName" name="lastName" placeholder='Doe' required />
+          <Input 
+            id="lastName" 
+            name="lastName" 
+            required 
+          />
         </div>
       </div>
+      
       <div>
-        <Label htmlFor="schoolEmail">School Email</Label>
-        <Input id="schoolEmail" name="schoolEmail" type="email" placeholder="example@school.edu" required />
+        <Label htmlFor="schoolEmail">Email</Label>
+        <Input 
+          id="schoolEmail" 
+          name="schoolEmail" 
+          type="email" 
+          placeholder="student@school.edu" 
+          required 
+        />
       </div>
-      <div>
-        <Label htmlFor="password">Password</Label>
-        <Input id="password" name="password" type="password" required />
+      
+      <div className="flex items-center space-x-2 py-2">
+        <Checkbox 
+          id="generatePassword" 
+          checked={generatePassword}
+          onCheckedChange={(checked) => {
+            setGeneratePassword(checked === true);
+          }} 
+        />
+        <Label 
+          htmlFor="generatePassword" 
+          className="cursor-pointer"
+        >
+          Generate temporary password and send invitation email
+        </Label>
       </div>
-      <div className="flex justify-end gap-2">
-        <button
-          type="button"
-          onClick={onClose}
-          className="px-4 py-2 border rounded-md hover:bg-muted"
+      
+      {!generatePassword && (
+        <div>
+          <Label htmlFor="password">Password</Label>
+          <Input 
+            id="password" 
+            name="password" 
+            type="password" 
+            required={!generatePassword} 
+          />
+        </div>
+      )}
+      
+      <div className="flex justify-end gap-2 pt-4">
+        <Button 
+          type="button" 
+          variant="outline" 
+          onClick={onClose} 
+          disabled={loading}
         >
           Cancel
-        </button>
-        <button
-          type="submit"
+        </Button>
+        <Button 
+          type="submit" 
           disabled={loading}
-          className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 disabled:opacity-50"
         >
           {loading ? 'Adding...' : 'Add Student'}
-        </button>
+        </Button>
       </div>
     </form>
   );

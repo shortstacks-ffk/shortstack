@@ -12,8 +12,8 @@ interface EditStudentFormProps {
     id: string;
     firstName: string;
     lastName: string;
-    username: string;
     schoolName: string;
+    schoolEmail: string; // Add this missing field
   };
   onClose: () => void;
 }
@@ -84,7 +84,14 @@ export function EditStudentForm({
       </div>
       <div>
         <Label htmlFor="schoolEmail">School Email</Label>
-        <Input id="schoolEmail" name="schoolEmail" type="email" placeholder="example@school.edu" required />
+        <Input 
+          id="schoolEmail" 
+          name="schoolEmail" 
+          type="email" 
+          defaultValue={student.schoolEmail}  // Add the default value
+          placeholder="example@school.edu" 
+          required 
+        />
       </div>
       <div>
         <Label htmlFor="password">New Password (Optional)</Label>

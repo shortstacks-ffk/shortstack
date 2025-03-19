@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { db } from "@/src/lib/db";
 import bcrypt from "bcryptjs";
+import { sign } from 'jsonwebtoken';
+import { cookies } from 'next/headers';
 
 export async function POST(request: Request) {
   try {
@@ -8,7 +10,7 @@ export async function POST(request: Request) {
 
     if (!schoolEmail || !password) {
       return NextResponse.json(
-        { error: "Missng credentials" },
+        { error: "Missing credentials" },
         { status: 400 }
       );
     }
@@ -34,14 +36,54 @@ export async function POST(request: Request) {
       );
     }
 
-    // If successful, you might want to sign a token or set a cookie.
-    // For simplicity, we return success and student details.
+    // Generate JWT token for student session
+    const token = sign(
+      { 
+        studentId: student.id, 
+        email: student.schoolEmail,
+        firstName: student.firstName,
+        lastName: student.lastName
+      },
+      process.env.JWT_SECRET || 'fallback-secret-key-for-development',
+      { expiresIn: '7d' } // Token valid for 7 days
+    );
+
+    // Set HTTP-only cookie with the token
+    const cookieStore = await cookies();
+    cookieStore.set({
+      name: 'student-auth-token',
+      value: token,
+      httpOnly: true,
+      maxAge: 60 * 60 * 24 * 7, // 1 week
+      path: '/',
+      sameSite: 'strict',
+      secure: process.env.NODE_ENV === 'production'
+    });
+
     return NextResponse.json(
-      { success: true, data: { studentId: student.id, schoolEmail: student.schoolEmail } },
+      { 
+        success: true, 
+        data: { 
+          studentId: student.id, 
+          firstName: student.firstName,
+          lastName: student.lastName,
+          schoolEmail: student.schoolEmail,
+          classId: student.classId
+        } 
+      },
       { status: 200 }
     );
   } catch (error: any) {
     console.error("Student auth error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
+}
+
+// Logout endpoint
+export async function DELETE() {
+  // Clear the auth cookie
+  const cookieStore = await cookies();
+  cookieStore.delete('student-auth-token');
+  
+  return NextResponse.json({ success: true });
 }

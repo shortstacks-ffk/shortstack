@@ -7,7 +7,6 @@ import "@/src/app/globals.css"
 import { Toaster }  from "@/src/components/ui/toaster"
 
 
-
 const inter = Inter({ subsets: ["latin"] })
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {

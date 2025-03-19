@@ -10,7 +10,7 @@ export default function Home() {
 
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-88px)] py-2">
         <h1 className="text-[54px] font-bold mb-6">Welcome to ShortStacks</h1>
-        <p className="text-[36px] mb-32">Welcome to Financial Freedom</p>
+        <p className="text-[36px] mb-32">Welcome to Financial Freedom Literacy</p>
 
         <h2 className="text-[36px] mb-10">Are you a Teacher or a Student</h2>
 

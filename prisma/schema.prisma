@@ -31,12 +31,13 @@ model Class {
   day             String?
   time            String?
   grade           String?
+  enrollments Enrollment[] // relation to enrollments for many-to-many relationship ( i.e many students can be part of many classes)
   students        Student[] // relation to students
   bills         Bill[]    // relation to bills
   storeItems    StoreItem[] // relation to store items
    // relation to teacher
   userId String
-  user User @relation(fields: [userId], references: [clerkUserId], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [clerkUserId], onDelete: Cascade) // relation to teacher
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   lessonPlans      LessonPlan[] // tie lesson plans to a class
@@ -49,17 +50,33 @@ model Student {
   firstName   String
   lastName    String
   schoolEmail String   @unique
-  password    String   // Note: Ensure proper hashing in implementation
+  password    String   // Will be hashed before storage
   classId     String
   bills       StudentBill[]
   purchases   StudentPurchase[]
   progress    Int      @default(0)
+  enrollments Enrollment[]
+  bills       StudentBill[]
+  purchases   StudentPurchase[]
   class       Class    @relation(fields: [classId], references: [code], onDelete: Cascade)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   @@index([classId])
   @@index([schoolEmail])
+}
+
+model Enrollment {
+  id        String   @id @default(cuid())
+  studentId String
+  classId   String
+  enrolled  Boolean  @default(false)  // becomes true when student joins
+  student   Student  @relation(fields: [studentId], references: [id])
+  class     Class    @relation(fields: [classId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([studentId, classId])
 }
 
 
@@ -78,9 +95,9 @@ model LessonPlan {
 model File {
   id          String       @id @default(cuid())
   name        String
-  fileType    String
+  fileType    String?
   activity    String?
-  size        Int
+  size        Int?
   url         String
   classId     String
   lessonPlans LessonPlan[] @relation("LessonPlanFiles")

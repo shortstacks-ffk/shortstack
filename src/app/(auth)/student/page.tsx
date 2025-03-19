@@ -5,8 +5,9 @@ import { useRouter } from 'next/navigation';
 import { Input } from '@/src/components/ui/input';
 import { Label } from '@/src/components/ui/label';
 import { Button } from '@/src/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/src/components/ui/card';
 
-const StudentGuestPage = () => {
+export default function StudentLoginPage() {
   const router = useRouter();
   const [schoolEmail, setSchoolEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -32,12 +33,7 @@ const StudentGuestPage = () => {
         return;
       }
 
-      // If authentication succeeds, redirect to dashboard.
-      // REVISIT THIS IMPLEMENTATION: It is important to note that
-      // this is not the best way to handle authentication. You should
-      // use a library like NextAuth.js or Auth0 for a more secure
-      // authentication flow. Such that the user cannot access the redirect URL
-      // without being authenticated.
+      // Redirect to student dashboard
       router.push('/student/dashboard');
     } catch (err) {
       console.error('Login error:', err);
@@ -48,46 +44,48 @@ const StudentGuestPage = () => {
   };
 
   return (
-    <main className="container mx-auto p-4">
-      <div>
-        <h1 className="text-2xl font-bold">Student Login</h1>
-        <p>Enter your school email and password to login</p>
-        {error && <p className="mt-2 text-red-500">{error}</p>}
-      </div>
-
-      <form onSubmit={handleSubmit} className="mt-4 space-y-4">
-        <div>
-          <Label htmlFor="schoolEmail">School Email</Label>
-          <Input
-            id="schoolEmail"
-            name="schoolEmail"
-            type="email"
-            placeholder="Enter your school email"
-            value={schoolEmail}
-            onChange={(e) => setSchoolEmail(e.target.value)}
-            required
-          />
-        </div>
-        <div>
-          <Label htmlFor="password">Password</Label>
-          <Input
-            id="password"
-            name="password"
-            type="password"
-            placeholder="Enter your password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-        </div>
-        <div>
-          <Button type="submit" disabled={loading}>
-            {loading ? 'Logging in...' : 'Login'}
-          </Button>
-        </div>
-      </form>
-    </main>
+    <div className="container mx-auto flex items-center justify-center min-h-screen">
+      <Card className="w-full max-w-md mx-4">
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl font-bold">Student Login</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {error && (
+            <div className="bg-red-50 text-red-600 p-3 rounded-md mb-4 text-sm">
+              {error}
+            </div>
+          )}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="schoolEmail">School Email</Label>
+              <Input
+                id="schoolEmail"
+                value={schoolEmail}
+                onChange={(e) => setSchoolEmail(e.target.value)}
+                type="email"
+                placeholder="your.name@school.edu"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                type="password"
+                required
+              />
+            </div>
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? 'Logging in...' : 'Login'}
+            </Button>
+          </form>
+        </CardContent>
+        <CardFooter className="flex justify-center text-sm text-gray-500">
+          <p>Need help? Contact your teacher.</p>
+        </CardFooter>
+      </Card>
+    </div>
   );
-};
-
-export default StudentGuestPage;
+}
