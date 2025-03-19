@@ -5,7 +5,6 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-
 /**
  * The function `formatFileSize` converts a given number of bytes into a human-readable file size
  * format.
@@ -24,6 +23,7 @@ export function formatFileSize(bytes: number): string {
 
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
+
 export function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -32,3 +32,4 @@ export function formatCurrency(amount: number): string {
     maximumFractionDigits: 2
   }).format(amount);
 }
+

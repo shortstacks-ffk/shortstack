@@ -56,8 +56,6 @@ model Student {
   purchases   StudentPurchase[]
   progress    Int      @default(0)
   enrollments Enrollment[]
-  bills       StudentBill[]
-  purchases   StudentPurchase[]
   class       Class    @relation(fields: [classId], references: [code], onDelete: Cascade)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
