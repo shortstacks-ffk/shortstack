@@ -2,11 +2,11 @@
 import LessonPlanDetailPage from './LessonPlanDetailPage';
 
 interface PageProps {
-  params: { classId: string; planId: string };
+  params: Promise<{ classId: string; planId: string }>;
 }
 
 export default async function Page({ params }: PageProps) {
-  // Here, params is the route's [classId] and [planId]
+  // Await the params before destructuring
   const { classId, planId } = await params;
 
   // Render the client component, passing in classId & planId as props
