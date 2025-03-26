@@ -36,12 +36,14 @@ interface LessonPlanDetailProps {
       const res = await getLessonPlanByID(planId);
       if (res.success) {
         setLessonPlan(res.data);
-        setForm({
-          name: res.data.name,
-          description: res.data.description || '',
-        });
+        if (res.data) {
+          setForm({
+            name: res.data.name,
+            description: res.data.description || '',
+          });
+        }
       } else {
-        setError(res.error);
+        setError(res.error || null);
       }
     }
     if (planId) {
@@ -71,7 +73,7 @@ interface LessonPlanDetailProps {
         setEditMode(false);
         setError(null);
       } else {
-        setError(res.error);
+        setError(res.error || null);
       }
     } catch (error: any) {
       setError(error.message || 'Failed to update lesson plan');
@@ -129,7 +131,7 @@ interface LessonPlanDetailProps {
       </div>
 
       {/* Description Section */}
-      <h2 className="text-xl font-semibold mb-2">Description</h2>
+      <h2 className="text-xl font-semibold">Description</h2>
       {editMode ? (
         <RichEditor
           content={form.description}
@@ -137,7 +139,10 @@ interface LessonPlanDetailProps {
           editable={true}
         />
       ) : (
-        <div className="prose" dangerouslySetInnerHTML={{ __html: lessonPlan.description }} />
+        <div 
+          className="rich-text-content rounded-md"
+          dangerouslySetInnerHTML={{ __html: lessonPlan.description || '<p></p>' }} 
+        />
       )}
 
       {/* Accordion for Files & Assignments */}

@@ -1,25 +1,8 @@
-// import React from 'react';
-
-// export default function StudentDashboard() {
-//   return (
-//     <main className="container mx-auto p-4 ">
-//       <h1 className="text-xl font-bold mb-4 md:text-3xl">
-//         Welcome to your Student Dashboard!
-//       </h1>
-//       <p>
-//         You are now logged in. Here you can view your enrolled classes and other related details.
-//       </p>
-//       {/* Add additional dashboard content here */}
-//     </main>
-//   );
-// }
-
 'use client';
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/src/components/ui/button';
-import { StudentJoinClassDialog } from '@/src/components/students/StudentJoinClassDialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/src/components/ui/card';
 
 interface Class {
@@ -90,44 +73,6 @@ export default function StudentDashboard() {
         <Button variant="outline" onClick={handleLogout}>
           Logout
         </Button>
-      </div>
-
-      <div className="mb-8">
-        <h2 className="text-xl font-semibold mb-4">Your Classes</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {classes.length > 0 ? (
-            classes.map((cls) => (
-              <Card key={cls.id} className="cursor-pointer hover:shadow-md transition-shadow">
-                <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center gap-2">
-                    <span className="text-2xl">{cls.emoji}</span>
-                    <span>{cls.name}</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-gray-500">Class Code: {cls.code}</p>
-                  <Button 
-                    className="mt-4 w-full"
-                    onClick={() => router.push(`/student/dashboard/classes/${cls.code}`)}
-                  >
-                    Go to Class
-                  </Button>
-                </CardContent>
-              </Card>
-            ))
-          ) : (
-            <div className="col-span-full text-center py-8 bg-muted/30 rounded-lg">
-              <p className="text-gray-500 mb-4">You haven't joined any classes yet.</p>
-              <StudentJoinClassDialog />
-            </div>
-          )}
-        </div>
-        
-        {classes.length > 0 && (
-          <div className="mt-6">
-            <StudentJoinClassDialog />
-          </div>
-        )}
       </div>
     </div>
   );
