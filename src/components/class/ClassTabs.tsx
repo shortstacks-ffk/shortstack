@@ -11,7 +11,6 @@ interface ClassTabsProps {
     id: string;
     name: string;
     code: string;
-    numberOfStudents: number;
     students: any[];
     overview?: string;
   };
