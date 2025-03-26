@@ -26,7 +26,7 @@ export async function getStudentsByClass(classCode: string) {
     const classData = await db.class.findUnique({ where: { code: classCode } });
     if (!classData) return { success: false, error: "Class not found" };
 
-    console.log("Class data:", classData);
+    // console.log("Class data:", classData);
 
     // Get students enrolled in the class
     const enrollments = await db.enrollment.findMany({
@@ -392,8 +392,10 @@ export async function updateStudent(formData: FormData, classCode: string, stude
   }
 }
 
-// Delete a student with options to remove from class or delete completely
+
+
 // Completely rewrite the deleteStudent function:
+// Delete a student with options to remove from class or delete completely
 
 export async function deleteStudent(
   classCode: string, 
@@ -420,81 +422,79 @@ export async function deleteStudent(
       return { success: false, error: "Student not enrolled in this class" };
     }
 
-    // Step 1: Remove the enrollment (remove from class) - this always happens
-    try {
-      await db.enrollment.delete({
-        where: { id: enrollment.id }
-      });
-    } catch (enrollmentDeleteError) {
-      console.error("Failed to delete enrollment:", enrollmentDeleteError);
-      return { success: false, error: "Failed to remove student from class" };
-    }
+    console.log(`Deleting student ${studentId} with options:`, options);
     
-    // Step 2: If requested, try to delete the entire student record
+    // Handle full deletion first if requested
     if (!options.removeFromClassOnly) {
+      console.log("Attempting complete student deletion");
+      
       try {
-        // Check if this student has the same email as a teacher (potential conflict)
-        const student = await db.student.findUnique({
-          where: { id: studentId },
-          select: { schoolEmail: true }
+        // First delete all enrollments for this student (to avoid FK constraints)
+        const deleteEnrollments = await db.enrollment.deleteMany({
+          where: { studentId: studentId }
         });
         
-        if (student) {
-          const teacherWithSameEmail = await db.user.findUnique({
-            where: { email: student.schoolEmail }
-          });
-          
-          if (teacherWithSameEmail) {
-            return { 
-              success: true, 
-              message: "Student removed from class but couldn't be completely deleted because the email is used by a teacher account",
-              warning: true
-            };
-          }
-        }
+        console.log(`Deleted ${deleteEnrollments.count} enrollments`);
         
-        // Check for other enrollments
-        const otherEnrollments = await db.enrollment.count({
-          where: {
-            studentId: studentId
-          }
-        });
-        
-        if (otherEnrollments > 0) {
-          console.log(`Student has ${otherEnrollments} other enrollments. Proceeding with deletion anyway.`);
-        }
-        
-        // Now try to delete the student
+        // Now delete the student record
         await db.student.delete({
           where: { id: studentId }
         });
         
-        revalidatePath(`/dashboard/classes/${classCode}`);
-        return { 
-          success: true, 
-          message: "Student deleted from the system"
-        };
-      } catch (deleteStudentError) {
-        console.error("Error deleting student:", deleteStudentError);
+        console.log("Student completely deleted");
         
-        // Something prevented complete deletion, but we've at least removed them from this class
         revalidatePath(`/dashboard/classes/${classCode}`);
         return { 
           success: true, 
-          message: "Student removed from class but couldn't be deleted completely due to database constraints",
-          warning: true
+          message: "Student has been completely deleted from the system"
         };
+      } catch (error) {
+        console.error("Failed to fully delete student:", error);
+        
+        // If full deletion fails, fall back to removing from just this class
+        try {
+          // Try to at least remove from this specific class
+          await db.enrollment.delete({
+            where: { id: enrollment.id }
+          });
+          
+          revalidatePath(`/dashboard/classes/${classCode}`);
+          return { 
+            success: true, 
+            message: "Student could not be fully deleted, but was removed from this class",
+            warning: true
+          };
+        } catch (fallbackError) {
+          console.error("Even class removal failed:", fallbackError);
+          return { success: false, error: "Failed to remove student from class" };
+        }
+      }
+    } else {
+      // Just remove from this class
+      console.log("Removing student from class only");
+      
+      try {
+        await db.enrollment.delete({
+          where: { id: enrollment.id }
+        });
+        
+        console.log("Student removed from class");
+        
+        revalidatePath(`/dashboard/classes/${classCode}`);
+        return { 
+          success: true, 
+          message: "Student has been removed from this class"
+        };
+      } catch (error) {
+        console.error("Failed to remove student from class:", error);
+        return { success: false, error: "Failed to remove student from class" };
       }
     }
-
-    // If we only wanted to remove from class and that succeeded, return success
-    revalidatePath(`/dashboard/classes/${classCode}`);
-    return { 
-      success: true, 
-      message: "Student removed from class"
-    };
-  } catch (error: any) {
+  } catch (error) {
     console.error("Delete student error:", error);
-    return { success: false, error: error.message || "Failed to delete student" };
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : "Failed to delete student"
+    };
   }
 }
