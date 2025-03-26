@@ -18,7 +18,7 @@ const nextConfig: NextConfig = {
       },
       // Add any other domains you need
     ],
-    // unoptimized: false is the default, so you can remove this line
+    unoptimized: true,
   },
   output: 'standalone',
   webpack: (config) => {
