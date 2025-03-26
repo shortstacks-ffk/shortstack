@@ -44,14 +44,17 @@ export function DeleteStudentDialog({
     setError(null);
     
     try {
+      console.log(`Deleting student ${studentId} with option ${deleteOption}`);
+      
       const result = await deleteStudent(
         classCode, 
         studentId, 
         { removeFromClassOnly: deleteOption === 'class' }
       );
       
+      console.log("Delete result:", result);
+      
       if (result.success) {
-        // Handle warnings but still consider it a success
         if (result.warning) {
           toast.success(result.message);
         } else {
@@ -61,11 +64,9 @@ export function DeleteStudentDialog({
           );
         }
         
-        // Always refresh the list on any kind of success
         onSuccess();
         onOpenChange(false);
       } else {
-        // Handle error case
         setError(result.error || 'Failed to delete student');
         toast.error(result.error || 'Failed to delete student');
       }
@@ -130,7 +131,7 @@ export function DeleteStudentDialog({
           <AlertDialogCancel disabled={isLoading}>Cancel</AlertDialogCancel>
           <AlertDialogAction 
             onClick={(e) => {
-              e.preventDefault(); // Prevent default to handle the action manually
+              e.preventDefault();
               handleDelete();
             }} 
             disabled={isLoading}

@@ -39,7 +39,9 @@ export async function GET(request: Request) {
                 id: true,
                 name: true,
                 code: true,
-                emoji: true
+                emoji: true,
+                time: true,
+                createdAt: true
               }
             }
           }

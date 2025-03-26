@@ -55,10 +55,9 @@ export default function TeacherSignUpPage() {
             height={300}
             className="mx-auto mb-12"
           />
-          <h2 className="text-4xl font-bold mb-6">Introducing a new learning experience</h2>
+          <h2 className="text-4xl font-bold mb-6">Ready to learn about finances?</h2>
           <p className="text-xl">
-            Empower your kids to save smart, spend wisely, and grow their money skills with our fun, interactive app.
-            Let's build strong financial habits together!
+            Login to find and join your class and start learning about finances today!
           </p>
         </div>
         <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-[#89C410] to-transparent" />

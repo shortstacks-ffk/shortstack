@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/ta
 import { StudentList } from '../students/StudentList';
 // import { LessonPlans} from '@/src/components/class/LessonPlans';
 import LessonPlansList  from '@/src/components/lesson_plans/LessonPlansList';
+import ClassOverview from './ClassOverview';
 
 interface ClassTabsProps {
   classData: {
@@ -12,25 +13,23 @@ interface ClassTabsProps {
     code: string;
     numberOfStudents: number;
     students: any[];
+    overview?: string;
   };
 }
 
 export default function ClassTabs({ classData }: ClassTabsProps) {
   return (
-    // <div> Class code: {classData.code} </div>
-    <Tabs defaultValue="students" className="w-full space-y-6">
+    <Tabs defaultValue="overview" className="w-full space-y-6">
       <TabsList className="grid w-full grid-cols-3">
-        <TabsTrigger value="students">Students</TabsTrigger>
+        <TabsTrigger value="overview">Overview</TabsTrigger>
         <TabsTrigger value="lessonPlans">Lesson Plans</TabsTrigger>
         <TabsTrigger value="gradebook">Gradebook</TabsTrigger>
       </TabsList>
 
-      <TabsContent value="students" className="space-y-4">
-        <StudentList
-          classCode={classData.code}
-          maxStudents={classData.numberOfStudents}
-        />
+      <TabsContent value="overview">
+        <ClassOverview classData={classData} />
       </TabsContent>
+
 
       <TabsContent value="lessonPlans">
         <LessonPlansList classCode={classData.code} cName={classData.name} />
