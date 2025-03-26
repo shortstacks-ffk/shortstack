@@ -6,6 +6,14 @@ interface PageProps {
   params: Promise<{ billId: string }>;
 }
 
+// Define the BillClass interface
+interface BillClass {
+  id: string;
+  emoji: string;
+  name: string;
+  code: string;
+}
+
 export default async function BillDetailPage({ params }: PageProps) {
   // Await the params before using them
   const resolvedParams = await params;
@@ -41,19 +49,19 @@ export default async function BillDetailPage({ params }: PageProps) {
           <Card className="p-6">
             <h2 className="text-xl font-semibold mb-4">Assigned Classes</h2>
             {bill.class && bill.class.length > 0 ? (
-              <div className="space-y-4">
-                {bill.class.map((cls) => (
+                <div className="space-y-4">
+                {bill.class.map((cls: BillClass) => (
                   <div key={cls.id} className="p-4 border rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <span className="text-2xl">{cls.emoji}</span>
-                      <div>
-                        <p className="font-medium">{cls.name}</p>
-                        <p className="text-sm text-gray-600">Code: {cls.code}</p>
-                      </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl">{cls.emoji}</span>
+                    <div>
+                    <p className="font-medium">{cls.name}</p>
+                    <p className="text-sm text-gray-600">Code: {cls.code}</p>
                     </div>
                   </div>
+                  </div>
                 ))}
-              </div>
+                </div>
             ) : (
               <p className="text-gray-500">No classes assigned to this bill</p>
             )}
