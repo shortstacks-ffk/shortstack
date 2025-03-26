@@ -12,7 +12,7 @@ interface ClassTabsProps {
     name: string;
     code: string;
     students: any[];
-    overview?: string;
+    overview?: string | null;
   };
 }
 
