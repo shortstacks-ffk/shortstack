@@ -20,7 +20,7 @@ interface Class {
 
 }
 
-export default function StudentClassesPage({code}) {
+export default function StudentClassesPage() {
   const [loading, setLoading] = useState(true);
   const [classes, setClasses] = useState<Class[]>([]);
   const router = useRouter();
@@ -120,5 +120,3 @@ export default function StudentClassesPage({code}) {
     </div>
   );
 }
-
-{/* <Button className="w-full" onClick={handleCardClick} >View Class</Button> */}
