@@ -1,5 +1,6 @@
 generator client {
   provider = "prisma-client-js"
+  previewFeatures = ["fullTextSearch"]
 }
 
 datasource db {
@@ -31,6 +32,7 @@ model Class {
   day             String?
   time            String?
   grade           String?
+  overview        String?
   enrollments Enrollment[] // relation to enrollments for many-to-many relationship ( i.e many students can be part of many classes)
   students        Student[] // relation to students
   bills         Bill[]    // relation to bills
