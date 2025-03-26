@@ -47,3 +47,5 @@ next-env.d.ts
 text.txt
 
 pnpm-lock.yaml
+
+.vscode
