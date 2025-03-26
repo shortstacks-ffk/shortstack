@@ -11,7 +11,6 @@ interface ClassOverviewProps {
         name: string;
         overview?: string;
         code: string;
-        numberOfStudents: number;
         students: any[];
     };
     }
@@ -84,7 +83,7 @@ const ClassOverview = ({ classData }: ClassOverviewProps) => {
         <h3 className="text-xl font-semibold mb-4">Student Management</h3>
         <StudentList
           classCode={classData.code}
-          maxStudents={classData.numberOfStudents}
+          maxStudents={classData.students.length}
         />
       </div>
     </div>

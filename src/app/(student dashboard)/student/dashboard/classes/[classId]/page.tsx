@@ -23,7 +23,7 @@ export default async function ClassPage({
           <h1 className="text-2xl font-bold mb-6">
             {classData.emoji} {classData.name}
           </h1>
-          <ClassTabs classData={classData} />
+          <ClassTabs classData={{ ...classData, overview: classData.overview ?? undefined }} />
         </div>
       </Suspense>
     </main>
