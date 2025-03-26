@@ -1,40 +1,44 @@
-// Next configuration file
-// import type { NextConfig } from "next";
+import type { NextConfig } from 'next';
 
-// const nextConfig: NextConfig = {
-//   devIndicators: false,
-//   // devIndicators: {
-//   //   // Disable the build indicator
-//   //   appIsrStatus: false,
-//   // },
-// };
-
-// export default nextConfig;
-
-
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  devIndicators: false,
+const nextConfig: NextConfig = {
   reactStrictMode: true,
-  swcMinify: true,
   images: {
-    domains: [
-      'clerk.com', 
-      'images.clerk.dev',
-      'storage.googleapis.com'
-    ]
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'clerk.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'images.clerk.dev',
+      },
+      {
+        protocol: 'https',
+        hostname: 'storage.googleapis.com',
+      },
+      // Add any other domains you need
+    ],
+    // unoptimized: false is the default, so you can remove this line
   },
   output: 'standalone',
   webpack: (config) => {
-    // Handle Google API issues
-    config.resolve.fallback = { 
+    config.resolve.fallback = {
       ...config.resolve.fallback,
       fs: false,
       net: false,
-      tls: false
+      tls: false,
     };
     return config;
+  },
+  // Optional: Add compiler configuration if needed
+  compiler: {
+    // removeConsole: process.env.NODE_ENV === 'production',
+  },
+  // Optional: Enable experimental features if needed
+  experimental: {
+    // serverActions: true, // Already enabled by default in 15.2.3
+    // typedRoutes: true,
   }
-}
+};
 
-module.exports = nextConfig
+export default nextConfig;
