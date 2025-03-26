@@ -2,12 +2,16 @@ import { getBill } from "@/src/app/actions/billActions";
 import { Card } from "@/src/components/ui/card";
 import { formatCurrency } from "@/src/lib/utils";
 
-export default async function BillDetailPage({
-  params,
-}: {
-  params: { billId: string };
-}) {
-  const response = await getBill(params.billId);
+interface PageProps {
+  params: Promise<{ billId: string }>;
+}
+
+export default async function BillDetailPage({ params }: PageProps) {
+  // Await the params before using them
+  const resolvedParams = await params;
+  const billId = resolvedParams.billId;
+  
+  const response = await getBill(billId);
 
   if (!response.success || !response.data) {
     return <div>Failed to load bill details</div>;
