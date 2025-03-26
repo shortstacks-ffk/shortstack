@@ -38,9 +38,6 @@ export default function StudentClassesPage() {
         }
 
         const data = await res.json();
-        console.log("Class data received:", data.classes);
-        // Add this line to inspect individual class objects
-        data.classes?.forEach((cls, index) => console.log(`Class ${index}:`, cls, "Time:", cls.time));
         setClasses(data.classes || []);
       } catch (error) {
         console.error("Error fetching classes:", error);
