@@ -109,7 +109,9 @@ export async function POST(request: Request) {
             id: classData.id,
             name: classData.name,
             code: classData.code,
-            emoji: classData.emoji
+            emoji: classData.emoji,
+            time: classData.time,
+            createdAt: classData.createdAt
           }
         });
       } else {
@@ -121,7 +123,9 @@ export async function POST(request: Request) {
             id: classData.id,
             name: classData.name,
             code: classData.code,
-            emoji: classData.emoji
+            emoji: classData.emoji,
+            time: classData.time,
+            createdAt: classData.createdAt
           }
         });
       }
@@ -142,7 +146,9 @@ export async function POST(request: Request) {
           id: classData.id,
           name: classData.name,
           code: classData.code,
-          emoji: classData.emoji
+          emoji: classData.emoji,
+          time: classData.time,
+          createdAt: classData.createdAt
         }
       });
     }
