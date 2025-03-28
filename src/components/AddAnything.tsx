@@ -1,9 +1,16 @@
+"use client";
+
 import { useState } from "react";
 import { Card, CardContent } from "@/src/components/ui/card";
 import { Plus } from "lucide-react";
 
 
-const AddAnything = ({ title, FormComponent }) => {
+interface AddAnythingProps {
+  title: string;
+  FormComponent: React.ComponentType<{ isOpen: boolean; onClose: () => void; onSuccess: () => void }>;
+}
+
+const AddAnything: React.FC<AddAnythingProps> = ({ title, FormComponent }) => {
   const [isOpen, setIsOpen] = useState(false);
 
   return (

@@ -1,6 +1,5 @@
 generator client {
   provider = "prisma-client-js"
-  previewFeatures = ["fullTextSearch"]
 }
 
 datasource db {
@@ -21,8 +20,6 @@ model User {
 }
 
 // class
-
-
 model Class {
   id              String    @id @default(cuid())
   name            String
@@ -122,18 +119,20 @@ model Assignment {
 
 //Bill
 model Bill {
-  id          String      @id @default(cuid())
+  id          String        @id @default(cuid())
   title       String
-  emoji       String
+  emoji       String        @default("💰")
   amount      Float
   dueDate     DateTime
   description String?
-  frequency   BillFrequency
-  status      BillStatus  @default(PENDING)
-  class       Class[]     
+  frequency   String        @default("ONCE") // ONCE, WEEKLY, BIWEEKLY, MONTHLY, QUARTERLY, YEARLY
+  status      String        @default("PENDING") // PENDING, ACTIVE, PAID, CANCELLED
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  
+  // Relations
+  class       Class[]       // Many-to-many relationship with classes
   students    StudentBill[]
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
 }
 
 

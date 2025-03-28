@@ -4,33 +4,26 @@ import { db } from "@/src/lib/db";
 import { revalidatePath } from "next/cache";
 import { auth } from "@clerk/nextjs/server";
 
-// Types
+// Define types
 interface CreateBillData {
   title: string;
-  emoji: string;  // Added this as it's required in schema
+  emoji?: string;
   amount: number;
   dueDate: Date;
   description?: string;
   frequency: "ONCE" | "WEEKLY" | "BIWEEKLY" | "MONTHLY" | "QUARTERLY" | "YEARLY";
-  classIds?: string[];  // Added to handle class assignments
-}
-
-interface UpdateBillData {
-  title: string;
-  amount: number;
-  dueDate: string;
-  description?: string;
-  frequency: string;
-  status: string;
 }
 
 interface BillResponse {
   success: boolean;
   data?: any;
   error?: string;
+  message?: string;
 }
 
-// Create Bill
+type BillStatus = "PENDING" | "ACTIVE" | "PAID" | "CANCELLED";
+
+// Create Bill with class selection
 export async function createBill(formData: FormData): Promise<BillResponse> {
   try {
     const { userId } = await auth();
@@ -40,14 +33,14 @@ export async function createBill(formData: FormData): Promise<BillResponse> {
 
     const data: CreateBillData = {
       title: formData.get("title") as string,
-      emoji: formData.get("emoji") as string || "💰", // Default emoji if none provided
+      emoji: (formData.get("emoji") as string) ?? "💰",
       amount: parseFloat(formData.get("amount") as string),
       dueDate: new Date(formData.get("dueDate") as string),
       description: formData.get("description") as string,
       frequency: formData.get("frequency") as CreateBillData["frequency"],
     };
 
-    // Get class IDs if provided
+    // Get class IDs - now required
     const classIds = formData.getAll("classIds") as string[];
 
     // Validate required fields
@@ -55,14 +48,53 @@ export async function createBill(formData: FormData): Promise<BillResponse> {
       return { success: false, error: "Missing required fields" };
     }
 
+    if (!classIds.length) {
+      return { success: false, error: "At least one class must be selected" };
+    }
+
+    // Verify that all classes belong to this user
+    const classes = await db.class.findMany({
+      where: {
+        id: { in: classIds },
+        userId: userId
+      }
+    });
+
+    // If any class doesn't belong to this user or doesn't exist
+    if (classes.length !== classIds.length) {
+      return { success: false, error: "One or more selected classes are invalid" };
+    }
+
+    // Create the bill with class assignments
     const newBill = await db.bill.create({
       data: {
         ...data,
         class: {
-          connect: classIds.map(id => ({ code: id }))
+          connect: classIds.map(id => ({ id })) 
         }
+      },
+      include: {
+        class: true
       }
     });
+
+    // Get all students from the selected classes
+    const students = await db.student.findMany({
+      where: {
+        classId: { in: classIds }
+      }
+    });
+
+    // If there are students, create StudentBill records for each
+    if (students.length > 0) {
+      await db.studentBill.createMany({
+        data: students.map(student => ({
+          billId: newBill.id,
+          studentId: student.id,
+          isPaid: false
+        }))
+      });
+    }
 
     revalidatePath("/dashboard/bills");
     return { success: true, data: newBill };
@@ -72,74 +104,39 @@ export async function createBill(formData: FormData): Promise<BillResponse> {
   }
 }
 
-// Assign Bill to Class
-export async function assignBillToClass(
-  billId: string,
-  classId: string
-): Promise<BillResponse> {
+// Get Bills - filter by user's classes
+export async function getBills(filters?: {
+  classId?: string;
+}): Promise<BillResponse> {
   try {
     const { userId } = await auth();
     if (!userId) {
       return { success: false, error: "User not found" };
     }
 
-    // Verificar que la clase pertenece al usuario
-    const classExists = await db.class.findFirst({
-      where: { id: classId, userId },
-    });
+    // All bills must be associated with a class owned by this user
+    let whereClause: any = {
+      class: {
+        some: {
+          userId: userId
+        }
+      }
+    };
 
-    if (!classExists) {
-      return { success: false, error: "Class not found" };
-    }
-
-    
-    await db.bill.update({
-      where: { id: billId },
-      data: {
+    // Add class filter if provided
+    if (filters?.classId) {
+      whereClause = {
         class: {
-          connect: { id: classId },
-        },
-      },
-      include: {
-        class: true,
-        students: true,
-      },
-    });
-
-    const students = await db.student.findMany({
-      where: { classId },
-    });
-
-    await Promise.all(
-      students.map((student) =>
-        db.studentBill.create({
-          data: {
-            billId,
-            studentId: student.id,
-          },
-        })
-      )
-    );
-
-    revalidatePath("/dashboard/bills");
-    revalidatePath("/dashboard/classes");
-    return { success: true };
-  } catch (error) {
-    console.error("Error fetching bill:", error);
-    return { success: false, error: "Failed to fetch bill details" };
-  }
-}
-
-//Get a single Bill
-export async function getBill(billId: string): Promise<BillResponse> {
-  try {
-    const { userId } = await auth();
-    if (!userId) {
-      return { success: false, error: "User not found" };
+          some: { 
+            id: filters.classId,
+            userId
+          }
+        }
+      };
     }
 
-    const bill = await db.bill.findUnique({
-      where: { id: billId },
+    const bills = await db.bill.findMany({
+      where: whereClause,
       include: {
         class: {
           select: {
@@ -149,50 +146,6 @@ export async function getBill(billId: string): Promise<BillResponse> {
             code: true,
           },
         },
-      },
-    });
-
-    if (!bill) {
-      return { success: false, error: "Bill not found" };
-    }
-
-    return { success: true, data: bill };
-  } catch (error) {
-    console.error("Error fetching bill:", error);
-    return { success: false, error: "Failed to fetch bill details" };
-  }
-}
-
-// Get Bills
-export async function getBills(filters?: {
-  classId?: string;
-  unassigned?: boolean;
-}): Promise<BillResponse> {
-  try {
-    const { userId } = await auth();
-    if (!userId) {
-      return { success: false, error: "User not found" };
-    }
-
-    let whereClause = {};
-    if (filters?.classId) {
-      whereClause = {
-        classes: {
-          some: { id: filters.classId },
-        },
-      };
-    } else if (filters?.unassigned) {
-      whereClause = {
-        classes: {
-          none: {},
-        },
-      };
-    }
-
-    const bills = await db.bill.findMany({
-      where: whereClause,
-      include: {
-        class: true,
         students: {
           include: {
             student: true,
@@ -204,8 +157,251 @@ export async function getBills(filters?: {
 
     return { success: true, data: bills };
   } catch (error) {
+    console.error("Error fetching bills:", error);
+    return { success: false, error: "Failed to fetch bill details" };
+  }
+}
+
+// Get a single Bill - ensure it belongs to the user
+export async function getBill(billId: string): Promise<BillResponse> {
+  try {
+    const { userId } = await auth();
+    if (!userId) {
+      return { success: false, error: "User not found" };
+    }
+
+    const bill = await db.bill.findFirst({
+      where: {
+        id: billId,
+        class: {
+          some: {
+            userId: userId
+          }
+        }
+      },
+      include: {
+        class: {
+          select: {
+            id: true,
+            name: true,
+            emoji: true,
+            code: true,
+          },
+        },
+        students: {
+          include: {
+            student: true
+          }
+        }
+      },
+    });
+
+    if (!bill) {
+      return { success: false, error: "Bill not found or doesn't belong to you" };
+    }
+
+    return { success: true, data: bill };
+  } catch (error) {
     console.error("Error fetching bill:", error);
     return { success: false, error: "Failed to fetch bill details" };
+  }
+}
+
+// Update Bill
+export async function updateBill(billId: string, data: Partial<CreateBillData>): Promise<BillResponse> {
+  try {
+    const { userId } = await auth();
+    if (!userId) {
+      return { success: false, error: "Unauthorized" };
+    }
+
+    // First verify the bill belongs to this user
+    const billExists = await db.bill.findFirst({
+      where: {
+        id: billId,
+        class: {
+          some: {
+            userId: userId
+          }
+        }
+      }
+    });
+
+    if (!billExists) {
+      return { success: false, error: "Bill not found or doesn't belong to you" };
+    }
+
+    const updateData: any = {
+      title: data.title,
+      amount: data.amount,
+      dueDate: data.dueDate ? new Date(data.dueDate) : undefined,
+      description: data.description,
+      frequency: data.frequency,
+    };
+
+    const bill = await db.bill.update({
+      where: { id: billId },
+      data: updateData
+    });
+
+    revalidatePath('/dashboard/bills');
+    return { success: true, data: bill };
+  } catch (error: any) {
+    console.error("Update bill error:", error?.message || "Unknown error");
+    return { success: false, error: "Failed to update bill" };
+  }
+}
+
+// New function to copy bill to additional classes
+interface CopyBillToClassParams {
+  billId: string;
+  targetClassIds: string[];
+}
+
+export async function copyBillToClasses({
+  billId,
+  targetClassIds
+}: CopyBillToClassParams): Promise<BillResponse> {
+  try {
+    const { userId } = await auth();
+    if (!userId) {
+      return { success: false, error: "Unauthorized" };
+    }
+
+    // 1. Verify the bill exists and belongs to this user
+    const originalBill = await db.bill.findFirst({
+      where: {
+        id: billId,
+        class: {
+          some: {
+            userId
+          }
+        }
+      },
+      include: {
+        class: true
+      }
+    });
+
+    if (!originalBill) {
+      return { success: false, error: "Bill not found or doesn't belong to you" };
+    }
+
+    // 2. Verify all target classes belong to this user
+    const targetClasses = await db.class.findMany({
+      where: {
+        id: { in: targetClassIds },
+        userId
+      }
+    });
+
+    if (targetClasses.length !== targetClassIds.length) {
+      return { success: false, error: "One or more target classes are invalid" };
+    }
+
+    // 3. Check which classes the bill is already assigned to
+    const existingClassIds = originalBill.class.map(cls => cls.id);
+    
+    // Filter out classes that already have this bill
+    const newClassIds = targetClassIds.filter(id => !existingClassIds.includes(id));
+    
+    if (newClassIds.length === 0) {
+      return { success: false, error: "Bill is already assigned to all selected classes" };
+    }
+
+    // 4. Update the bill to add the new class connections
+    const updatedBill = await db.bill.update({
+      where: { id: billId },
+      data: {
+        class: {
+          connect: newClassIds.map(id => ({ id }))
+        }
+      },
+      include: {
+        class: true
+      }
+    });
+
+    // 5. Get all students from the new classes
+    const students = await db.student.findMany({
+      where: {
+        classId: { in: newClassIds }
+      }
+    });
+
+    // 6. Create StudentBill records for each student in the new classes
+    if (students.length > 0) {
+      // First check which students already have this bill assigned
+      const existingStudentBills = await db.studentBill.findMany({
+        where: { billId }
+      });
+      
+      const existingStudentIds = existingStudentBills.map(sb => sb.studentId);
+      
+      // Only create records for students who don't already have this bill
+      const newStudentBills = students
+        .filter(student => !existingStudentIds.includes(student.id))
+        .map(student => ({
+          billId,
+          studentId: student.id,
+          isPaid: false
+        }));
+        
+      if (newStudentBills.length > 0) {
+        await db.studentBill.createMany({
+          data: newStudentBills
+        });
+      }
+    }
+
+    revalidatePath("/dashboard/bills");
+    revalidatePath("/dashboard/classes");
+    
+    return { 
+      success: true, 
+      data: updatedBill,
+      message: `Bill successfully assigned to ${newClassIds.length} additional class(es)`
+    };
+  } catch (error) {
+    console.error("Error copying bill to classes:", error);
+    return { success: false, error: "Failed to assign bill to additional classes" };
+  }
+}
+
+// Delete Bill
+export async function deleteBill(id: string): Promise<BillResponse> {
+  try {
+    const { userId } = await auth();
+    if (!userId) {
+      return { success: false, error: "User not authorized" };
+    }
+
+    // Verify the bill belongs to this user
+    const bill = await db.bill.findFirst({
+      where: {
+        id: id,
+        class: {
+          some: {
+            userId: userId
+          }
+        }
+      }
+    });
+
+    if (!bill) {
+      return { success: false, error: "Bill not found or doesn't belong to you" };
+    }
+
+    // Delete the bill if it belongs to this user
+    await db.bill.delete({
+      where: { id },
+    });
+
+    revalidatePath("/dashboard/bills");
+    return { success: true };
+  } catch (error) {
+    console.error("Error deleting bill:", error);
+    return { success: false, error: "Failed to delete bill" };
   }
 }
 
@@ -219,6 +415,27 @@ export async function updatePaymentStatus(
     const { userId } = await auth();
     if (!userId) {
       return { success: false, error: "User not found" };
+    }
+
+    // Verify the bill belongs to this user and the student is in one of their classes
+    const billAndStudent = await db.bill.findFirst({
+      where: {
+        id: billId,
+        class: {
+          some: {
+            userId: userId,
+            students: {
+              some: {
+                id: studentId
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!billAndStudent) {
+      return { success: false, error: "Bill or student not found, or doesn't belong to your classes" };
     }
 
     const updatedStudentBill = await db.studentBill.update({
@@ -237,62 +454,13 @@ export async function updatePaymentStatus(
     revalidatePath("/dashboard/bills");
     return { success: true, data: updatedStudentBill };
   } catch (error) {
-    console.error("Error updating the bill:", error);
-    return { success: false, error: "Failed to update the bill" };
-  }
-}
-// Update Bill
-export async function updateBill(
-  id: string, 
-  data: UpdateBillData
-): Promise<BillResponse> {
-  try {
-    const { userId } = await auth();
-    if (!userId) {
-      return { success: false, error: "User not authorized" };
-    }
-
-    // Validate required fields
-    if (!data.title || !data.amount || !data.dueDate || !data.frequency || !data.status) {
-      return { success: false, error: "Missing required fields" };
-    }
-
-    const updatedBill = await db.bill.update({
-      where: { id },
-      data: {
-        title: data.title,
-        amount: data.amount,
-        dueDate: new Date(data.dueDate),
-        description: data.description,
-        frequency: data.frequency,
-        status: data.status
-      }
-    });
-
-    revalidatePath("/dashboard/bills");
-    return { success: true, data: updatedBill };
-  } catch (error) {
-    console.error("Update bill error:", error);
-    return { success: false, error: "Failed to update bill" };
+    console.error("Error updating payment status:", error);
+    return { success: false, error: "Failed to update payment status" };
   }
 }
 
-// Delete Bill
-export async function deleteBill(id: string): Promise<BillResponse> {
-  try {
-    const { userId } = await auth();
-    if (!userId) {
-      return { success: false, error: "User not authorized" };
-    }
-
-    await db.bill.delete({
-      where: { id },
-    });
-
-    revalidatePath("/dashboard/bills");
-    return { success: true };
-  } catch (error) {
-    console.error("Error deleting bill:", error);
-    return { success: false, error: "Failed to delete bill" };
-  }
+// Helper function remains the same
+function isValidBillFrequency(frequency: string): boolean {
+  const validFrequencies = ["ONCE", "WEEKLY", "BIWEEKLY", "MONTHLY", "QUARTERLY", "YEARLY"];
+  return validFrequencies.includes(frequency);
 }
