@@ -34,7 +34,7 @@ export function EditStudentForm({
       const result = await updateStudent(formData, classCode, student.id);
       
       if (!result.success) {
-        toast.error(result.error);
+        toast.error(result.error || "An unknown error occurred");
         return;
       }
 

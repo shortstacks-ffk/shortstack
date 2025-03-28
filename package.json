@@ -3,10 +3,9 @@
   "version": "0.11.5",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --turbo",
     "build": "next build",
     "start": "next start",
-    "prebuild": "(npm ls sharp || npm install sharp) && (if [ \"$VERCEL\" = \"1\" ]; then npm rebuild --platform=linux --arch=x64 sharp; fi)",
     "lint": "next lint",
     "postinstall": "prisma generate",
     "deploy-db": "prisma generate && prisma migrate deploy"
@@ -57,7 +56,8 @@
     "sharp": "^0.33.5",
     "tailwind-merge": "^2.6.0",
     "uuid": "^11.0.5",
-    "zod": "^3.24.1"
+    "zod": "^3.24.1",
+    "zustand": "^5.0.3"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
@@ -66,7 +66,9 @@
     "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.9",
     "@types/node": "^20.17.16",
+    "@types/nodemailer": "^6.4.17",
     "@types/react": "^19",
+    "@types/react-day-picker": "^5.2.1",
     "@types/react-dom": "^19",
     "bcryptjs": "^2.4.3",
     "eslint": "^9",
@@ -77,5 +79,8 @@
     "tailwindcss-animate": "^1.0.7",
     "tsx": "^4.19.2",
     "typescript": "^5.8.2"
+  },
+  "engines": {
+    "node": "22.x"
   }
 }

@@ -83,7 +83,7 @@ const ClassOverview = ({ classData }: ClassOverviewProps) => {
         <h3 className="text-xl font-semibold mb-4">Student Management</h3>
         <StudentList
           classCode={classData.code}
-          maxStudents={classData.students.length}
+          maxStudents={Infinity}
         />
       </div>
     </div>

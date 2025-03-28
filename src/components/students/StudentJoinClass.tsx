@@ -7,7 +7,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { toast } from "react-hot-toast";
 import { useRouter } from "next/navigation";
 
-export function StudentJoinClass({ isOpen, onClose, onSuccess }) {
+export function StudentJoinClass({   isOpen,
+  onClose,
+  onSuccess,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+})  {
   const [classCode, setClassCode] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();

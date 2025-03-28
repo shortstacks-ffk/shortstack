@@ -3,9 +3,9 @@
 import { EditorContent, useEditor, Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { useEffect } from 'react';
+import { EditorView } from '@tiptap/pm/view';
 import TextAlign from "@tiptap/extension-text-align";
 import Highlight from "@tiptap/extension-highlight";
-import { Button } from '@/src/components/ui/button';
 import { Toggle } from "@/src/components/ui/toggle";
 import {
   AlignCenter,
@@ -142,7 +142,7 @@ const RichEditor = ({ content, onChange, editable = true }: RichEditorProps) => 
       TextAlign.configure({
         types: ['heading', 'paragraph'],
       }),
-     Highlight,
+      Highlight,
     ],
     content,
     editable,
@@ -153,7 +153,8 @@ const RichEditor = ({ content, onChange, editable = true }: RichEditorProps) => 
       attributes: {
         class: 'min-h-[150px] p-4 focus:outline-none prose prose-sm max-w-none',
       },
-      handleKeyDown: (view, event) => {
+      // Properly typed handleKeyDown function
+      handleKeyDown: (view: EditorView, event: KeyboardEvent): boolean => {
         // Handle Shift+Enter for soft line breaks
         if (event.key === 'Enter' && event.shiftKey) {
           editor?.commands.insertContent('<br>');
@@ -165,11 +166,13 @@ const RichEditor = ({ content, onChange, editable = true }: RichEditorProps) => 
           event.preventDefault();
           if (event.shiftKey) {
             if (editor?.isActive('listItem')) {
-              return editor.commands.liftListItem('listItem');
+              editor.commands.liftListItem('listItem');
+              return true;
             }
           } else {
             if (editor?.isActive('listItem')) {
-              return editor.commands.sinkListItem('listItem');
+              editor.commands.sinkListItem('listItem');
+              return true;
             }
             editor?.commands.insertContent('    ');
             return true;

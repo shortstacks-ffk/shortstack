@@ -1,7 +1,9 @@
-import DashboardAddStoreItemCard from "@/src/components/storefront/dashboardAddStoreItemCard";
+// import DashboardAddStoreItemCard from "@/src/components/storefront/dashboardAddStoreItemCard";
 import { getStoreItems } from "@/src/app/actions/storeFrontActions";
 import { StoreItemCard } from "@/src/components/storefront/StoreItemCard";
-import { Store } from "lucide-react";
+// import { Store } from "lucide-react";
+import AddAnything from "@/src/components/AddAnything";
+import AddStoreItem from "@/src/components/storefront/AddStoreItem";
 
 export default async function StoreFrontPage() {
   const getColumnColor = (index: number) => {
@@ -36,7 +38,11 @@ export default async function StoreFrontPage() {
               backgroundColor={getColumnColor(index)}
             />
           ))}
-      <DashboardAddStoreItemCard />
+      {/* <DashboardAddStoreItemCard /> */}
+      <AddAnything
+        title="Add Store Item"
+        FormComponent={AddStoreItem}
+        />
         </div>
         </div>
     </main>

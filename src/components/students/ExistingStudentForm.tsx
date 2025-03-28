@@ -23,7 +23,7 @@ interface AvailableStudent {
   firstName: string;
   lastName: string;
   schoolEmail: string;
-  classId: string;
+  classId?: string;
 }
 
 export function ExistingStudentForm({ classCode, onClose }: ExistingStudentFormProps) {
@@ -38,7 +38,7 @@ export function ExistingStudentForm({ classCode, onClose }: ExistingStudentFormP
         setLoading(true);
         const result = await getAvailableStudents(classCode);
         if (result.success) {
-          setStudents(result.data || []);
+          setStudents(result.data as AvailableStudent[] || []);
         } else {
           toast.error(result.error || 'Failed to load available students');
         }

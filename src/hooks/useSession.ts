@@ -1,6 +1,6 @@
 'use client';
 
-import { useSessionStore } from '@/src/app/lib/sessionStore';
+import { useSessionStore } from '@/src/lib/sessionStore';
 import { useAuth } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 

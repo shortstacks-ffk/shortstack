@@ -2,7 +2,7 @@ import * as React from "react"
 import { ChevronRight } from "lucide-react"
 
 import { Calendars } from "@/src/components/calendars"
-import { DatePicker } from "@/src/components/date-picker"
+// import { DatePicker } from "@/src/components/date-picker"
 import { NavUser } from "@/src/components/nav-user"
 import {
   Sidebar,
@@ -53,7 +53,7 @@ export function SidebarRight({
         <NavUser user={data.user} />
       </SidebarHeader>
       <SidebarContent>
-        <DatePicker />
+        {/* <DatePicker /> */}
         <SidebarSeparator className="mx-0" />
         <Calendars calendars={data.calendars} />
       </SidebarContent>

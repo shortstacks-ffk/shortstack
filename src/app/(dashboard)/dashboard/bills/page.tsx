@@ -1,53 +1,79 @@
 import { getBills } from "@/src/app/actions/billActions";
-import DashboardAddBillCard from "@/src/components/bills/dashboardAddBillCard";
 import { BillCard } from "@/src/components/bills/BillCard";
+import { Suspense } from "react";
+import AddAnything from "@/src/components/AddAnything";
+import AddBill from "@/src/components/bills/AddBill";
 
-export default async function BillsPage() {
-  const getColumnColor = (index: number) => {
-    switch (index % 3) {
-      case 0:
-        return "bg-green-200";
-      case 1:
-        return "bg-emerald-200";
-      case 2:
-        return "bg-teal-200";
-      default:
-        return "bg-blue-200";
-    }
-  };
+interface BillClass {
+  id: string;
+  name: string;
+}
 
+// Bills content component to handle data fetching
+async function BillsContent() {
   const response = await getBills();
 
   if (!response.success || !response.data) {
-    return <div>Failed to load bills</div>;
+    return <div className="text-center py-8 opacity-0">No bills found</div>;
   }
 
-  // Reverse the array so newest items are at the end
+  // Sort the bills
   const sortedBills = [...response.data].sort((a, b) => {
-    //First compare by frequency
-    if(a.frequency !== "ONCE" && b.frequency === "ONCE") return -1;
-    if(a.frequency === "ONCE" && b.frequency !== "ONCE") return 1;
+    // First compare by frequency
+    if (a.frequency !== "ONCE" && b.frequency === "ONCE") return -1;
+    if (a.frequency === "ONCE" && b.frequency !== "ONCE") return 1;
 
-    //If frequencies are the same, sort by due date
+    // If frequencies are the same, sort by due date
     const dateA = new Date(a.dueDate).getTime();
     const dateB = new Date(b.dueDate).getTime();
     return dateA - dateB;
   });
+
+  const getColumnColor = (index: number) => {
+    switch (index % 3) {
+      case 0: return "bg-blue-100";
+      case 1: return "bg-green-100";
+      case 2: return "bg-yellow-100";
+      default: return "bg-blue-100";
+    }
+  };
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+      {sortedBills.map((bill, index) => (
+        <BillCard
+          key={bill.id}
+          id={bill.id}
+          title={bill.title}
+          emoji={bill.emoji}
+          amount={bill.amount}
+          dueDate={bill.dueDate}
+          frequency={bill.frequency}
+          status={bill.status}
+          description={bill.description || ""}
+          backgroundColor={getColumnColor(index)}
+          classes={bill.class.map((c: BillClass) => ({ id: c.id, name: c.name }))}
+        />
+      ))}
+      
+      {/* Add the AddAnything component here */}
+      <AddAnything 
+        title="Create a Bill" 
+        FormComponent={AddBill} 
+      />
+    </div>
+  );
+}
+
+// Main page component
+export default function BillsPage() {
   return (
     <main className="container mx-auto p-4">
-      <h1 className="text-3xl font-bold mb-4">Bills</h1>
-      <div className="max-w-4xl ml-0 mr-auto w-full">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {sortedBills.map((bill, index) => (
-            <BillCard
-              key={bill.id}
-              {...bill}
-              backgroundColor={getColumnColor(index)}
-            />
-          ))}
-          <DashboardAddBillCard />
-        </div>
-      </div>
+      <h1 className="text-2xl font-bold mb-8">Bills</h1>
+      
+      <Suspense fallback={<div className="text-center py-8">Loading bills...</div>}>
+        <BillsContent />
+      </Suspense>
     </main>
   );
 }

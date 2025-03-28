@@ -1,5 +1,128 @@
-import { google } from 'googleapis';
+// import { google } from 'googleapis';
+// import { Readable } from 'stream';
+
+// // Convert Buffer to Readable Stream
+// function bufferToStream(buffer: Buffer): Readable {
+//   const stream = new Readable();
+//   stream.push(buffer);
+//   stream.push(null); // Signal the end of the stream
+//   return stream;
+// }
+
+// // Keep a cache of folder IDs to avoid repeated lookups
+// const folderCache: Record<string, string> = {};
+
+// // Configure Google Drive API client
+// function getDriveClient() {
+//   // Use service account for server-side operations
+//   const auth = new google.auth.GoogleAuth({
+//     credentials: {
+//       client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+//       private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+//     },
+//     scopes: ['https://www.googleapis.com/auth/drive.file'],
+//   });
+
+//   return google.drive({ version: 'v3', auth });
+// }
+
+// // Create folders if they don't exist
+// export async function createFolderIfNotExists(folderName: string) {
+//   // Check cache first
+//   if (folderCache[folderName]) {
+//     return folderCache[folderName];
+//   }
+  
+//   const drive = getDriveClient();
+  
+//   // Check if folder exists
+//   const response = await drive.files.list({
+//     q: `name='${folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+//     fields: 'files(id, name)',
+//   });
+
+//   if (response.data.files && response.data.files.length > 0) {
+//     // Cache the folder ID
+//     if (response.data.files[0].id) {
+//       folderCache[folderName] = response.data.files[0].id;
+//     } else {
+//       throw new Error(`Folder ID for '${folderName}' is undefined or null.`);
+//     }
+//     return response.data.files[0].id;
+//   }
+
+//   // Create folder if it doesn't exist
+//   const fileMetadata = {
+//     name: folderName,
+//     mimeType: 'application/vnd.google-apps.folder',
+//   };
+  
+//   const folder = await drive.files.create({
+//     requestBody: fileMetadata,
+//     fields: 'id',
+//   });
+  
+//   // Cache the new folder ID
+//   if (!folder.data.id) {
+//     throw new Error(`Failed to create folder '${folderName}', folder ID is undefined.`);
+//   }
+//   folderCache[folderName] = folder.data.id;
+//   return folder.data.id;
+// }
+
+// export async function uploadFileToDrive(file: Buffer, fileName: string, mimeType: string) {
+//   try {
+//     const drive = getDriveClient();
+    
+//     // Ensure the uploads folder exists (using cache when possible)
+//     const folderId = await createFolderIfNotExists('shortstack_uploads');
+    
+//     // Convert buffer to stream
+//     const fileStream = bufferToStream(file);
+    
+//     // Upload file to Google Drive and create public permissions in one step
+//     const response = await drive.files.create({
+//       requestBody: {
+//         name: fileName,
+//         mimeType: mimeType,
+//         parents: [folderId],
+//       },
+//       media: {
+//         mimeType: mimeType,
+//         body: fileStream,
+//       },
+//       fields: 'id, webViewLink, webContentLink',
+//     });
+
+//     if (!response.data.id) {
+//       throw new Error('Failed to upload file to Google Drive');
+//     }
+    
+//     // Make the file publicly accessible with a link
+//     await drive.permissions.create({
+//       fileId: response.data.id,
+//       requestBody: {
+//         role: 'reader',
+//         type: 'anyone',
+//       },
+//     });
+
+//     // Return direct web and download links
+//     return {
+//       success: true,
+//       fileId: response.data.id,
+//       webViewLink: `https://drive.google.com/file/d/${response.data.id}/view`,
+//       downloadLink: `https://drive.google.com/uc?export=download&id=${response.data.id}`,
+//     };
+//   } catch (error) {
+//     console.error('Error uploading to Google Drive:', error);
+//     throw error;
+//   }
+// }
+
+import { google, drive_v3 } from 'googleapis';
 import { Readable } from 'stream';
+import { GaxiosResponse } from 'gaxios';
 
 // Convert Buffer to Readable Stream
 function bufferToStream(buffer: Buffer): Readable {
@@ -13,7 +136,7 @@ function bufferToStream(buffer: Buffer): Readable {
 const folderCache: Record<string, string> = {};
 
 // Configure Google Drive API client
-function getDriveClient() {
+function getDriveClient(): drive_v3.Drive {
   // Use service account for server-side operations
   const auth = new google.auth.GoogleAuth({
     credentials: {
@@ -27,7 +150,7 @@ function getDriveClient() {
 }
 
 // Create folders if they don't exist
-export async function createFolderIfNotExists(folderName: string) {
+export async function createFolderIfNotExists(folderName: string): Promise<string> {
   // Check cache first
   if (folderCache[folderName]) {
     return folderCache[folderName];
@@ -43,12 +166,17 @@ export async function createFolderIfNotExists(folderName: string) {
 
   if (response.data.files && response.data.files.length > 0) {
     // Cache the folder ID
-    folderCache[folderName] = response.data.files[0].id;
-    return response.data.files[0].id;
+    const folderId = response.data.files[0].id;
+    if (folderId) {
+      folderCache[folderName] = folderId;
+      return folderId;
+    } else {
+      throw new Error(`Folder ID for '${folderName}' is undefined or null.`);
+    }
   }
 
   // Create folder if it doesn't exist
-  const fileMetadata = {
+  const fileMetadata: drive_v3.Schema$File = {
     name: folderName,
     mimeType: 'application/vnd.google-apps.folder',
   };
@@ -59,11 +187,26 @@ export async function createFolderIfNotExists(folderName: string) {
   });
   
   // Cache the new folder ID
-  folderCache[folderName] = folder.data.id;
-  return folder.data.id;
+  const newFolderId = folder.data.id;
+  if (!newFolderId) {
+    throw new Error(`Failed to create folder '${folderName}', folder ID is undefined.`);
+  }
+  folderCache[folderName] = newFolderId;
+  return newFolderId;
 }
 
-export async function uploadFileToDrive(file: Buffer, fileName: string, mimeType: string) {
+interface DriveUploadResult {
+  success: boolean;
+  fileId: string;
+  webViewLink: string;
+  downloadLink: string;
+}
+
+export async function uploadFileToDrive(
+  file: Buffer, 
+  fileName: string, 
+  mimeType: string
+): Promise<DriveUploadResult> {
   try {
     const drive = getDriveClient();
     
@@ -73,8 +216,8 @@ export async function uploadFileToDrive(file: Buffer, fileName: string, mimeType
     // Convert buffer to stream
     const fileStream = bufferToStream(file);
     
-    // Upload file to Google Drive and create public permissions in one step
-    const response = await drive.files.create({
+    // Upload file to Google Drive
+    const response: GaxiosResponse<drive_v3.Schema$File> = await drive.files.create({
       requestBody: {
         name: fileName,
         mimeType: mimeType,
@@ -87,13 +230,14 @@ export async function uploadFileToDrive(file: Buffer, fileName: string, mimeType
       fields: 'id, webViewLink, webContentLink',
     });
 
-    if (!response.data.id) {
+    const fileId = response.data.id;
+    if (!fileId) {
       throw new Error('Failed to upload file to Google Drive');
     }
     
     // Make the file publicly accessible with a link
     await drive.permissions.create({
-      fileId: response.data.id,
+      fileId: fileId,
       requestBody: {
         role: 'reader',
         type: 'anyone',
@@ -103,9 +247,9 @@ export async function uploadFileToDrive(file: Buffer, fileName: string, mimeType
     // Return direct web and download links
     return {
       success: true,
-      fileId: response.data.id,
-      webViewLink: `https://drive.google.com/file/d/${response.data.id}/view`,
-      downloadLink: `https://drive.google.com/uc?export=download&id=${response.data.id}`,
+      fileId: fileId,
+      webViewLink: `https://drive.google.com/file/d/${fileId}/view`,
+      downloadLink: `https://drive.google.com/uc?export=download&id=${fileId}`,
     };
   } catch (error) {
     console.error('Error uploading to Google Drive:', error);

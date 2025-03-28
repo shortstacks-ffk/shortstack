@@ -26,7 +26,7 @@ interface StudentListProps {
   maxStudents: number;
 }
 
-export function StudentList({ classCode, maxStudents }: StudentListProps) {
+export function StudentList({ classCode, maxStudents = Infinity }: StudentListProps) {
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddDialog, setShowAddDialog] = useState(false);
@@ -88,12 +88,11 @@ export function StudentList({ classCode, maxStudents }: StudentListProps) {
           </p>
         </div>
         <button
-          onClick={() => setShowAddDialog(true)}
-          className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90"
-          disabled={enrollmentStats.total >= maxStudents}
-        >
-          Add Student
-        </button>
+  onClick={() => setShowAddDialog(true)}
+  className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90 cursor-pointer"
+>
+  Add Student
+</button>
       </div>
 
       {/* Add Student Dialog with Tabs */}
@@ -112,7 +111,7 @@ export function StudentList({ classCode, maxStudents }: StudentListProps) {
             <TabsContent value="new">
               <AddStudentForm
                 classCode={classCode}
-                maxStudents={maxStudents}
+                maxStudents={Infinity} 
                 currentStudentCount={students.length}
                 onClose={() => {
                   setShowAddDialog(false);
