@@ -26,7 +26,7 @@ export default function ClassTabs({ classData }: ClassTabsProps) {
       </TabsList>
 
       <TabsContent value="overview">
-        <ClassOverview classData={classData} />
+        <ClassOverview classData={{ ...classData, overview: classData.overview ?? undefined }} />
       </TabsContent>
 
 

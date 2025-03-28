@@ -26,10 +26,10 @@ export function AddStudentForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (currentStudentCount >= maxStudents) {
-      toast.error('Maximum number of students reached');
-      return;
-    }
+    // if (currentStudentCount >= maxStudents) {
+    //   toast.error('Maximum number of students reached');
+    //   return;
+    // }
 
     setLoading(true);
     try {

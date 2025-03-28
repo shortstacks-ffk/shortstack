@@ -3,17 +3,20 @@ import { createAssignment } from '@/src/app/actions/assignmentActions';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { useState } from 'react';
+import { useParams } from 'next/navigation';
+import { Loader2, Upload } from 'lucide-react';
 
 interface AssignmentRecord {
-    id: string;
-    name: string;
-    fileType?: string;
-    activityType?: string;
-    createdAt?: string;
-    dueDate?: string;
-    size?: string | number;
-  }
-
+  id: string;
+  name: string;
+  fileType?: string;
+  activity?: string;  // Changed from activityType to match schema
+  createdAt?: string;
+  dueDate?: string;
+  size?: string | number;
+  file?: File;
+  url?: string;
+}
 
 // Dialog for uploading an assignment
 export default function UploadAssignmentDialog({
@@ -23,58 +26,180 @@ export default function UploadAssignmentDialog({
   lessonPlanId: string;
   onAssignmentUploaded: (assignment: AssignmentRecord) => void;
 }) {
+  // Get classId from URL params
+  const params = useParams();
+  const classId = params.classId as string;
+  
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
-  const [activityType, setActivityType] = useState('interactive');
-  const [file, setFile] = useState<File | null>(null);
+  const [activity, setActivity] = useState('interactive');  // Changed variable name to match schema
+  const [isUploading, setIsUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [dueDate, setDueDate] = useState('');
+  const [file, setFile] = useState<File | null>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setFile(e.target.files[0]);
+      if (!name) {
+        // Auto-fill name from file name if empty
+        setName(e.target.files[0].name.split('.')[0]);
+      }
+    }
+  };
 
   const handleSubmit = async () => {
-    const fd = new FormData();
-    fd.append('name', name);
-    fd.append('activityType', activityType);
-    fd.append('dueDate', dueDate);
-    if (file) {
-      fd.append('file', file);
+    if (!name) {
+      setError('Please provide an assignment name');
+      return;
     }
-    // Create assignment record using our action.
-    const res = await createAssignment({
-      name,
-      dueDate: dueDate ? new Date(dueDate) : undefined,
-      lessonPlanIds: [lessonPlanId],
-    });
-    if (res.success) {
-      onAssignmentUploaded(res.data);
-      setOpen(false);
-      setName('');
-      setActivityType('interactive');
-      setFile(null);
-      setDueDate('');
-    } else {
-      console.error(res.error);
+
+    setIsUploading(true);
+    setError(null);
+
+    try {
+      // Upload file first if provided
+      let url = '';
+      let fileType = '';
+      let size = 0;
+
+      if (file) {
+        // Create a FormData instance
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        // Upload the file to your storage service
+        const uploadRes = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+        });
+        
+        if (!uploadRes.ok) {
+          throw new Error('Failed to upload file');
+        }
+        
+        const uploadData = await uploadRes.json();
+        url = uploadData.url;
+        fileType = file.type;
+        size = file.size;
+      }
+
+      // Create assignment record using our action
+      const res = await createAssignment({
+        name,
+        activity,
+        dueDate: dueDate ? new Date(dueDate) : undefined,
+        classId,
+        lessonPlanIds: [lessonPlanId],
+        url, // Add the file URL if uploaded
+        fileType,
+        size,
+      });
+
+      if (res.success) {
+        onAssignmentUploaded(res.data);
+        setOpen(false);
+        setName('');
+        setActivity('interactive');
+        setDueDate('');
+        setFile(null);
+      } else {
+        setError(res.error || 'Failed to create assignment');
+      }
+    } catch (error: any) {
+      console.error('Error creating assignment:', error);
+      setError(error.message || 'An unexpected error occurred');
+    } finally {
+      setIsUploading(false);
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(isOpen) => {
+      if (!isUploading) {
+        setOpen(isOpen);
+        if (!isOpen) {
+          setError(null);
+        }
+      }
+    }}>
       <DialogTrigger asChild>
         <Button className="bg-orange-500 text-white" size="sm">Upload</Button>
       </DialogTrigger>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Upload Assignment</DialogTitle>
+          <DialogTitle>Create Assignment</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
-          <Input placeholder="Assignment Name" value={name} onChange={(e) => setName(e.target.value)} />
-          <select className="border p-2 w-full rounded" value={activityType} onChange={(e) => setActivityType(e.target.value)}>
+          <Input 
+            placeholder="Assignment Name" 
+            value={name} 
+            onChange={(e) => setName(e.target.value)} 
+            disabled={isUploading}
+          />
+          
+          {/* File Upload Component */}
+          <div className="border-2 border-dashed border-gray-300 rounded-md p-4 text-center">
+            <label className="flex flex-col items-center gap-2 cursor-pointer">
+              <Upload className="h-6 w-6 text-gray-400" />
+              <span className="text-sm text-gray-600">
+                {file ? file.name : 'Click to upload assignment file'}
+              </span>
+              <Input 
+                type="file" 
+                className="hidden" 
+                onChange={handleFileChange}
+                disabled={isUploading} 
+              />
+            </label>
+            {file && (
+              <div className="mt-2 text-xs text-gray-500">
+                Size: {(file.size / 1024 / 1024).toFixed(2)} MB
+              </div>
+            )}
+          </div>
+          
+          <select 
+            className="border p-2 w-full rounded" 
+            value={activity} 
+            onChange={(e) => setActivity(e.target.value)}
+            disabled={isUploading}
+          >
             <option value="interactive">Interactive</option>
             <option value="presentation">Presentation</option>
           </select>
-          <Input type="file" accept=".pdf,.ppt,.pptx" onChange={(e) => setFile(e.target.files?.[0] || null)} />
-          <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+          
+          <Input 
+            type="date" 
+            value={dueDate} 
+            onChange={(e) => setDueDate(e.target.value)}
+            disabled={isUploading} 
+          />
+          
+          {error && <div className="text-red-500 text-sm">{error}</div>}
+          
           <div className="flex justify-end gap-2 pt-2">
-            <Button variant="secondary" size="sm" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button size="sm" onClick={handleSubmit}>Submit</Button>
+            <Button 
+              variant="secondary" 
+              size="sm" 
+              onClick={() => setOpen(false)}
+              disabled={isUploading}
+            >
+              Cancel
+            </Button>
+            <Button 
+              size="sm" 
+              onClick={handleSubmit} 
+              disabled={isUploading}
+              className="min-w-[80px]"
+            >
+              {isUploading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Creating
+                </>
+              ) : 'Create'}
+            </Button>
           </div>
         </div>
       </DialogContent>

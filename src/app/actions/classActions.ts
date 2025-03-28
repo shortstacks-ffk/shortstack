@@ -57,7 +57,10 @@ export async function createClass(formData: FormData): Promise<ClassResponse> {
       return { success: false, error: "User not found" };
     }
 
-    const code = await generateUniqueClassCode(dbUser.id);
+    if (!dbUser.userId) {
+      return { success: false, error: "User ID is missing" };
+    }
+    const code = await generateUniqueClassCode(dbUser.userId);
     
     const data = {
       name: formData.get('name') as string,

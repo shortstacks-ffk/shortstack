@@ -53,7 +53,7 @@ export default function AssignFileDialog({ file, isOpen, onClose, onUpdate }: As
         if (result.success) {
           setClasses(result.data || []);
           // Select a default class other than the current one
-          const otherClass = result.data.find(c => c.code !== file.classId);
+          const otherClass = result.data.find((c: { code: string }) => c.code !== file.classId);
           if (otherClass) {
             setSelectedClass(otherClass.code);
           } else if (result.data.length > 0) {

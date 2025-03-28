@@ -24,12 +24,12 @@ const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes in milliseconds
 // Create a store with the session state persisted in localStorage
 export const useSessionStore = create<SessionState>()(
   persist(
-    (set) => ({
+    (set: (partial: Partial<SessionState> | ((state: SessionState) => Partial<SessionState>)) => void) => ({
       user: null,
       isAuthenticated: false,
       lastActivity: Date.now(),
       
-      setUser: (user) => set({ 
+      setUser: (user: User | null) => set({ 
         user, 
         isAuthenticated: !!user,
         lastActivity: Date.now() 
@@ -47,7 +47,7 @@ export const useSessionStore = create<SessionState>()(
     {
       name: 'shortstack-session',
       // Add some processing to ensure data integrity when loading from storage
-      onRehydrateStorage: () => (state) => {
+      onRehydrateStorage: () => (state: SessionState | undefined) => {
         // Check if session has timed out upon rehydration
         if (state) {
           const now = Date.now();
