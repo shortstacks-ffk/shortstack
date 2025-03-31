@@ -3,7 +3,7 @@
   "version": "0.11.5",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbo",
+    "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -46,6 +46,7 @@
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.469.0",
     "next": "^15.2.0",
+    "next-auth": "^4.24.11",
     "nodemailer": "^6.10.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

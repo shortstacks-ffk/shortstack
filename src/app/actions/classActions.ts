@@ -4,6 +4,11 @@ import { db } from "@/src/lib/db";
 import { revalidatePath } from "next/cache";
 import { auth } from "@clerk/nextjs/server";
 
+
+import { getAuthSession } from "@/src/lib/auth";
+
+
+
 // Types
 interface ClassData {
   name: string;
@@ -182,27 +187,167 @@ export async function deleteClass(id: string): Promise<ClassResponse> {
 
 export async function getClassData(classId: string) {
   try {
-    const { userId } = await auth();
-    if (!userId) return null;
+    // Try to get session from NextAuth (for students)
+    const session = await getAuthSession();
+    let userId: string | null = null;
+    let isStudent = false;
 
-    const classData = await db.class.findUnique({
-      where: { code: classId },
-      include: {
-        students: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            schoolEmail: true,
-            progress: true
+    if (session?.user?.id && session.user.role === "student") {
+      // User is authenticated with NextAuth (student)
+      userId = session.user.id;
+      isStudent = true;
+    } else {
+      // Try Clerk auth (for teacher/admin routes)
+      try {
+        const clerkAuthResult = await auth();
+        userId = clerkAuthResult.userId;
+      } catch (clerkError) {
+        console.error("Clerk auth error:", clerkError);
+      }
+    }
+
+    if (!userId) {
+      console.error("No authenticated user found");
+      return null;
+    }
+
+    console.log("Auth type:", isStudent ? "Student (NextAuth)" : "Teacher (Clerk)");
+    console.log("User ID:", userId);
+
+    let classData;
+
+    if (isStudent) {
+      // For students, make sure they're enrolled in this class
+      console.log("Fetching class data for student:", userId);
+      classData = await db.class.findFirst({
+        where: {
+          code: classId,
+          enrollments: {
+            some: {
+              studentId: userId,
+              enrolled: true
+            }
+          }
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              imageURL: true
+            }
+          },
+          students: true,
+          lessonPlans: {
+            include: {
+              assignments: true,
+              files: true
+            },
+            orderBy: {
+              createdAt: 'desc'
+            }
+          },
+          bills: {
+            where: {
+              students: {
+                some: {
+                  studentId: userId
+                }
+              }
+            },
+            orderBy: {
+              dueDate: 'asc'
+            }
+          },
+          storeItems: {
+            where: {
+              isAvailable: true
+            }
+          },
+          enrollments: {
+            where: {
+              studentId: userId
+            },
+            select: {
+              enrolled: true,
+              createdAt: true
+            }
           }
         }
-      }
-    });
+      });
+    } else {
+      // For teachers/admins
+      console.log("Fetching class data for teacher:", userId);
+      classData = await db.class.findUnique({
+        where: {
+          code: classId
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              imageURL: true
+            }
+          },
+          students: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              schoolEmail: true,
+              progress: true,
+              profileImage: true
+            }
+          },
+          enrollments: {
+            include: {
+              student: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  schoolEmail: true,
+                  progress: true,
+                  profileImage: true
+                }
+              }
+            }
+          },
+          lessonPlans: {
+            include: {
+              assignments: true,
+              files: true
+            },
+            orderBy: {
+              createdAt: 'desc'
+            }
+          },
+          bills: {
+            include: {
+              students: {
+                include: {
+                  student: true
+                }
+              }
+            },
+            orderBy: {
+              dueDate: 'asc'
+            }
+          },
+          storeItems: {
+            orderBy: {
+              createdAt: 'desc'
+            }
+          }
+        }
+      });
+    }
 
+    console.log("Class data found:", !!classData);
     return classData;
   } catch (error) {
-    console.error('Error fetching class data:', error);
-    return null;
+    console.error("Error fetching class data:", error);
+    throw error;
   }
 }

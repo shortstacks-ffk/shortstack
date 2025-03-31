@@ -1,36 +1,29 @@
 import { NextResponse } from "next/server";
-import { verify } from 'jsonwebtoken';
-import { cookies } from 'next/headers';
 import { db } from "@/src/lib/db";
+import { getAuthSession } from "@/src/lib/auth";
 
-export async function GET(request: Request) {
+export async function GET() {
   try {
-    // Get the auth token from cookies
-    const cookieStore = await cookies();
-    const token = cookieStore.get('student-auth-token')?.value;
+    // Get session from NextAuth using our helper
+    const session = await getAuthSession();
     
-    if (!token) {
+    if (!session?.user?.id || session.user.role !== "student") {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
       );
     }
     
-    // Verify and decode the token
-    const decoded = verify(
-      token, 
-      process.env.JWT_SECRET || 'fallback-secret-key-for-development'
-    ) as { studentId: string, email: string };
-    
     // Get student with their enrollments and classes
     const student = await db.student.findUnique({
-      where: { id: decoded.studentId },
+      where: { id: session.user.id },
       select: {
         id: true,
         firstName: true,
         lastName: true,
         schoolEmail: true,
         progress: true,
+        profileImage: true,
         enrollments: {
           where: { enrolled: true },
           include: {
@@ -70,12 +63,8 @@ export async function GET(request: Request) {
   } catch (error: any) {
     console.error("Profile API error:", error);
     
-    if (error.name === 'JsonWebTokenError') {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-    }
-    
     return NextResponse.json(
-      { error: "Failed to fetch profile" },
+      { error: "Failed to fetch profile", message: error.message },
       { status: 500 }
     );
   }
