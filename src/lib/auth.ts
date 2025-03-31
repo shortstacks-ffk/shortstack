@@ -1,3 +1,8 @@
+// Add this at the top of your auth.ts file
+if (!process.env.NEXTAUTH_SECRET) {
+  console.warn("Warning: NEXTAUTH_SECRET is not defined. This will cause session handling issues.");
+}
+
 import { getServerSession } from "next-auth";
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
