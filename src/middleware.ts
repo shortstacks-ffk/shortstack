@@ -1,57 +1,70 @@
-// import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
-// import { checkUser } from '@/src/lib/checkUser';
+import { NextResponse, NextRequest } from "next/server";
+import { clerkMiddleware } from "@clerk/nextjs/server";
+import { getToken } from "next-auth/jwt";
+import { createRouteMatcher } from "@clerk/nextjs/server";
 
-
-// const isPublicRoute = createRouteMatcher([
-//   '/teacher(.*)', // Exclude the /teacher catch-all route from protection
-//   // Add other public routes here
-//   '/',
-//   '/student',
-//   '/login',
-// ]);
-
-// // const isProtectedRoute = createRouteMatcher(['/dashboard(.*)']);
-
-// export default clerkMiddleware(async (auth, request) => {
-//   if (!isPublicRoute(request)) {
-//     await auth.protect();
-//     if (auth.userId) {
-//       await checkUser();
-//     }
-//   }
-
-// });
-// export const config = {
-//   matcher: [
-//     // Skip Next.js internals and all static files, unless found in search params
-//     '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
-//     // Always run for API routes
-//     '/(api|trpc)(.*)',
-//   ],
-// };
-
-import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
-// import { checkUser } from '@/src/lib/checkUser';
-
-const isPublicRoute = createRouteMatcher([
-  '/teacher(.*)',
-  '/',
-  '/student',
-  '/login',
+// Routes that should use NextAuth.js instead of Clerk
+const isNextAuthRoute = createRouteMatcher([
+  '/student(.*)',
+  '/api/student/(.*)', 
+  '/api/auth/(.*)'
 ]);
 
-export default clerkMiddleware(async (auth, request) => {
-  const { userId, redirectToSignIn } = await auth();
-
-  if (!userId && !isPublicRoute(request)) {
-      return redirectToSignIn();
-    // await checkUser();
+// Standalone NextAuth middleware function
+async function handleNextAuthRoutes(req: NextRequest) {
+  const { pathname } = req.nextUrl;
+  
+  // Protected student routes - require NextAuth.js authentication
+  if (pathname.startsWith("/student/dashboard") || pathname.startsWith("/api/student/")) {
+    const token = await getToken({ 
+      req,
+      // Use a proper secret - it should be the same as in your [...nextauth] route
+      secret: process.env.NEXTAUTH_SECRET || ""
+    });
+    
+    // Redirect unauthenticated users to student login
+    if (!token || token.role !== "student") {
+      // For API routes, return 401 instead of redirecting
+      if (pathname.startsWith("/api/")) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+      
+      const url = new URL("/student", req.url);
+      url.searchParams.set("callbackUrl", encodeURI(pathname));
+      return NextResponse.redirect(url);
+    }
   }
-});
+  
+  // Redirect authenticated students away from login page
+  if (pathname === "/student") {
+    const token = await getToken({ 
+      req,
+      secret: process.env.NEXTAUTH_SECRET || ""
+    });
+    
+    if (token && token.role === "student") {
+      return NextResponse.redirect(new URL("/student/dashboard", req.url));
+    }
+  }
+  
+  return NextResponse.next();
+}
 
+// Main middleware function
+export async function middleware(req: NextRequest) {
+  // For NextAuth student routes, use NextAuth middleware
+  if (isNextAuthRoute(req)) {
+    return handleNextAuthRoutes(req);
+  }
+  
+  // For all other routes, use Clerk middleware
+  return clerkMiddleware(req, {} as any);
+}
+
+// Apply middleware to all routes except static assets
 export const config = {
   matcher: [
-    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+    '/((?!.+\\.[\\w]+$|_next).*)',
     '/(api|trpc)(.*)',
   ],
 };
