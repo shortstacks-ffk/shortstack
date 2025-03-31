@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { signIn } from 'next-auth/react';
 import { Input } from '@/src/components/ui/input';
 import { Label } from '@/src/components/ui/label';
 import { Button } from '@/src/components/ui/button';
@@ -26,24 +27,21 @@ export default function StudentLoginPage() {
     setError(null);
 
     try {
-      const res = await fetch('/api/student/auth', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ schoolEmail, password }),
+      const result = await signIn("student-login", {
+        schoolEmail,
+        password,
+        redirect: false,
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || 'Invalid credentials');
-        setLoading(false);
-        return;
+      if (result?.error) {
+        setError("Invalid email or password");
+      } else if (result?.ok) {
+        router.push("/student/dashboard");
+        router.refresh();
       }
-
-      // Redirect to student dashboard
-      router.push('/student/dashboard');
     } catch (err) {
-      console.error('Login error:', err);
-      setError('Something went wrong. Please try again.');
+      console.error("Login error:", err);
+      setError("Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
