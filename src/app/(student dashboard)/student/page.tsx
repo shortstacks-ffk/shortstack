@@ -7,12 +7,11 @@ import { Input } from '@/src/components/ui/input';
 import { Label } from '@/src/components/ui/label';
 import { Button } from '@/src/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/src/components/ui/card';
-
 import Image from "next/image";
 import login_mascout from "@/public/assets/img/LoginMascout2ldpi.png";
-import main_logo from "@/public/assets/img/Main Primary Logo - Colorfu Black Greenldpi.png";
-import { LoginForm } from "@/src/components/login-form";
 
+// Only use dynamic to prevent caching
+export const dynamic = 'force-dynamic';
 
 export default function StudentLoginPage() {
   const router = useRouter();
@@ -47,8 +46,9 @@ export default function StudentLoginPage() {
     }
   };
 
+
   return (
-    <div className="container mx-auto flex items-center justify-center grid lg:grid-cols-2 ">
+    <div className="container mx-auto flex items-center justify-center grid lg:grid-cols-2 min-h-screen">
       <Card className="w-full h-full max-w-md mx-4 flex flex-col gap-4 p-6 md:p-10">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold">Student Login</CardTitle>
@@ -92,30 +92,26 @@ export default function StudentLoginPage() {
       </Card>
 
       {/* Right Panel */}
-            <div className="relative w-full h-full hidden lg:flex flex-col items-center justify-center bg-[hsl(79,89%,43%)] py-10 px-6 lg:block overflow-hidden">
-              {/* Content */}
-              <div className="relative z-10 flex flex-col items-center text-center">
-                <Image
-                  src={login_mascout}
-                  alt="Mascot Image"
-                  width={350}
-                  height={350}
-                  className="mb-4"
-                />
-                <h1 className="text-3xl font-bold text-white mb-2">
-                  Introducing a new learning experience
-                </h1>
-                <p className="text-md text-white leading-6">
-                  Empower your kids to save smart, spend wisely, and grow their money
-                  skills with our fun, interactive app. Let's build strong financial
-                  habits together!
-                </p>
-              </div>
-      
-              {/* Semi-Circle Arc */}
-              <div className="absolute -bottom-60 -left-5 w-[320px] h-[320px] bg-[hsl(79,65%,60%)] rounded-full"></div>
-            </div>
-
+      <div className="relative w-full h-full hidden lg:flex flex-col items-center justify-center bg-[hsl(79,89%,43%)] py-10 px-6 lg:block overflow-hidden">
+        <div className="relative z-10 flex flex-col items-center text-center">
+          <Image
+            src={login_mascout}
+            alt="Mascot Image"
+            width={350}
+            height={350}
+            className="mb-4"
+          />
+          <h1 className="text-3xl font-bold text-white mb-2">
+            Introducing a new learning experience
+          </h1>
+          <p className="text-md text-white leading-6">
+            Empower your kids to save smart, spend wisely, and grow their money
+            skills with our fun, interactive app. Let's build strong financial
+            habits together!
+          </p>
+        </div>
+        <div className="absolute -bottom-60 -left-5 w-[320px] h-[320px] bg-[hsl(79,65%,60%)] rounded-full"></div>
+      </div>
     </div>
   );
 }

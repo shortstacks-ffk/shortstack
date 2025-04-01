@@ -23,6 +23,7 @@ import {
 } from '@/src/components/ui/dropdown-menu';
 import { ChevronDown, User, Settings, LogOut } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/src/components/ui/avatar';
+import { SessionDebugger } from '@/src/components/debug/SessionDebug';
 
 interface Class {
   id: string;
@@ -197,6 +198,9 @@ export default function StudentDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Add Session Debugger (only shows in development) */}
+      <SessionDebugger />
     </div>
   );
 }
