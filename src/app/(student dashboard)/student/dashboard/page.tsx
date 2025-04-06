@@ -46,7 +46,10 @@ export default function StudentDashboard() {
   const [classes, setClasses] = useState<Class[]>([]);
   const [student, setStudent] = useState<Student | null>(null);
   const router = useRouter();
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
+  
+  console.log("Session status:", status);
+  console.log("Session data:", session);
   const { toast } = useToast(); // Add toast
 
   useEffect(() => {

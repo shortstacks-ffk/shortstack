@@ -13,12 +13,12 @@ const isNextAuthRoute = createRouteMatcher([
 // Standalone NextAuth middleware function
 async function handleNextAuthRoutes(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  
+
   // Check if NEXTAUTH_SECRET is set
   if (!process.env.NEXTAUTH_SECRET) {
     console.error("NEXTAUTH_SECRET is not set. Authentication will fail.");
   }
-  
+
   // Protected student routes - require NextAuth.js authentication
   if (pathname.startsWith("/student/dashboard") || pathname.startsWith("/api/student/")) {
     try {
@@ -26,17 +26,17 @@ async function handleNextAuthRoutes(req: NextRequest) {
         req,
         secret: process.env.NEXTAUTH_SECRET
       });
-      
+
       // Debug logging (remove in production)
       console.log(`Auth check for ${pathname}:`, token ? `Authenticated as ${token.role}` : "Not authenticated");
-      
+
       // Redirect unauthenticated users to student login
       if (!token || token.role !== "student") {
         // For API routes, return 401 instead of redirecting
         if (pathname.startsWith("/api/")) {
           return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
-        
+
         const url = new URL("/student", req.url);
         url.searchParams.set("callbackUrl", encodeURI(pathname));
         return NextResponse.redirect(url);
@@ -47,11 +47,11 @@ async function handleNextAuthRoutes(req: NextRequest) {
       if (pathname.startsWith("/api/")) {
         return NextResponse.json({ error: "Authentication error" }, { status: 500 });
       }
-      
+
       return NextResponse.redirect(new URL("/student?error=auth_error", req.url));
     }
   }
-  
+
   // Redirect authenticated students away from login page
   if (pathname === "/student") {
     try {
@@ -59,7 +59,7 @@ async function handleNextAuthRoutes(req: NextRequest) {
         req,
         secret: process.env.NEXTAUTH_SECRET
       });
-      
+
       if (token && token.role === "student") {
         return NextResponse.redirect(new URL("/student/dashboard", req.url));
       }
@@ -68,7 +68,7 @@ async function handleNextAuthRoutes(req: NextRequest) {
       // Allow user to proceed to login page on error
     }
   }
-  
+
   return NextResponse.next();
 }
 
@@ -78,23 +78,14 @@ export async function middleware(req: NextRequest, event: NextFetchEvent) {
   if (isNextAuthRoute(req)) {
     return handleNextAuthRoutes(req);
   }
-  
+
   // For all other routes, use Clerk middleware
-  // Pass both request and event to clerkMiddleware
   return clerkMiddleware()(req, event);
 }
 
 // Apply middleware to all routes except static assets and special paths
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the following:
-     * - Static files (.+\.[\\w]+$)
-     * - API routes that don't match NextAuth patterns
-     * - _next/static (Next.js static files)
-     * - _next/image (Next.js image optimization files)
-     * - favicon.ico (Browser favicon)
-     */
     '/((?!_next/static|_next/image|favicon.ico|.+\\.[\\w]+$).*)',
     '/api/((?!_health).*)',
   ],

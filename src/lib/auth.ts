@@ -27,7 +27,7 @@ export const authOptions: NextAuthOptions = {
         }
 
         try {
-          // Find the student by email (not user - they are different tables!)
+          // Find the student by email
           const student = await db.student.findUnique({
             where: {
               schoolEmail: credentials.schoolEmail,
@@ -89,8 +89,8 @@ export const authOptions: NextAuthOptions = {
     }
   },
   pages: {
-    signIn: "/student", // Custom sign-in page
-    error: "/student" // Custom error page
+    signIn: "/student",
+    error: "/student"
   },
   session: {
     strategy: "jwt",
@@ -103,7 +103,6 @@ export const authOptions: NextAuthOptions = {
         httpOnly: true,
         sameSite: "lax",
         path: "/",
-        // In production, set secure to true for HTTPS environments
         secure: process.env.NODE_ENV === "production"
       }
     }

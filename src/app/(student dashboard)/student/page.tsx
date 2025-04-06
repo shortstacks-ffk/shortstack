@@ -36,7 +36,6 @@ export default function StudentLoginPage() {
         setError("Invalid email or password");
       } else if (result?.ok) {
         router.push("/student/dashboard");
-        router.refresh();
       }
     } catch (err) {
       console.error("Login error:", err);
@@ -45,7 +44,6 @@ export default function StudentLoginPage() {
       setLoading(false);
     }
   };
-
 
   return (
     <div className="container mx-auto flex items-center justify-center grid lg:grid-cols-2 min-h-screen">
