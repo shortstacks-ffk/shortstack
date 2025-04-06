@@ -1,16 +1,17 @@
-import "@/src/app/globals.css"
-import { AuthProvider } from "@/src/components/providers/auth-provider"
+'use client';
 
-export default function StudentRootLayout({
+import { SessionProvider } from 'next-auth/react';
+
+export default function StudentLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body>
-        <AuthProvider>{children}</AuthProvider>
-      </body>
-    </html>
+    <SessionProvider>
+      <div className="min-h-screen">
+        {children}
+      </div>
+    </SessionProvider>
   );
 }

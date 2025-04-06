@@ -1,14 +1,9 @@
 import { DashboardSidebar } from "@/src/components/students/StudentSidebarLeft"
-import "@/src/app/globals.css"
-import { AuthProvider } from "@/src/components/providers/auth-provider"
 
 export const metadata = {
   title: 'Student Dashboard - ShortStack',
   description: 'Financial education platform',
 }
-
-// Ensure dashboard pages are never cached
-export const dynamic = 'force-dynamic';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
