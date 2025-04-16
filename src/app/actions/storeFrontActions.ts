@@ -29,6 +29,7 @@ interface StoreItemResponse {
   success: boolean;
   data?: any;
   error?: string;
+  message?: string;
 }
 
 // Create a new store item (Teacher only)
