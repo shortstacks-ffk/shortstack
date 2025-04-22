@@ -8,116 +8,56 @@ datasource db {
 }
 
 model User {
-  id             String          @id @default(cuid())
-  name           String?
-  firstName      String?
-  lastName       String?
-  email          String?         @unique
-  emailVerified  DateTime?
-  image          String?
-  password       String?
-  role           Role            @default(TEACHER)
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  accounts       Account[]
-  createdBills   Bill[]
-  calendarEvents CalendarEvent[]
-  classes        Class[]
-  teacherProfile TeacherProfile?
-  todos          Todo[]
-}
-
-model TeacherProfile {
-  id        Int    @id @default(autoincrement())
-  userId    String @unique
-  firstName String
-  lastName  String
-  bio      String?
-  institution String?
-  user      User   @relation(fields: [userId], references: [id])
-}
-
-model Account {
-  id                String  @id @default(cuid())
-  userId            String
-  type              String
-  provider          String
-  providerAccountId String
-  refresh_token     String?
-  access_token      String?
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String?
-  session_state     String?
-  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerAccountId])
+  id          String   @id @default(uuid())
+  clerkUserId String   @unique
+  email       String   @unique
+  name        String?
+  imageURL    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  role        String   @default("USER") // Add this field for roles
+  classes     Class[]
 }
 
 model Class {
-  id             String          @id @default(cuid())
-  name           String
-  emoji          String
-  code           String          @unique
-  cadence        String?
-  grade          String?
-  overview       String?
-  userId         String
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  color          String?
-  endDate        DateTime?
-  startDate      DateTime?
-  assignments    Assignment[]    @relation("ClassAssignments")
-  calendarEvents CalendarEvent[]
-  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  classSessions  ClassSession[]
-  enrollments    Enrollment[]
-  files          File[]          @relation("ClassFiles")
-  lessonPlans    LessonPlan[]
-  students       Student[]
-  bills          Bill[]          @relation("BillToClass")
-  storeItems     StoreItem[]     @relation("StoreItemToClass")
+  id          String       @id @default(cuid())
+  name        String
+  emoji       String
+  code        String       @unique
+  cadence     String?
+  day         String?
+  time        String?
+  grade       String?
+  userId      String
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  overview    String?
+  user        User         @relation(fields: [userId], references: [clerkUserId], onDelete: Cascade)
+  enrollments Enrollment[]
+  lessonPlans LessonPlan[]
+  storeItems  StoreItem[]  @relation("StoreItemToClass")
+  students    Student[]
+  bills       Bill[]       @relation("BillToClass")
 
-  @@index([code])
   @@index([userId])
 }
 
-model ClassSession {
-  id        String   @id @default(cuid())
-  dayOfWeek Int
-  startTime String
-  endTime   String
-  classId   String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  class     Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
-
-  @@index([classId])
-}
-
 model Student {
-  id                    String                        @id @default(cuid())
-  firstName             String
-  lastName              String
-  schoolEmail           String                        @unique
-  password              String
-  classId               String
-  progress              Int                           @default(0)
-  lastLogin             DateTime?
-  profileImage          String?
-  userId                String?                       @unique
-  teacherId             String
-  createdAt             DateTime                      @default(now())
-  updatedAt             DateTime                      @updatedAt
-  bankAccounts          BankAccount[]
-  calendarEvents        CalendarEvent[]
-  enrollments           Enrollment[]
-  class                 Class                         @relation(fields: [classId], references: [code], onDelete: Cascade)
-  assignmentSubmissions StudentAssignmentSubmission[]
-  bills                 StudentBill[]
-  purchases             StudentPurchase[]
+  id           String            @id @default(cuid())
+  firstName    String
+  lastName     String
+  password     String
+  classId      String
+  progress     Int               @default(0)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  schoolEmail  String            @unique
+  profileImage String?
+  BankAccount  BankAccount[]
+  enrollments  Enrollment[]
+  class        Class             @relation(fields: [classId], references: [code], onDelete: Cascade)
+  bills        StudentBill[]
+  purchases    StudentPurchase[]
 
   @@index([classId])
   @@index([schoolEmail])
@@ -136,22 +76,6 @@ model Enrollment {
   @@unique([studentId, classId])
 }
 
-model LessonPlan {
-  id                  String             @id @default(cuid())
-  name                String
-  description         String?
-  classId             String
-  createdAt           DateTime           @default(now())
-  updatedAt           DateTime           @updatedAt
-  genericLessonPlanId String?
-  class               Class              @relation(fields: [classId], references: [code], onDelete: Cascade)
-  genericLessonPlan   GenericLessonPlan? @relation("GenericToUserLessonPlans", fields: [genericLessonPlanId], references: [id])
-  assignmentRelations Assignment[]       @relation("LessonPlanAssignments")
-  files               File[]             @relation("LessonPlanFiles")
-
-  @@index([classId])
-}
-
 model GenericLessonPlan {
   id          String       @id @default(cuid())
   name        String       @unique
@@ -159,116 +83,86 @@ model GenericLessonPlan {
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
   createdBy   String?
-  lessonPlans LessonPlan[] @relation("GenericToUserLessonPlans")
   assignments Assignment[] @relation("GenericLessonPlanAssignments")
   files       File[]       @relation("GenericLessonPlanFiles")
+  lessonPlans LessonPlan[] @relation("GenericToUserLessonPlans") // Add this relation
+}
+
+model LessonPlan {
+  id                  String             @id @default(cuid())
+  name                String
+  description         String?
+  classId             String?         
+  class               Class?             @relation(fields: [classId], references: [id], onDelete: Cascade)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  status              LessonPlanStatus   @default(DRAFT)
+  genericLessonPlanId String?
+  genericLessonPlan   GenericLessonPlan? @relation(fields: [genericLessonPlanId], references: [id], onDelete: SetNull, name: "GenericToUserLessonPlans")
+  assignments         Assignment[]       @relation("LessonPlanAssignments")
+  files               File[]             @relation("LessonPlanFiles")
+
+  @@index([classId])
+  @@index([genericLessonPlanId])
 }
 
 model File {
   id                String              @id @default(cuid())
   name              String
-  fileType          String?
-  activity          String?
-  size              Int?
   url               String
-  classId           String
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
-  class             Class               @relation("ClassFiles", fields: [classId], references: [code], onDelete: Cascade)
-  GenericLessonPlan GenericLessonPlan[] @relation("GenericLessonPlanFiles")
+  activity          String?
+  classId           String
+  fileType          String?
+  size              Int?
   lessonPlans       LessonPlan[]        @relation("LessonPlanFiles")
+  GenericLessonPlan GenericLessonPlan[] @relation("GenericLessonPlanFiles")
 }
 
 model Assignment {
-  id                 String                        @id @default(cuid())
-  name               String
-  fileType           String
-  activity           String?
-  dueDate            DateTime?
-  size               Int
-  url                String
-  rubric             String?
-  classId            String
-  createdAt          DateTime                      @default(now())
-  updatedAt          DateTime                      @updatedAt
-  class              Class                         @relation("ClassAssignments", fields: [classId], references: [code], onDelete: Cascade)
-  calendarEvents     CalendarEvent[]
-  studentSubmissions StudentAssignmentSubmission[]
-  GenericLessonPlan  GenericLessonPlan[]           @relation("GenericLessonPlanAssignments")
-  lessonPlans        LessonPlan[]                  @relation("LessonPlanAssignments")
-}
-
-model StudentAssignmentSubmission {
-  id           String     @id @default(cuid())
-  assignmentId String
-  studentId    String
-  fileUrl      String?
-  textContent  String?
-  comments     String?
-  fileName     String?
-  fileType     String?
-  fileSize     Int?
-  grade        Int?
-  status       String     @default("SUBMITTED")
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-  assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
-  student      Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
-
-  @@index([assignmentId])
-  @@index([studentId])
+  id                String              @id @default(cuid())
+  name              String
+  dueDate           DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  activity          String?
+  classId           String
+  fileType          String
+  size              Int
+  lessonPlans       LessonPlan[]        @relation("LessonPlanAssignments")
+  GenericLessonPlan GenericLessonPlan[] @relation("GenericLessonPlanAssignments")
 }
 
 model Bill {
-  id             String          @id @default(cuid())
-  title          String
-  emoji          String          @default("💰")
-  amount         Float
-  dueDate        DateTime
-  description    String?
-  frequency      BillFrequency   @default(ONCE)
-  status         BillStatus      @default(ACTIVE)
-  creatorId      String
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  creator        User            @relation(fields: [creatorId], references: [id], onDelete: Cascade)
-  calendarEvents CalendarEvent[]
-  studentBills   StudentBill[]
-  class          Class[]         @relation("BillToClass")
-
-  @@index([creatorId])
+  id          String        @id @default(cuid())
+  title       String
+  amount      Float
+  dueDate     DateTime
+  description String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  emoji       String        @default("💰")
+  frequency   String        @default("ONCE")
+  status      String        @default("PENDING")
+  students    StudentBill[]
+  class       Class[]       @relation("BillToClass")
 }
 
 model StudentBill {
-  id         String    @id @default(cuid())
-  billId     String
-  studentId  String
-  amount     Float
-  paidAmount Float     @default(0)
-  isPaid     Boolean   @default(false)
-  paidAt     DateTime?
-  dueDate    DateTime
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  payments   Payment[]
-  bill       Bill      @relation(fields: [billId], references: [id], onDelete: Cascade)
-  student    Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  id        String    @id @default(cuid())
+  billId    String
+  studentId String
+  isPaid    Boolean   @default(false)
+  paidAt    DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  bill      Bill      @relation(fields: [billId], references: [id], onDelete: Cascade)
+  student   Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@unique([billId, studentId])
   @@index([billId])
   @@index([studentId])
-}
-
-model Payment {
-  id            String      @id @default(cuid())
-  amount        Float
-  studentBillId String
-  accountId     String
-  transactionId String?
-  paymentDate   DateTime    @default(now())
-  studentBill   StudentBill @relation(fields: [studentBillId], references: [id], onDelete: Cascade)
-
-  @@index([studentBillId])
 }
 
 model StoreItem {
@@ -279,13 +173,10 @@ model StoreItem {
   description String?
   quantity    Int               @default(0)
   isAvailable Boolean           @default(true)
-  classId     String
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
   purchases   StudentPurchase[]
   class       Class[]           @relation("StoreItemToClass")
-
-  @@index([classId])
 }
 
 model StudentPurchase {
@@ -306,90 +197,39 @@ model StudentPurchase {
 }
 
 model BankAccount {
-  id                String        @id @default(cuid())
-  accountNumber     String        @unique @db.VarChar(12)
-  accountType       AccountType
-  balance           Float         @default(0)
-  studentId         String
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
-  student           Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  transactions      Transaction[]
-  receivedTransfers Transaction[] @relation("TransferTransactions")
+  id                                                      String        @id
+  accountNumber                                           String        @unique @db.VarChar(12)
+  accountType                                             AccountType
+  balance                                                 Float         @default(0)
+  studentId                                               String
+  createdAt                                               DateTime      @default(now())
+  updatedAt                                               DateTime
+  Student                                                 Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  Transaction_Transaction_accountIdToBankAccount          Transaction[] @relation("Transaction_accountIdToBankAccount")
+  Transaction_Transaction_receivingAccountIdToBankAccount Transaction[] @relation("Transaction_receivingAccountIdToBankAccount")
 
   @@index([studentId])
 }
 
 model Transaction {
-  id                 String          @id @default(cuid())
-  amount             Float
-  description        String
-  transactionType    TransactionType
-  accountId          String
-  receivingAccountId String?
-  createdAt          DateTime        @default(now())
-  account            BankAccount     @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  receivingAccount   BankAccount?    @relation("TransferTransactions", fields: [receivingAccountId], references: [id])
+  id                                                      String          @id
+  amount                                                  Float
+  description                                             String
+  transactionType                                         TransactionType
+  accountId                                               String
+  receivingAccountId                                      String?
+  createdAt                                               DateTime        @default(now())
+  BankAccount_Transaction_accountIdToBankAccount          BankAccount     @relation("Transaction_accountIdToBankAccount", fields: [accountId], references: [id], onDelete: Cascade)
+  BankAccount_Transaction_receivingAccountIdToBankAccount BankAccount?    @relation("Transaction_receivingAccountIdToBankAccount", fields: [receivingAccountId], references: [id])
 
   @@index([accountId])
   @@index([receivingAccountId])
 }
 
-model CalendarEvent {
-  id            String          @id @default(cuid())
-  title         String
-  description   String?
-  startDate     DateTime
-  endDate       DateTime
-  variant       String          @default("primary")
-  isRecurring   Boolean         @default(false)
-  recurringDays Int[]
-  createdById   String
-  billId        String?
-  assignmentId  String?
-  classId       String?
-  studentId     String?
-  parentEventId String?
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
-  assignment    Assignment?     @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
-  bill          Bill?           @relation(fields: [billId], references: [id], onDelete: Cascade)
-  class         Class?          @relation(fields: [classId], references: [id], onDelete: Cascade)
-  createdBy     User            @relation(fields: [createdById], references: [id], onDelete: Cascade)
-  parentEvent   CalendarEvent?  @relation("EventChildren", fields: [parentEventId], references: [id], onDelete: Cascade)
-  childEvents   CalendarEvent[] @relation("EventChildren")
-  student       Student?        @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  todos         Todo[]
-
-  @@index([createdById])
-  @@index([billId])
-  @@index([assignmentId])
-  @@index([classId])
-  @@index([studentId])
-  @@index([parentEventId])
-}
-
-model Todo {
-  id              String         @id @default(cuid())
-  title           String
-  completed       Boolean        @default(false)
-  dueDate         DateTime
-  priority        TodoPriority   @default(UPCOMING)
-  userId          String
-  calendarEventId String?
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-  calendarEvent   CalendarEvent? @relation(fields: [calendarEventId], references: [id], onDelete: Cascade)
-  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([dueDate])
-}
-
-enum Role {
-  TEACHER
-  STUDENT
-  SUPER
+enum LessonPlanStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
 }
 
 enum PurchaseStatus {
@@ -424,11 +264,4 @@ enum TransactionType {
   WITHDRAWAL
   TRANSFER_IN
   TRANSFER_OUT
-  BILL_PAYMENT
-}
-
-enum TodoPriority {
-  UPCOMING
-  TODAY
-  URGENT
 }
