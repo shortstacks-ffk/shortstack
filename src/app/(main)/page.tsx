@@ -1,16 +1,21 @@
 // home page app/page.tsx
 import Link from "next/link"
+// import { MainLayoutLogo } from "@/src/components/MainLayoutLogo";
 
 
 export default function Home() {
   return (
     <div className="max-w-7xl mx-auto px-4">
-      {/* Add this temporarily */}
-      {/* <TailwindTest /> */}
+            {/* <header>
+        <div className="max-w-7xl mx-auto p-auto flex items-center justify-between">
+          <MainLayoutLogo />
+          {/* Add any additional header content here */}
+        {/* </div>
+      </header> */}
 
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-88px)] py-2">
+      <div className="flex flex-col items-center justify-center min-h-[calc(80vh-78px)]">
         <h1 className="text-[54px] font-bold mb-6">Welcome to ShortStacks</h1>
-        <p className="text-[36px] mb-32">Welcome to Financial Freedom Literacy</p>
+        <p className="text-[36px] mb-32">Welcome to Financial Freedom</p>
 
         <h2 className="text-[36px] mb-10">Are you a Teacher or a Student</h2>
 

@@ -50,3 +50,10 @@ export function formatDate(date: Date): string {
   }).format(date);
 }
 
+// Generate a random account number for bank accounts
+export function generateAccountNumber(): string {
+  // Generate a 10-digit random number (typical for account numbers)
+  const randomNumber = Math.floor(Math.random() * 9000000000) + 1000000000;
+  return randomNumber.toString();
+}
+

@@ -20,20 +20,20 @@ export const metadata: Metadata = {
   description: "Financial education app",
 };
 
-export default function AuthLayout({
+export default function MainLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
-    <div className={`min-h-screen ${geistSans.variable} ${geistMono.variable}`}>
-      {/* Logo positioned absolutely in the top left */}
-      <div className="absolute top-4 left-4 z-10">
-        <MainLayoutLogo />
-      </div>
-      
-      {/* Main content takes full height */}
-      <main className="min-h-screen">
+    <div className="flex flex-col min-h-screen">
+      <header>
+        <div className="max-w-7xl mx-auto p-auto flex items-center justify-between">
+          <MainLayoutLogo />
+          {/* Add any additional header content here */}
+        </div>
+      </header>
+      <main className="flex-grow">
         {children}
       </main>
       <Toaster position="top-right" />
