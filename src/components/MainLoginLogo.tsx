@@ -3,7 +3,7 @@ import Link from "next/link"
 
 import main_layout_logo from "@/public/assets/img/Primary Logo - Colorfu Black Greenldpi.png"
 
-export function MainLayoutLogo() {
+export function MainLoginLogo() {
   return (
     <Link href="/" className="flex items-center gap-2">
       <div className="relative flex items-center">

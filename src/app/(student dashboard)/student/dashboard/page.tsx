@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useSession, signOut } from 'next-auth/react'; // Ensure signOut is imported directly
-import { useToast } from '@/src/hooks/use-toast'; // Use your toast hook
+import { useSession, signOut } from 'next-auth/react';
+import { useToast } from '@/src/hooks/use-toast';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Button } from '@/src/components/ui/button';
@@ -39,6 +39,12 @@ interface Student {
   schoolEmail: string;
   profileImage?: string | null;
   progress?: any;
+  teacher?: {
+    id: string;
+    name: string;
+    email: string;
+    image?: string | null;
+  } | null;
 }
 
 export default function StudentDashboard() {
@@ -47,20 +53,24 @@ export default function StudentDashboard() {
   const [student, setStudent] = useState<Student | null>(null);
   const router = useRouter();
   const { data: session, status } = useSession();
-  
-  console.log("Session status:", status);
-  console.log("Session data:", session);
-  const { toast } = useToast(); // Add toast
+  const { toast } = useToast();
 
   useEffect(() => {
     // Fetch student info and enrolled classes
     const fetchStudentData = async () => {
       try {
+        // Log session data to help with debugging
+        console.log("Session data:", session);
+        
         const res = await fetch('/api/student/profile', {
           credentials: 'include', // Ensure cookies are sent
+          headers: {
+            'Cache-Control': 'no-cache' // Prevent caching
+          }
         });
         
         if (!res.ok) {
+          console.error(`API error: ${res.status} ${res.statusText}`);
           // Handle unauthorized or other errors
           if (res.status === 401) {
             router.push('/student');
@@ -70,6 +80,8 @@ export default function StudentDashboard() {
         }
 
         const data = await res.json();
+        console.log("Student data retrieved:", data);
+        
         setStudent(data.student);
         setClasses(data.classes || []);
       } catch (error) {
@@ -84,8 +96,12 @@ export default function StudentDashboard() {
       }
     };
 
-    fetchStudentData();
-  }, [router, toast]);
+    if (status === "authenticated") {
+      fetchStudentData();
+    } else if (status === "unauthenticated") {
+      router.push('/student');
+    }
+  }, [router, toast, status, session]);
 
   const handleLogout = async () => {
     await signOut({ callbackUrl: '/student' });
@@ -130,72 +146,66 @@ export default function StudentDashboard() {
               </Avatar>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-56" align="end" forceMount>
-            <DropdownMenuLabel className="font-normal">
-              <div className="flex flex-col space-y-1">
-                <p className="text-sm font-medium">{student?.firstName} {student?.lastName}</p>
-                <p className="text-xs text-gray-500">{student?.schoolEmail}</p>
-              </div>
-            </DropdownMenuLabel>
+          <DropdownMenuContent align="end">
+            <DropdownMenuLabel>My Account</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link href="/student/dashboard/account">
+              <Link href="/student/dashboard/account" className="flex items-center">
                 <User className="mr-2 h-4 w-4" />
-                <span>My Account</span>
+                Profile
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
-              <Link href="/student/dashboard/account/settings">
+              <Link href="/student/dashboard/account" className="flex items-center">
                 <Settings className="mr-2 h-4 w-4" />
-                <span>Settings</span>
+                Settings
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleLogout}>
+            <DropdownMenuItem className="text-red-600" onClick={handleLogout}>
               <LogOut className="mr-2 h-4 w-4" />
-              <span>Log out</span>
+              Logout
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
 
-      {/* Dashboard Content */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        {/* Quick Stats Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle>My Progress</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center">
-              <div className="w-full bg-gray-200 rounded-full h-2.5">
-                <div 
-                  className="bg-primary h-2.5 rounded-full" 
-                  style={{ width: `${student?.progress?.overallProgress || 0}%` }}
-                ></div>
-              </div>
-              <span className="ml-2 text-sm">{student?.progress?.overallProgress || 0}%</span>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Class Cards */}
+      <h2 className="text-xl font-semibold mb-4">My Classes</h2>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {classes.length > 0 ? (
+          classes.map((classItem) => (
+            <Link key={classItem.id} href={`/student/dashboard/classes/${classItem.code}`}>
+              <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg flex items-center">
+                    <span className="mr-2 text-2xl">{classItem.emoji}</span>
+                    {classItem.name}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-gray-500">Class Code: {classItem.code}</p>
+                </CardContent>
+              </Card>
+            </Link>
+          ))
+        ) : (
+          <Card className="col-span-full">
+            <CardContent className="p-6 text-center">
+              <p className="text-muted-foreground mb-4">You don't have any classes yet.</p>
+              <p className="text-sm text-gray-500">
+                Classes you're enrolled in will appear here.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
 
-        {/* My Classes Card */}
+      {/* Progress Cards */}
+      <h2 className="text-xl font-semibold mb-4 mt-8">My Progress</h2>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <Card>
-          <CardHeader>
-            <CardTitle>My Classes</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">{classes.length}</p>
-            <p className="text-gray-500 text-sm">Enrolled Classes</p>
-          </CardContent>
-        </Card>
-
-        {/* Upcoming Assignments */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Assignments</CardTitle>
-          </CardHeader>
-          <CardContent>
+          <CardContent className="p-6 text-center">
             <p className="text-2xl font-bold">{student?.progress?.completedAssignments || 0}/{student?.progress?.totalAssignments || 0}</p>
             <p className="text-gray-500 text-sm">Completed Assignments</p>
           </CardContent>
@@ -203,7 +213,7 @@ export default function StudentDashboard() {
       </div>
 
       {/* Add Session Debugger (only shows in development) */}
-      <SessionDebugger />
+      {process.env.NODE_ENV === 'development' && <SessionDebugger />}
     </div>
   );
 }
