@@ -1,4 +1,5 @@
 import { DashboardSidebar } from "@/src/components/students/StudentSidebarLeft"
+import { Toaster } from "@/src/components/ui/sonner"
 
 export const metadata = {
   title: 'Student Dashboard - ShortStack',
@@ -14,6 +15,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Main content */}
       <main className="flex-1 bg-gray-50">
         {children}
+        <Toaster richColors/>
       </main>
     </div>
   );

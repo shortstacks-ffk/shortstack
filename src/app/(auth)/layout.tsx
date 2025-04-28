@@ -2,9 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { MainLayoutLogo } from "@/src/components/MainLayoutLogo";
 import "@/src/app/globals.css";
-import { ClerkProvider } from "@clerk/nextjs";
-import { AuthProvider } from "@/src/components/providers/auth-provider";
-import { Toaster } from "@/src/components/ui/toaster";
+import { Toaster } from "@/src/components/ui/sonner";
+import Providers from "@/src/components/Providers";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -27,21 +26,17 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   return (
-    <ClerkProvider>
-      <AuthProvider>
-        <div className={`flex flex-col min-h-screen ${geistSans.variable}`}>
-          <header>
-            <div className="max-w-7xl mx-auto p-auto flex items-center justify-between">
-              <MainLayoutLogo />
-              {/* Add any additional header content here */}
-            </div>
-          </header>
-          <main className={`${geistMono.variable} flex-grow max-w-7xl mx-auto px-4 py-2`}>
-            {children}
-            <Toaster />
-          </main>
-        </div>
-      </AuthProvider>
-    </ClerkProvider>
+    <div className={`min-h-screen ${geistSans.variable} ${geistMono.variable}`}>
+      {/* Logo positioned absolutely in the top left */}
+      <div className="absolute top-4 left-4 z-10">
+        <MainLayoutLogo />
+      </div>
+      
+      {/* Main content takes full height */}
+      <main className="min-h-screen">
+        {children}
+      </main>
+      <Toaster position="top-right" />
+    </div>
   );
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/src/lib/auth";
+import { authOptions } from "@/src/lib/auth/config";
 import { db } from "@/src/lib/db";
 import bcrypt from "bcryptjs";
 
@@ -9,7 +9,7 @@ export async function PUT(request: Request) {
     // Get session from NextAuth
     const session = await getServerSession(authOptions);
     
-    if (!session?.user || session.user.role !== "student") {
+    if (!session?.user || session.user.role !== "STUDENT") {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }

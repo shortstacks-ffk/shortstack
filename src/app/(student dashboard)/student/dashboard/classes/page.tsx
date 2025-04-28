@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/src/components/ui/card";
-import { useToast } from "@/src/hooks/use-toast"; // Fix the import for toast
+import { useToast } from "@/src/hooks/use-toast";
 import AddAnything from "@/src/components/AddAnything";
 import { StudentJoinClass } from "@/src/components/students/StudentJoinClass";
 import { Clock } from 'lucide-react';
@@ -22,45 +22,56 @@ export default function StudentClassesPage() {
   const [loading, setLoading] = useState(true);
   const [classes, setClasses] = useState<Class[]>([]);
   const router = useRouter();
-  const { toast } = useToast(); // Use the toast hook properly
+  const { toast } = useToast();
+
+  const fetchClasses = async () => {
+    try {
+      setLoading(true);
+      // Add credentials: 'include' to ensure cookies are sent with the request
+      const res = await fetch("/api/student/profile", {
+        method: "GET",
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!res.ok) {
+        if (res.status === 401) {
+          router.push("/student");
+          return;
+        }
+        throw new Error("Failed to fetch classes");
+      }
+
+      const data = await res.json();
+      setClasses(data.classes || []);
+    } catch (error) {
+      console.error("Error fetching classes:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load your classes",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchClasses = async () => {
-      try {
-        setLoading(true);
-        // Add credentials: 'include' to ensure cookies are sent with the request
-        const res = await fetch("/api/student/profile", {
-          method: "GET",
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
-        
-        if (!res.ok) {
-          if (res.status === 401) {
-            router.push("/student");
-            return;
-          }
-          throw new Error("Failed to fetch classes");
-        }
-
-        const data = await res.json();
-        setClasses(data.classes || []);
-      } catch (error) {
-        console.error("Error fetching classes:", error);
-        toast({
-          title: "Error",
-          description: "Failed to load your classes",
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchClasses();
   }, [router, toast]);
+
+  // Handle newly joined class
+  const handleClassJoined = (newClass: Class) => {
+    // Check if the class already exists in the list
+    const classExists = classes.some(c => c.id === newClass.id);
+    
+    if (!classExists) {
+      // Add the new class to the list
+      setClasses(prevClasses => [...prevClasses, newClass]);
+    }
+  };
 
   if (loading) {
     return (
@@ -99,8 +110,12 @@ export default function StudentClassesPage() {
           </Link>
         ))}
         
-        {/* Always show the "Join Class" card */}
-        <AddAnything title="Join Class" FormComponent={StudentJoinClass} />
+        {/* Always show the "Join Class" card with onItemAdded prop */}
+        <AddAnything 
+          title="Join Class" 
+          FormComponent={StudentJoinClass} 
+          onItemAdded={handleClassJoined}
+        />
       </div>
     </div>
   );

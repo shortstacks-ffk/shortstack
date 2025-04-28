@@ -9,8 +9,9 @@ import { useToast } from "@/src/hooks/use-toast";
 import {
   Menu,
   X,
+  ShoppingBag ,
   Home,
-  School,
+  SquarePen,
   Calendar,
   Wallet,
   LogOut,
@@ -30,9 +31,10 @@ export function DashboardSidebar() {
 
   const navItems = [
     { href: "/student/dashboard", icon: Home, label: "Dashboard" },
-    { href: "/student/dashboard/classes", icon: School, label: "Classes" },
+    { href: "/student/dashboard/classes", icon: SquarePen, label: "Classes" },
     { href: "/student/dashboard/calendar", icon: Calendar, label: "Calendar" },
     { href: "/student/dashboard/bank", icon: Wallet, label: "Bank" },
+    { href: "/student/dashboard/storefront", icon: ShoppingBag , label: "Storefront" },
   ];
   
   const handleLogout = async () => {
@@ -81,9 +83,9 @@ export function DashboardSidebar() {
       >
         {/* Drawer Header */}
         <div className="flex items-center justify-between p-4 border-b bg-[#f1faf3]">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center">
             <Image src={mascot} alt="Mascot" width={32} height={32} />
-            <Image src={simpleLogo} alt="ShortStacks" width={80} height={20} />
+            <Image src={simpleLogo} alt="ShortStacks" width={120} height={32} />
           </div>
           <button
             onClick={() => setIsMobileOpen(false)}
