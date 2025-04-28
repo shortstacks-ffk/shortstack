@@ -112,6 +112,7 @@ model Student {
   profileImage String?
   enrollments Enrollment[]
   bankAccounts BankAccount[] // Relation to BankAccount
+  assignmentSubmissions StudentAssignmentSubmission[]
   class       Class    @relation(fields: [classId], references: [code], onDelete: Cascade)
   userId       String?  @unique // Link to User table for authentication
   teacherId    String   // Link to the teacher who created this student
