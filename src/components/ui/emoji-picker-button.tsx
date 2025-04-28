@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/src/components/ui/button";
-import EmojiPicker, { EmojiClickData } from "emoji-picker-react";
-import { useOnClickOutside } from "@/src/hooks/use-on-click-outside";
+import EmojiPicker, { EmojiClickData, EmojiStyle } from "emoji-picker-react";
+// import { useOnClickOutside } from "@/src/hooks/use-on-click-outside";
 
 interface EmojiPickerButtonProps {
   value: string;
@@ -29,7 +29,7 @@ export function EmojiPickerButton({
   }, []);
   
   // Handle click outside to close the picker
-  useOnClickOutside(containerRef, () => setIsOpen(false));
+  useOnClickOutside(containerRef as React.RefObject<HTMLElement>, () => setIsOpen(false));
   
   const handleEmojiClick = (emojiData: EmojiClickData) => {
     onChange(emojiData.emoji);
@@ -82,7 +82,7 @@ export function EmojiPickerButton({
             searchDisabled={false}
             skinTonesDisabled={false}
             previewConfig={{ showPreview: false }}
-            emojiStyle="native"
+            emojiStyle={EmojiStyle.NATIVE}
           />
         </div>
       )}

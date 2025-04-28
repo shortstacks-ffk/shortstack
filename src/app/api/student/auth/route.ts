@@ -15,19 +15,12 @@ export async function GET(req: Request) {
     // Find student profile using the correct relation name
     const student = await db.student.findFirst({
       where: {
-        user: {
-          email: session.user.email,
-        },
+        schoolEmail: session.user.email,
       },
       include: {
-        teacher: {
-          select: {
-            id: true,
-            name: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-            image: true,
+        class: {
+          include: {
+            user: true,
           },
         },
       },
@@ -37,10 +30,10 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Student profile not found" }, { status: 404 });
     }
 
-    // Format teacher name
-    const teacher = student.teacher;
-    const teacherName = teacher.name || 
-      `${teacher.firstName || ''} ${teacher.lastName || ''}`.trim() || 
+    // Access the teacher through the class
+    const teacher = student.class?.user;
+    const teacherName = teacher?.name || 
+      `${teacher?.firstName || ''} ${teacher?.lastName || ''}`.trim() || 
       'Your Teacher';
 
     return NextResponse.json({ 
@@ -52,10 +45,10 @@ export async function GET(req: Request) {
         progress: student.progress,
         profileImage: student.profileImage,
         teacher: {
-          id: teacher.id,
+          id: teacher?.id,
           name: teacherName,
-          email: teacher.email,
-          image: teacher.image,
+          email: teacher?.email,
+          image: teacher?.image,
         }
       } 
     });

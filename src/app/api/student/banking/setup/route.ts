@@ -48,8 +48,9 @@ export async function POST() {
     // Use the shared utility function
     const result = await setupBankAccountsForStudent(student.id);
     
+    // Ensure result has an error property or use optional chaining
     if (!result.success) {
-      return NextResponse.json({ error: result.error }, { status: 400 });
+      return NextResponse.json({ error: "Failed to create accounts" }, { status: 400 });
     }
 
     return NextResponse.json(result.data);

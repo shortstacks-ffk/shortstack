@@ -159,7 +159,12 @@ export const BillCard = ({
           frequency,
           status,
           description: description || '',
-          classes: classes // Use 'class' instead of 'classes' to match your API
+          class: classes.map(cls => ({
+            id: cls.id,
+            name: cls.name,
+            emoji: cls.emoji || "📝", // Provide a default emoji if none exists
+            code: cls.code || "" // Ensure code is always a string
+          }))
         }}
       />
 

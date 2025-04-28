@@ -24,13 +24,16 @@ export function formatFileSize(bytes: number): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
-export function formatCurrency(amount: number): string {
+export function formatCurrency(amount: number, showSymbol: boolean = true): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
     minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  }).format(amount);
+    maximumFractionDigits: 2,
+    // Only include the currency symbol if showSymbol is true
+    currencyDisplay: showSymbol ? 'symbol' : 'code',
+    currencySign: 'accounting'
+  }).format(amount).replace('USD', '').trim();
 }
 
 export function getInitials(firstName?: string, lastName?: string): string {

@@ -65,14 +65,14 @@ export async function GET(
           },
           select: {
             id: true,
-            lastLogin: true
+            createdAt: true // Use createdAt instead of lastLogin
           }
         })
       : [];
 
-    // Create a map of userId -> lastLogin for quick lookup
+    // Create a map of userId -> createdAt for quick lookup
     const userLoginMap = Object.fromEntries(
-      userLoginInfo.map(user => [user.id, user.lastLogin])
+      userLoginInfo.map(user => [user.id, user.createdAt]) // Fix the user.lastLogin access
     );
 
     // Format the student data for the frontend

@@ -124,9 +124,9 @@ export async function PUT(req: Request) {
     }
 
     // Update user and teacherProfile in a transaction
-    const [updatedUser] = await db.$transaction([
-      db.user.update({
-        where: { email: session.user.email },
+    const result = await db.$transaction(async (prisma) => {
+      const updatedUser = await prisma.user.update({
+        where: { email: session.user.email! },
         data: updateData,
         select: {
           id: true,
@@ -137,14 +137,19 @@ export async function PUT(req: Request) {
           image: true,
           role: true,
         },
-      }),
-      user.teacherProfile && Object.keys(updateProfileData).length > 0
-        ? db.teacherProfile.update({
-            where: { userId: user.id },
-            data: updateProfileData,
-          })
-        : Promise.resolve(null),
-    ]);
+      });
+      
+      if (user.teacherProfile && Object.keys(updateProfileData).length > 0) {
+        await prisma.teacherProfile.update({
+          where: { userId: user.id },
+          data: updateProfileData,
+        });
+      }
+      
+      return updatedUser;
+    });
+    
+    const updatedUser = result;
 
     return NextResponse.json({
       user: updatedUser,

@@ -16,7 +16,7 @@ export async function GET() {
       where: {
         OR: [
           { userId: session.user.id },
-          { schoolEmail: session.user.email },
+          ...(session.user.email ? [{ schoolEmail: session.user.email }] : []),
           { id: session.user.id }
         ]
       }

@@ -47,7 +47,7 @@ export async function getStudentLessonsByClass(classCode: string): Promise<Lesso
         where: { classId: enrollment.classId },
         include: {
             files: true, // Include files associated with the lesson plan
-            assignments: true // Include assignments
+            assignmentRelations: true // Instead of assignments
         },
         orderBy: { createdAt: 'asc' }
     });

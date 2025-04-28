@@ -180,7 +180,11 @@ export async function deleteStoreItem(id: string): Promise<StoreItemResponse> {
     }
 
     // Delete associated purchases first (or use cascade delete)
-    await db.studentPurchase.deleteMany({ where: { storeItemId: id } });
+    await db.studentPurchase.deleteMany({ 
+      where: { 
+        itemId: id // Change storeItemId to itemId if that's what your schema uses
+      } 
+    });
 
     await db.storeItem.delete({ where: { id } });
 
@@ -206,72 +210,84 @@ export async function purchaseStoreItem(
 
     // Find the student record associated with the user
     const student = await db.student.findUnique({
-        where: { userId: session.user.id },
-        select: { id: true, balance: true } // Include balance
+      where: { id: session.user.id },
+      include: { bankAccounts: true }
     });
 
     if (!student) {
-        return { success: false, error: "Student profile not found" };
+      return { success: false, error: "Student not found" };
     }
 
     if (quantity <= 0) {
-        return { success: false, error: "Quantity must be positive" };
+      return { success: false, error: "Quantity must be positive" };
+    }
+
+    // Assuming the student has a checking account
+    const checkingAccount = student.bankAccounts.find(
+      acc => acc.accountType === "CHECKING"
+    );
+
+    // Get item details to calculate total price
+    const item = await db.storeItem.findUnique({
+      where: { id: itemId },
+    });
+    
+    if (!item) {
+      return { success: false, error: "Item not found" };
+    }
+    
+    const totalPrice = item.price * quantity;
+
+    if (!checkingAccount || checkingAccount.balance < totalPrice) {
+      return { success: false, error: "Insufficient funds" };
     }
 
     // Use transaction for purchase logic
     const result = await db.$transaction(async (tx) => {
-        // Get item details and lock the row for update
-        const item = await tx.storeItem.findUnique({
-            where: { id: itemId },
-            // select: { id: true, price: true, quantity: true, isAvailable: true, classId: true } // Select necessary fields
-        });
+      // Get item details and lock the row for update
+      const item = await tx.storeItem.findUnique({
+        where: { id: itemId },
+      });
 
-        if (!item) throw new Error("Item not found");
-        if (!item.isAvailable) throw new Error("Item is not available for purchase");
-        if (item.quantity < quantity) throw new Error("Insufficient stock available");
+      if (!item) throw new Error("Item not found");
+      if (!item.isAvailable) throw new Error("Item is not available for purchase");
+      if (item.quantity < quantity) throw new Error("Insufficient stock available");
 
-        const totalPrice = item.price * quantity;
+      const totalPrice = item.price * quantity;
 
-        // Check student balance
-        if (student.balance < totalPrice) {
-            throw new Error("Insufficient balance");
+      // Update the bank account balance instead
+      await tx.bankAccount.update({
+        where: { id: checkingAccount.id },
+        data: { balance: { decrement: totalPrice } }
+      });
+
+      // Decrement item quantity
+      const updatedItem = await tx.storeItem.update({
+        where: { id: itemId },
+        data: { quantity: { decrement: quantity } }
+      });
+
+      // Create purchase record
+      const purchase = await tx.studentPurchase.create({
+        data: {
+          studentId: student.id,
+          itemId: itemId, // Changed from storeItemId to itemId
+          quantity: quantity,
+          totalPrice: totalPrice, // Changed from price to amount, assuming this is the correct field name
+          status: "PAID", // Changed from COMPLETED to PAID if that's what your enum allows
         }
+      });
 
-        // Deduct balance from student
-        const updatedStudent = await tx.student.update({
-            where: { id: student.id },
-            data: { balance: { decrement: totalPrice } }
-        });
-
-        // Decrement item quantity
-        const updatedItem = await tx.storeItem.update({
-            where: { id: itemId },
-            data: { quantity: { decrement: quantity } }
-        });
-
-        // Create purchase record
-        const purchase = await tx.studentPurchase.create({
-            data: {
-                studentId: student.id,
-                storeItemId: itemId,
-                quantity: quantity,
-                totalPrice: totalPrice,
-                purchaseDate: new Date(),
-                status: PurchaseStatus.COMPLETED, // Assuming immediate completion
-            }
-        });
-
-        return { purchase, updatedStudent, updatedItem };
+      return { purchase, updatedItem };
     });
 
     // Revalidate relevant paths (e.g., student balance display, store item list)
     // Need class code for revalidation
     const itemClass = await db.storeItem.findUnique({ where: { id: itemId }, select: { class: { select: { code: true } } } });
     if (itemClass) {
-        revalidatePath(`/dashboard/classes/${itemClass.class.code}/store`);
-        // Revalidate student-specific pages if applicable
+      revalidatePath(`/dashboard/classes/${itemClass.class.code}/store`);
+      // Revalidate student-specific pages if applicable
     }
-
 
     return { success: true, data: result.purchase };
 
@@ -279,7 +295,7 @@ export async function purchaseStoreItem(
     console.error("Purchase store item error:", error);
     // Check for specific transaction errors (e.g., insufficient balance/stock)
     if (error.message === "Insufficient balance" || error.message === "Insufficient stock available" || error.message === "Item not found" || error.message === "Item is not available for purchase") {
-        return { success: false, error: error.message };
+      return { success: false, error: error.message };
     }
     return { success: false, error: "Failed to purchase item" };
   }

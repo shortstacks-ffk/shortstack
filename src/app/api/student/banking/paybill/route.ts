@@ -23,14 +23,10 @@ export async function POST(request: Request) {
     // Find student
     const student = await db.student.findFirst({
       where: {
-        OR: [
-          { userId: session.user.id },
-          { schoolEmail: session.user.email },
-          { id: session.user.id }
-        ]
+        schoolEmail: session.user?.email || "",
       },
       include: {
-        bankAccounts: true
+        bankAccounts: true,
       }
     });
     
@@ -39,7 +35,7 @@ export async function POST(request: Request) {
     }
     
     // Verify account ownership
-    const studentAccountIds = student.bankAccounts.map(acc => acc.id);
+    const studentAccountIds = student?.bankAccounts?.map(acc => acc.id) || [];
     if (!studentAccountIds.includes(accountId)) {
       return NextResponse.json({ error: "Unauthorized access to account" }, { status: 403 });
     }

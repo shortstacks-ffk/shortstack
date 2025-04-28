@@ -8,7 +8,19 @@ import {
   DropdownMenuTrigger
 } from "@/src/components/ui/dropdown-menu";
 
-export default function UserDropdown({ teacherImage, teacherInitial, teacherName, onLogout }) {
+interface UserDropdownProps {
+  teacherImage: string;
+  teacherInitial: string;
+  teacherName: string;
+  onLogout: () => void;
+}
+
+export default function UserDropdown({ 
+  teacherImage, 
+  teacherInitial, 
+  teacherName, 
+  onLogout 
+}: UserDropdownProps) {
   return (
     <div className="flex items-center gap-4 self-end sm:self-auto">
       <DropdownMenu>

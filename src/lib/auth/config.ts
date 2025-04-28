@@ -1,10 +1,15 @@
-
 import type { NextAuthOptions } from "next-auth";
+import type { User } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { db } from "@/src/lib/db";
 import bcrypt from "bcryptjs";
+
+interface CustomUser extends User {
+  firstName?: string;
+  lastName?: string;
+}
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(db),
@@ -107,8 +112,8 @@ export const authOptions: NextAuthOptions = {
             await db.teacherProfile.create({
               data: {
                 userId: user.id,
-                firstName: user.firstName || user.name?.split(' ')[0] || '',
-                lastName: user.lastName || user.name?.split(' ').slice(1).join(' ') || '',
+                firstName: (user as CustomUser).firstName || user.name?.split(' ')[0] || '',
+                lastName: (user as CustomUser).lastName || user.name?.split(' ').slice(1).join(' ') || '',
               },
             });
             console.log(`Created TeacherProfile for new user ${user.id}`);
@@ -131,8 +136,8 @@ export const authOptions: NextAuthOptions = {
             await db.teacherProfile.create({
               data: {
                 userId: user.id,
-                firstName: user.firstName || user.name?.split(' ')[0] || '',
-                lastName: user.lastName || user.name?.split(' ').slice(1).join(' ') || '',
+                firstName: (user as CustomUser).firstName || user.name?.split(' ')[0] || '',
+                lastName: (user as CustomUser).lastName || user.name?.split(' ').slice(1).join(' ') || '',
               },
             });
             console.log(`Created TeacherProfile for existing user ${user.id} on sign in`);

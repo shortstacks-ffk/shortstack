@@ -28,13 +28,11 @@ interface DashboardClientProps {
   }>
 }
 declare module "next-auth" {
-  interface Session {
-    user: User & {
-      id: string;
-      firstName?: string;
-      lastName?: string;
-      role: "TEACHER" | "STUDENT";
-    };
+  interface User {
+    id: string;
+    firstName?: string;
+    lastName?: string;
+    role: "TEACHER" | "STUDENT";
   }
 }
 
@@ -108,7 +106,7 @@ const DashboardClient = ({ classes }: DashboardClientProps) => {
           <SearchBar />
           <Notification />
           <UserDropdown
-            teacherImage={teacherImage}
+            teacherImage={teacherImage || ""}
             teacherInitial={teacherInitial}
             teacherName={teacherName}
             onLogout={handleLogout}
