@@ -5,27 +5,36 @@ import Link from 'next/link';
 import { ArrowLeft, Calendar, FileText, Download, Book, Clock } from 'lucide-react';
 import { formatDate } from '@/src/lib/utils';
 
-export default async function StudentLessonPage({
-  params,
-}: {
-  params: Promise<{ classId: string; lessonId: string }>;
-}) {
+interface PageParams {
+  params: Promise<{
+    classId: string;
+    lessonId: string;
+  }>;
+}
+
+// Updated to use proper interface instead of Promise
+export default async function StudentLessonPage(props: PageParams) {
+  const params = await props.params;
   try {
-    // Fix: Await the params to get the classId and lessonId
-    // This is necessary because params is a Promise in this context
-    const { classId, lessonId } = await params;
+    const { classId, lessonId } = params;
     
     if (!classId || !lessonId) {
+      console.log("Missing classId or lessonId parameters");
       notFound();
     }
     
+    console.log(`Fetching lesson ${lessonId} for class ${classId}`);
+    
     const response = await getStudentLessonById(lessonId);
+    console.log("Lesson response:", response.success);
     
     if (!response.success || !response.data) {
+      console.log("Lesson not found or access denied:", response.error);
       notFound();
     }
     
     const lesson = response.data;
+    console.log("Lesson loaded:", lesson.name);
 
     return (
       <main className="container mx-auto px-4 pb-20">
@@ -89,7 +98,7 @@ export default async function StudentLessonPage({
               </div>
             </div>
             
-            {/* Assignments section */}
+            {/* Enhanced Assignments section */}
             {lesson.assignments && lesson.assignments.length > 0 && (
               <div className="bg-card rounded-xl shadow-sm border overflow-hidden">
                 <div className="bg-muted/30 px-4 sm:px-6 py-3 sm:py-4 border-b">
@@ -101,31 +110,35 @@ export default async function StudentLessonPage({
                 <div className="divide-y">
                   {lesson.assignments.map((assignment: any) => (
                     <div key={assignment.id} className="p-4 sm:p-6">
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-                        <div>
-                          <h3 className="text-base sm:text-lg font-medium">{assignment.name}</h3>
-                          {assignment.activity && (
-                            <p className="text-sm text-muted-foreground mt-1">{assignment.activity}</p>
-                          )}
-                        </div>
-                        
-                        {assignment.dueDate && (
-                          <div className="flex items-center gap-1.5 text-xs sm:text-sm font-medium px-3 py-1.5 bg-amber-50 text-amber-700 rounded-md border border-amber-200 w-fit">
-                            <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
-                            Due: {formatDate(new Date(assignment.dueDate))}
+                      <Link href={`/student/dashboard/classes/${classId}/lessons/${lessonId}/assignments/${assignment.id}`}>
+                        <div className="cursor-pointer transition-colors hover:bg-muted/20 -mx-4 -my-4 sm:-mx-6 sm:-my-6 p-4 sm:p-6">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+                            <div>
+                              <h3 className="text-base sm:text-lg font-medium text-primary hover:text-primary/80 transition-colors">
+                                {assignment.name}
+                              </h3>
+                              {assignment.activity && (
+                                <div className="flex items-center gap-1.5 mt-1">
+                                  <span className="inline-block h-2 w-2 rounded-full bg-blue-500"></span>
+                                  <p className="text-sm text-muted-foreground">{assignment.activity}</p>
+                                </div>
+                              )}
+                            </div>
+                            
+                            <div className="flex flex-wrap gap-2 items-center">
+                              {assignment.dueDate && (
+                                <div className="flex items-center gap-1.5 text-xs sm:text-sm font-medium px-3 py-1.5 bg-amber-50 text-amber-700 rounded-md border border-amber-200">
+                                  <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
+                                  Due: {formatDate(new Date(assignment.dueDate))}
+                                </div>
+                              )}
+                              
+                            </div>
                           </div>
-                        )}
-                      </div>
-                      
-                      {assignment.url && (
-                        <div className="mt-4">
-                          <a href={assignment.url} target="_blank" rel="noopener noreferrer" download>
-                            <Button variant="secondary" size="sm">
-                              <Download className="h-3 w-3 mr-1.5" /> Download/View Assignment
-                            </Button>
-                          </a>
+                          
+                          
                         </div>
-                      )}
+                      </Link>
                     </div>
                   ))}
                 </div>
@@ -212,8 +225,9 @@ export default async function StudentLessonPage({
       <div className="container mx-auto p-4 sm:p-6 text-center">
         <div className="bg-destructive/10 text-destructive p-4 rounded-md mb-4">
           <p className="font-medium">Failed to load lesson data. Please try again later.</p>
+          <p className="text-sm mt-2">Error: {error instanceof Error ? error.message : 'Unknown error'}</p>
         </div>
-        <Link href={`/student/dashboard/classes/${(await params).classId}`}>
+        <Link href={`/student/dashboard/classes/${params.classId}`}>
           <Button variant="secondary">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Class
