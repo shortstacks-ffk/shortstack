@@ -15,10 +15,10 @@ interface Student {
   id: string;
   firstName: string;
   lastName: string;
-  schoolName?: string;
   schoolEmail: string;
   progress: number;
   enrolled: boolean;
+  schoolName?: string; // Add this property
 }
 
 interface StudentListProps {
@@ -71,9 +71,9 @@ export function StudentList({ classCode, maxStudents = Infinity }: StudentListPr
             total: totalStudents, 
             enrolled: enrolledStudents 
           });
-        } else if (result.enrollmentStats) {
-          setStudents(result.data);
-          setEnrollmentStats(result.enrollmentStats);
+        } else if (result.data.enrollmentStats) {
+          setStudents(result.data.students);
+          setEnrollmentStats(result.data.enrollmentStats);
         }
       } else {
         console.error("Student fetch error:", result.error || "Unknown error");
@@ -188,7 +188,7 @@ export function StudentList({ classCode, maxStudents = Infinity }: StudentListPr
               classCode={classCode}
               student={{
                 ...editingStudent,
-                schoolName: editingStudent?.schoolName || ''
+                schoolName: (editingStudent as any)?.schoolName || ''
               }}
               onClose={() => {
                 setEditingStudent(null);

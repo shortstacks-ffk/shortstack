@@ -6,17 +6,7 @@ import { Label } from '@/src/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/src/components/ui/select';
 import { updateAssignment } from '@/src/app/actions/assignmentActions';
 import { toast } from 'sonner';
-
-interface AssignmentRecord {
-  id: string;
-  name: string;
-  fileType?: string;
-  activity?: string;
-  dueDate?: string;
-  size?: number;
-  url?: string;
-  classId?: string;
-}
+import { AssignmentRecord } from '@/src/types/assignments';
 
 interface EditAssignmentDialogProps {
   assignment: AssignmentRecord;
@@ -68,7 +58,8 @@ export default function EditAssignmentDialog({
       const result = await updateAssignment(assignment.id, {
         name: form.name,
         activity: form.activity,
-        dueDate: form.dueDate ? new Date(form.dueDate).toISOString() : undefined
+        dueDate: form.dueDate ? new Date(form.dueDate) : undefined,
+        classId: assignment.classId || "" // Add the classId from the assignment
       });
       
       if (result.success) {

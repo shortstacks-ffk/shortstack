@@ -21,18 +21,7 @@ import { MoreHorizontal, FileEdit, Trash2, Send } from 'lucide-react';
 import { deleteAssignment } from '@/src/app/actions/assignmentActions';
 import EditAssignmentDialog from './EditAssignmentDialog';
 import AssignAssignmentDialog from './AssignAssignmentDialog';
-
-interface AssignmentRecord {
-  id: string;
-  name: string;
-  fileType?: string;
-  activity?: string;
-  createdAt?: string;
-  dueDate?: string;
-  size?: number;
-  url?: string;
-  classId?: string;
-}
+import { AssignmentRecord } from '@/src/types/assignments';
 
 const formatFileSize = (bytes?: number): string => {
   if (!bytes) return 'N/A';
@@ -140,7 +129,7 @@ export default function AssignmentTable({
                 </div>
               </div>
               <div className="col-span-1">{assignment.activity || 'N/A'}</div>
-              <div className="col-span-1">{formatDate(assignment.createdAt)}</div>
+              <div className="col-span-1">{formatDate(assignment.createdAt || assignment.dueDate)}</div>
               <div className="col-span-1">{formatDate(assignment.dueDate)}</div>
               <div className="col-span-1 flex justify-between items-center">
                 <div className="bg-blue-100 px-2 py-1 rounded-full text-blue-700 text-xs flex items-center">
@@ -208,7 +197,12 @@ export default function AssignmentTable({
       {/* Edit Assignment Dialog */}
       {assignmentToEdit && (
         <EditAssignmentDialog
-          assignment={assignmentToEdit}
+          assignment={{
+            ...assignmentToEdit,
+            id: assignmentToEdit?.id || "",
+            name: assignmentToEdit?.name || "",
+            classId: assignmentToEdit?.classId || ""
+          }}
           isOpen={!!assignmentToEdit}
           onClose={() => setAssignmentToEdit(null)}
           onUpdate={() => {

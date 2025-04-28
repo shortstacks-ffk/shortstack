@@ -4,6 +4,8 @@ import { StoreItemCard } from "@/src/components/storefront/StoreItemCard";
 // import { Store } from "lucide-react";
 import AddAnything from "@/src/components/AddAnything";
 import AddStoreItem from "@/src/components/storefront/AddStoreItem";
+import { getAuthSession } from "@/src/lib/auth";
+import { db } from "@/src/lib/db"; // Import the db instance properly
 
 export default async function StoreFrontPage() {
   const getColumnColor = (index: number) => {
@@ -18,33 +20,53 @@ export default async function StoreFrontPage() {
         return "bg-blue-200";
     }
   };
-  const response = await getStoreItems();
+  
+  // Get the current teacher's class ID
+  const session = await getAuthSession();
+  const teacherId = session?.user?.id;
+  
+  // Fetch the primary class ID for this teacher
+  // Use the imported db instance instead of prisma directly
+  const teacherClass = await db.class.findFirst({
+    where: { userId: teacherId },
+    select: { id: true }
+  });
+  
+  const classId = teacherClass?.id;
+  
+  if (!classId) {
+    return <div>No class found for this teacher</div>;
+  }
+  
+  const response = await getStoreItems(classId);
   if (!response.success || !response.data) {
     return <div>Failed to load classes</div>;
   }
 
-    // Reverse the array so newest items are at the end
-    const sortedStoreItems = [...response.data].reverse();
+  // Reverse the array so newest items are at the end
+  const sortedStoreItems = [...response.data].reverse();
 
   return (
     <main className="container mx-auto p-4">
       <h1 className="text-3xl font-bold mb-4">Storefront</h1>
       <div className="max-w-4xl ml-0 mr-auto w-full">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {sortedStoreItems.map((storeItem, index) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {sortedStoreItems.map((storeItem, index) => (
             <StoreItemCard
               key={storeItem.id}
               {...storeItem}
               backgroundColor={getColumnColor(index)}
             />
           ))}
-      {/* <DashboardAddStoreItemCard /> */}
-      <AddAnything
-        title="Add Store Item"
-        FormComponent={AddStoreItem}
-        />
+          <AddAnything
+            title="Add Store Item"
+            FormComponent={AddStoreItem}
+            onItemAdded={(newItem) => {
+              // Handle new item addition if needed
+            }}
+          />
         </div>
-        </div>
+      </div>
     </main>
   );
 }
