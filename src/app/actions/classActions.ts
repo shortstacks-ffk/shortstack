@@ -1,11 +1,17 @@
 'use server';
 
 import { db } from "@/src/lib/db";
-import { revalidatePath } from "next/cache";
 import { getAuthSession } from "@/src/lib/auth";
-import { Prisma } from "@prisma/client";
+import { revalidatePath } from "next/cache";
+import { Prisma } from '@prisma/client';
 
 // Types
+interface ClassSchedule {
+  days: string[]; // e.g., ["monday", "wednesday"]
+  startTime: string; // e.g., "09:00"
+  endTime: string; // e.g., "11:00"
+}
+
 interface ClassData {
   name: string;
   emoji: string;
@@ -13,6 +19,7 @@ interface ClassData {
   day?: string;
   time?: string;
   grade?: string;
+  schedule?: ClassSchedule;
 }
 
 interface ClassResponse {
@@ -21,7 +28,8 @@ interface ClassResponse {
   error?: string;
 }
 
-const generateUniqueClassCode = async (userId: string): Promise<string> => {
+// Helper function to generate a unique class code
+async function generateUniqueClassCode(userId: string): Promise<string> {
   const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   const codeLength = 6;
 
@@ -46,7 +54,84 @@ const generateUniqueClassCode = async (userId: string): Promise<string> => {
       return code;
     }
   }
-};
+}
+
+// Create recurring calendar events for class sessions
+async function createClassScheduleEvents(classData: any, schedules: any[]) {
+  try {
+    const session = await getAuthSession();
+    if (!session?.user?.id) {
+      console.log("No session for calendar event creation");
+      return;
+    }
+    
+    // Create calendar events for each schedule
+    for (const schedule of schedules) {
+      // Get the days for this schedule
+      const days = schedule.days || [];
+      
+      if (days.length === 0) {
+        console.log("No days specified for this schedule");
+        continue;
+      }
+      
+      // For each day, create a recurring calendar event
+      for (const day of days) {
+        // Create the main calendar event
+        const eventTitle = `${classData.emoji} ${classData.name} Class`;
+        
+        const calendarEvent = await db.calendarEvent.create({
+          data: {
+            title: eventTitle,
+            description: `Regular class session for ${classData.name}`,
+            startDate: new Date(), // Current date with time adjusted below
+            endDate: new Date(),   // Current date with time adjusted below
+            variant: "primary",
+            isRecurring: true,
+            recurringDays: [day],  // 0=Sunday, 1=Monday, etc.
+            createdById: session.user.id,
+            classId: classData.id,
+          }
+        });
+        
+        // Set the proper time for the event
+        const startHour = parseInt(schedule.startTime.split(':')[0]);
+        const startMinute = parseInt(schedule.startTime.split(':')[1]);
+        const endHour = parseInt(schedule.endTime.split(':')[0]);
+        const endMinute = parseInt(schedule.endTime.split(':')[1]);
+        
+        const startDate = new Date(calendarEvent.startDate);
+        startDate.setHours(startHour, startMinute, 0, 0);
+        
+        const endDate = new Date(calendarEvent.endDate);
+        endDate.setHours(endHour, endMinute, 0, 0);
+        
+        // Update the event with the correct times
+        await db.calendarEvent.update({
+          where: { id: calendarEvent.id },
+          data: {
+            startDate,
+            endDate
+          }
+        });
+        
+        // Create class session record
+        await db.classSession.create({
+          data: {
+            dayOfWeek: day,
+            startTime: schedule.startTime,
+            endTime: schedule.endTime,
+            classId: classData.id
+          }
+        });
+        
+        console.log(`Created recurring calendar event for class ${classData.name} on day ${day}`);
+      }
+    }
+  } catch (error) {
+    console.error("Error creating class schedule events:", error);
+  }
+}
 
 // Create class
 export async function createClass(formData: FormData): Promise<ClassResponse> {
@@ -68,11 +153,25 @@ export async function createClass(formData: FormData): Promise<ClassResponse> {
     const name = formData.get('name') as string;
     const emoji = formData.get('emoji') as string;
     const cadence = formData.get('cadence') as string || "Weekly";
-    const day = formData.get('day') as string || "monday";
-    const time = formData.get('time') as string || "09:00";
     const grade = formData.get('grade') as string || "9th";
     
-    console.log("Form data:", { name, emoji, cadence, day, time, grade });
+    // Get schedules from JSON
+    const schedulesJson = formData.get('schedules') as string;
+    const schedules = schedulesJson ? JSON.parse(schedulesJson) : [];
+    
+    // For backward compatibility
+    // Use the first schedule's first day and time if available
+    let day = "monday";
+    let time = "09:00";
+    
+    if (schedules.length > 0 && schedules[0].days.length > 0) {
+      // Convert numeric day to string (0 = Sunday, 1 = Monday, etc.)
+      const dayMap = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+      day = dayMap[schedules[0].days[0]];
+      time = schedules[0].startTime;
+    }
+    
+    console.log("Form data:", { name, emoji, cadence, grade, day, time, schedules });
     
     // Verify all required fields are present
     if (!name || !emoji) {
@@ -89,8 +188,8 @@ export async function createClass(formData: FormData): Promise<ClassResponse> {
         emoji,
         code,
         cadence,
-        day,
-        time,
+        day,   // For backwards compatibility
+        time,  // For backwards compatibility
         grade,
         userId
       }
@@ -98,9 +197,15 @@ export async function createClass(formData: FormData): Promise<ClassResponse> {
 
     console.log("Class created successfully:", newClass);
 
+    // Create class sessions and calendar events
+    if (schedules && schedules.length > 0) {
+      await createClassScheduleEvents(newClass, schedules);
+    }
+
     // Update revalidation paths
     revalidatePath('/teacher/dashboard/classes', 'page');
     revalidatePath('/teacher/dashboard', 'page');
+
     return { success: true, data: newClass };
   } catch (error: any) {
     console.error("Create class error - DETAILED:", error);

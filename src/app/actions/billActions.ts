@@ -28,6 +28,51 @@ interface RemoveBillFromClassesParams {
   classIds: string[]; // Empty array means remove from all classes
 }
 
+// Add calendar events for a bill
+async function createBillCalendarEvents(bill: any, students: any[]) {
+  try {
+    // Create the main calendar event for the bill
+    const mainEvent = await db.calendarEvent.create({
+      data: {
+        title: `Bill Due: ${bill.title}`,
+        description: `Amount: $${bill.amount.toFixed(2)}\n${bill.description || ''}`,
+        startDate: bill.dueDate, 
+        endDate: new Date(new Date(bill.dueDate).getTime() + 60 * 60 * 1000), // One hour duration
+        variant: "destructive", // Red for bills
+        isRecurring: bill.frequency !== "ONCE",
+        recurringDays: [], // Would need to extract recurring days based on frequency
+        createdById: bill.creatorId,
+        billId: bill.id
+      }
+    });
+
+    // Create calendar events for each student assigned to this bill
+    for (const student of students) {
+      await db.calendarEvent.create({
+        data: {
+          title: `Bill Due: ${bill.title}`,
+          description: `Amount: $${bill.amount.toFixed(2)}\n${bill.description || ''}`,
+          startDate: bill.dueDate,
+          endDate: new Date(new Date(bill.dueDate).getTime() + 60 * 60 * 1000),
+          variant: "destructive",
+          isRecurring: bill.frequency !== "ONCE",
+          recurringDays: [],
+          createdById: bill.creatorId,
+          billId: bill.id,
+          studentId: student.id,
+          parentEventId: mainEvent.id
+        }
+      });
+    }
+
+    return mainEvent;
+  } catch (error) {
+    console.error("Error creating bill calendar events:", error);
+    // Don't throw, just log the error as this is a secondary function
+    return null;
+  }
+}
+
 // Create Bill with class selection
 export async function createBill(formData: FormData): Promise<BillResponse> {
   try {
@@ -103,6 +148,9 @@ export async function createBill(formData: FormData): Promise<BillResponse> {
         }))
       });
     }
+
+    // Create calendar events for the bill
+    await createBillCalendarEvents(newBill, students);
 
     revalidatePath("/teacher/dashboard/bills");
     return { success: true, data: newBill };

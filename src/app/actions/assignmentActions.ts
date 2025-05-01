@@ -21,6 +21,62 @@ interface AssignmentResponse {
   error?: string;
 }
 
+// Add calendar events for an assignment
+async function createAssignmentCalendarEvents(assignment: any, classInfo: any) {
+  try {
+    // Create the main calendar event for the assignment
+    const mainEvent = await db.calendarEvent.create({
+      data: {
+        title: `Assignment Due: ${assignment.name}`,
+        description: assignment.activity || 'Assignment due',
+        startDate: assignment.dueDate,
+        endDate: new Date(new Date(assignment.dueDate).getTime() + 60 * 60 * 1000), // One hour duration
+        variant: "primary", // Blue for assignments
+        isRecurring: false,
+        createdById: classInfo.userId, // Teacher's ID
+        assignmentId: assignment.id,
+        classId: classInfo.id
+      }
+    });
+
+    // Get all enrolled students for this class
+    const enrolledStudents = await db.enrollment.findMany({
+      where: {
+        classId: classInfo.id,
+        enrolled: true
+      },
+      select: {
+        studentId: true
+      }
+    });
+
+    // Create calendar events for each enrolled student
+    for (const enrollment of enrolledStudents) {
+      await db.calendarEvent.create({
+        data: {
+          title: `Assignment Due: ${assignment.name}`,
+          description: assignment.activity || 'Assignment due',
+          startDate: assignment.dueDate,
+          endDate: new Date(new Date(assignment.dueDate).getTime() + 60 * 60 * 1000),
+          variant: "primary",
+          isRecurring: false,
+          createdById: classInfo.userId,
+          assignmentId: assignment.id,
+          classId: classInfo.id,
+          studentId: enrollment.studentId,
+          parentEventId: mainEvent.id
+        }
+      });
+    }
+
+    return mainEvent;
+  } catch (error) {
+    console.error("Error creating assignment calendar events:", error);
+    // Don't throw, just log the error as this is a secondary function
+    return null;
+  }
+}
+
 // Create an assignment using the required fields.
 export async function createAssignment(data: AssignmentData): Promise<AssignmentResponse> {
   try {
@@ -69,6 +125,15 @@ export async function createAssignment(data: AssignmentData): Promise<Assignment
     });
 
     console.log('Assignment created successfully:', createdAssignment.id);
+
+    const classInfo = await db.class.findUnique({
+      where: { code: data.classId || "" },
+      select: { id: true, userId: true }
+    });
+
+    if (classInfo && createdAssignment.dueDate) {
+      await createAssignmentCalendarEvents(createdAssignment, classInfo);
+    }
     
     revalidatePath(`/teacher/dashboard/classes/${classObj.code}`);
     revalidatePath(`/teacher/dashboard/classes/${classObj.code}/lesson-plans`);
