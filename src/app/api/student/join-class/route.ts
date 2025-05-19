@@ -38,7 +38,7 @@ export async function POST(request: Request) {
       );
     }
     
-    // Find the class
+    // Find the class with class sessions
     const classData = await db.class.findUnique({
       where: { code: classCode },
       select: {
@@ -46,8 +46,20 @@ export async function POST(request: Request) {
         name: true,
         code: true,
         emoji: true,
-        time: true,
+        color: true,
+        cadence: true,
+        grade: true,
+        startDate: true,
+        endDate: true,
         createdAt: true,
+        classSessions: {
+          select: {
+            id: true,
+            dayOfWeek: true,
+            startTime: true,
+            endTime: true
+          }
+        },
         user: {
           select: {
             id: true,
@@ -101,6 +113,21 @@ export async function POST(request: Request) {
       `${teacher?.firstName || ''} ${teacher?.lastName || ''}`.trim() || 
       'Your Teacher';
     
+    // Format schedule from class sessions
+    const formattedSchedule = classData.classSessions.map(session => {
+      // Convert dayOfWeek number to string (0 = Sunday, 1 = Monday, etc.)
+      const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+      const dayName = days[session.dayOfWeek];
+      
+      return {
+        id: session.id,
+        day: dayName,
+        dayOfWeek: session.dayOfWeek,
+        startTime: session.startTime,
+        endTime: session.endTime
+      };
+    });
+    
     // Create or update enrollment
     if (enrollment) {
       // If enrollment exists but not marked as enrolled, update it
@@ -118,7 +145,12 @@ export async function POST(request: Request) {
             name: classData.name,
             code: classData.code,
             emoji: classData.emoji || "📚",
-            time: classData.time,
+            color: classData.color,
+            grade: classData.grade,
+            cadence: classData.cadence,
+            startDate: classData.startDate,
+            endDate: classData.endDate,
+            schedule: formattedSchedule,
             createdAt: classData.createdAt,
             teacher: {
               id: teacher?.id,
@@ -138,7 +170,12 @@ export async function POST(request: Request) {
             name: classData.name,
             code: classData.code,
             emoji: classData.emoji || "📚",
-            time: classData.time,
+            color: classData.color,
+            grade: classData.grade,
+            cadence: classData.cadence,
+            startDate: classData.startDate,
+            endDate: classData.endDate,
+            schedule: formattedSchedule,
             createdAt: classData.createdAt,
             teacher: {
               id: teacher?.id,
@@ -167,7 +204,12 @@ export async function POST(request: Request) {
           name: classData.name,
           code: classData.code,
           emoji: classData.emoji || "📚",
-          time: classData.time,
+          color: classData.color,
+          grade: classData.grade,
+          cadence: classData.cadence,
+          startDate: classData.startDate,
+          endDate: classData.endDate,
+          schedule: formattedSchedule,
           createdAt: classData.createdAt,
           teacher: {
             id: teacher?.id,
