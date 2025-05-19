@@ -8,6 +8,8 @@ import React, {
   ReactNode,
   Dispatch,
   useEffect,
+  useCallback,
+  useState,
 } from "react";
 import { z } from "zod";
 
@@ -19,7 +21,9 @@ import {
   SchedulerContextType,
   startOfWeek,
 } from "@/src/types/scheduler/index";
-import ModalProvider from "./modal-context";
+import ModalProvider, { useModal } from "./modal-context"; // Import useModal here
+import CustomModal from "@/src/components/ui/custom-modal"; // Import CustomModal component
+import AddEventModal from "@/src/components/scheduler/_modals/add-event-modal"; 
 // Define event and state types
 
 interface SchedulerState {
@@ -94,12 +98,65 @@ export const SchedulerProvider = ({
     schedulerReducer,
     { events: initialState ?? [] } // Sets initialState or an empty array as the default
   );
+  const [events, setEvents] = useState<Event[]>([]);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (initialState) {
       dispatch({ type: "SET_EVENTS", payload: initialState });
     }
   }, [initialState]);
+
+  useEffect(() => {
+    // Fetch calendar events including those linked to todos
+    const fetchEvents = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch("/api/calendar");
+        if (!response.ok) throw new Error("Failed to fetch events");
+        const data = await response.json();
+
+        // Map the data to ensure all date properties are Date objects
+        const formattedEvents = data.map((event: any) => ({
+          ...event,
+          startDate: new Date(event.startDate),
+          endDate: new Date(event.endDate),
+        }));
+
+        setEvents(formattedEvents);
+      } catch (error) {
+        console.error("Error fetching calendar events:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchEvents();
+  }, []);
+
+  // Add this function to the SchedulerProvider component
+  const refreshEvents = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch("/api/calendar");
+      if (!response.ok) throw new Error("Failed to fetch events");
+      const data = await response.json();
+
+      // Map the data to ensure all date properties are Date objects
+      const formattedEvents = data.map((event: any) => ({
+        ...event,
+        startDate: new Date(event.startDate),
+        endDate: new Date(event.endDate),
+      }));
+
+      setEvents(formattedEvents);
+      dispatch({ type: "SET_EVENTS", payload: formattedEvents });
+    } catch (error) {
+      console.error("Error refreshing calendar events:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // global getters
   const getDaysInMonth = (month: number, year: number) => {
@@ -154,31 +211,95 @@ export const SchedulerProvider = ({
   };
 
   // Helper function to filter events for a specific day
-  const getEventsForDay = (day: number, currentDate: Date) => {
-    return state?.events.filter((event) => {
-      const eventStart = new Date(event.startDate);
-      const eventEnd = new Date(event.endDate);
+  // This function is used to get events for a specific day in the month
 
-      // Create new Date objects to avoid mutating `currentDate`
-      const startOfDay = new Date(currentDate);
-      startOfDay.setDate(day);
-      startOfDay.setHours(0, 0, 0, 0);
+const getEventsForDay = useCallback(
+  (day: number, monthDate: Date) => {
+    if (!events?.length) return [];
+    
+    // Create a reference date for the day we're checking
+    const targetDate = new Date(monthDate.getFullYear(), monthDate.getMonth(), day);
+    const targetYear = targetDate.getFullYear();
+    const targetMonth = targetDate.getMonth();
+    const targetDay = targetDate.getDate();
+    const weekday = targetDate.getDay();
+    
+    // Debug the target date we're filtering for
+    console.log(`Filtering events for date: ${targetYear}-${targetMonth+1}-${targetDay} (weekday: ${weekday})`);
 
-      const endOfDay = new Date(currentDate);
-      endOfDay.setDate(day + 1);
-      endOfDay.setHours(0, 0, 0, 0);
+    return events.filter((event) => {
+      // For recurring events with recurring days, check if the weekday matches
+      if (
+        event.isRecurring === true &&
+        Array.isArray(event.recurringDays) &&
+        event.recurringDays.length > 0
+      ) {
+        const matches = event.recurringDays.includes(weekday);
+        if (matches) {
+          console.log(`Recurring event match: ${event.title} appears on weekday ${weekday}`);
+        }
+        return matches;
+      }
+      
+      // Special handling for bills and assignments
+      if (
+        event.metadata?.type === "bill" ||
+        event.metadata?.type === "assignment"
+      ) {
+        let eventDate: Date;
 
-      // Check if the event starts or spans across the given day
-      const isSameDay =
-        eventStart.getDate() === day &&
-        eventStart.getMonth() === currentDate.getMonth() &&
-        eventStart.getFullYear() === currentDate.getFullYear();
+        if (typeof event.metadata?.dueDate === "string") {
+          // "2025-05-09T00:00:00.000Z" → ["2025","05","09"] → local midnight
+          const [year, month, day] = (event.metadata.dueDate as string)
+            .slice(0, 10)
+            .split("-")
+            .map((n) => parseInt(n, 10));
+          eventDate = new Date(year, month - 1, day, 0, 0, 0, 0);
+        } else {
+          // fallback if someone stored a Date in metadata
+          const d = event.metadata.dueDate as unknown as Date;
+          eventDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+        }
 
-      const isSpanningDay = eventStart < endOfDay && eventEnd >= startOfDay;
+        const matches =
+          eventDate.getFullYear() === targetYear &&
+          eventDate.getMonth() === targetMonth &&
+          eventDate.getDate() === targetDay;
 
-      return isSameDay || isSpanningDay;
+        if (matches) {
+          console.log(
+            `Bill/Assignment match: ${event.title} on ${targetYear}-${
+              targetMonth + 1
+            }-${targetDay}`
+          );
+        }
+        return matches;
+      }
+      
+      // For all other regular events
+      const eventDate = event.startDate instanceof Date
+        ? event.startDate
+        : new Date(event.startDate);
+        
+      const eventYear = eventDate.getFullYear();
+      const eventMonth = eventDate.getMonth();
+      const eventDay = eventDate.getDate();
+      
+      const matches = (
+        eventYear === targetYear &&
+        eventMonth === targetMonth &&
+        eventDay === targetDay
+      );
+      
+      if (matches) {
+        console.log(`Regular event match: ${event.title} on ${eventYear}-${eventMonth+1}-${eventDay}`);
+      }
+      
+      return matches;
     });
-  };
+  },
+  [events]
+);
 
   const getDayName = (day: number) => {
     const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -193,117 +314,68 @@ export const SchedulerProvider = ({
     getDayName,
   };
 
-  // handlers
+  // Function to handle event styling
+  // This function calculates the height and position of the event
   function handleEventStyling(
-    event: Event, 
+    event: Event,
     dayEvents: Event[],
-    periodOptions?: { 
-      eventsInSamePeriod?: number; 
-      periodIndex?: number; 
+    periodOptions?: {
+      eventsInSamePeriod?: number;
+      periodIndex?: number;
       adjustForPeriod?: boolean;
     }
   ) {
-    // More precise time-based overlap detection
-    const eventsOnHour = dayEvents.filter((e) => {
-      // Don't compare with self
-      if (e.id === event.id) return false;
-      
-      // Convert dates to timestamps for precise comparison
-      const eStart = e.startDate instanceof Date ? e.startDate.getTime() : new Date(e.startDate).getTime();
-      const eEnd = e.endDate instanceof Date ? e.endDate.getTime() : new Date(e.endDate).getTime();
-      const eventStart = event.startDate instanceof Date ? event.startDate.getTime() : new Date(event.startDate).getTime();
-      const eventEnd = event.endDate instanceof Date ? event.endDate.getTime() : new Date(event.endDate).getTime();
-      
-      // True overlap check - one event starts before the other ends
-      return (eStart < eventEnd && eEnd > eventStart);
-    });
-
-    // Add the current event to the list of overlapping events
-    const allEventsInRange = [event, ...eventsOnHour];
-
-    // Sort overlapping events by start time to ensure consistent ordering
-    allEventsInRange.sort((a, b) => {
-      const aStart = a.startDate instanceof Date ? a.startDate.getTime() : new Date(a.startDate).getTime();
-      const bStart = b.startDate instanceof Date ? b.startDate.getTime() : new Date(b.startDate).getTime();
-      return aStart - bStart;
-    });
-
-    // Use custom period grouping if provided, otherwise use the precise overlapping events
-    const useCustomPeriod = periodOptions?.adjustForPeriod && 
-                           periodOptions.eventsInSamePeriod !== undefined && 
-                           periodOptions.periodIndex !== undefined;
-                           
-    let numEventsOnHour = useCustomPeriod ? periodOptions!.eventsInSamePeriod! : allEventsInRange.length;
-    let indexOnHour = useCustomPeriod ? periodOptions!.periodIndex! : allEventsInRange.indexOf(event);
-
-    // If there are no overlapping events or using custom grouping failed, give full width
+    // use your real row-height
+    const ROW_HEIGHT = 56;
+  
+    let eventHeight = 0;
+    let eventTop = 0;
+  
+    if (event.startDate instanceof Date && event.endDate instanceof Date) {
+      const startMinutes =
+        event.startDate.getHours() * 60 + event.startDate.getMinutes();
+      const endMinutes =
+        event.endDate.getHours() * 60 + event.endDate.getMinutes();
+      const adjustedEnd = endMinutes < startMinutes ? endMinutes + 1440 : endMinutes;
+      const diff = adjustedEnd - startMinutes;
+  
+      // height & top based on ROW_HEIGHT
+      eventHeight = (diff / 60) * ROW_HEIGHT;
+      eventTop = (startMinutes / 60) * ROW_HEIGHT;
+  
+      if (eventHeight < 20) eventHeight = 20;
+      const maxHeight = 24 * ROW_HEIGHT - eventTop;
+      if (eventHeight > maxHeight) eventHeight = maxHeight;
+    }
+  
+    // Overlap handling with proper width calculation
+    const useCustomPeriod =
+      periodOptions?.adjustForPeriod &&
+      periodOptions.eventsInSamePeriod !== undefined &&
+      periodOptions.periodIndex !== undefined;
+  
+    // Get event count and position for column layout
+    let numEventsOnHour = useCustomPeriod ? periodOptions!.eventsInSamePeriod! : 1;
+    let indexOnHour = useCustomPeriod ? periodOptions!.periodIndex! : 0;
+  
+    // If custom period indexing fails, fallback to default
     if (numEventsOnHour === 0 || indexOnHour === -1) {
       numEventsOnHour = 1;
       indexOnHour = 0;
     }
-
-    let eventHeight = 0;
-    let maxHeight = 0;
-    let eventTop = 0;
-
-    if (event.startDate instanceof Date && event.endDate instanceof Date) {
-      // Normalize start and end dates to only include hours and minutes
-      const startTime =
-        event.startDate.getHours() * 60 + event.startDate.getMinutes(); // Convert to minutes
-      const endTime =
-        event.endDate.getHours() * 60 + event.endDate.getMinutes(); // Convert to minutes
-
-      // Calculate the difference in minutes between start and end times
-      const diffInMinutes = endTime - startTime;
-
-      // Calculate the event height based on the duration (64px per hour, so 64px/60min = 1.0667px per minute)
-      eventHeight = (diffInMinutes / 60) * 64;
-
-      // Get the event start hour as a fraction (e.g., 13.5 for 13:30)
-      const eventStartHour =
-        event.startDate.getHours() + event.startDate.getMinutes() / 60;
-
-      // Define the day-end hour (24.0 for midnight)
-      const dayEndHour = 24;
-
-      // Calculate maxHeight based on the difference between the day-end hour and the event's start hour
-      maxHeight = Math.max(0, (dayEndHour - eventStartHour) * 64);
-
-      // Limit the event height to the calculated maxHeight (so it doesn't overflow beyond the day)
-      eventHeight = Math.min(eventHeight, maxHeight);
-
-      // Calculate the top position based on the event's start time (64px per hour)
-      eventTop = eventStartHour * 64;
-    } else {
-      console.error("Invalid event or missing start/end dates.");
-    }
-
-    // Improved width and position calculation
-    // Use a smaller width if we have multiple overlapping events
-    const widthPercentage = Math.min(95 / Math.max(numEventsOnHour, 1), 95);
-    
-    // Calculate left position with a small gap between events
-    const leftPosition = indexOnHour * (widthPercentage + 1);
-    
-    // Ensure left position doesn't go beyond container
+  
+    // Calculate width and position with spacing
+    const widthPercentage = 90 / Math.max(numEventsOnHour, 1);
+    const leftPosition = indexOnHour * widthPercentage;
     const safeLeftPosition = Math.min(leftPosition, 100 - widthPercentage);
-
-    // Minimum height for visibility
-    const minimumHeight = 20;
-
+  
     return {
-      height: `${
-        eventHeight < minimumHeight
-          ? minimumHeight
-          : eventHeight > maxHeight
-          ? maxHeight
-          : eventHeight
-      }px`,
+      height: `${eventHeight}px`,
       top: `${eventTop}px`,
-      zIndex: indexOnHour + 1,
       left: `${safeLeftPosition}%`,
       maxWidth: `${widthPercentage}%`,
       minWidth: `${widthPercentage}%`,
+      zIndex: indexOnHour + 1,
     };
   }
 
@@ -328,16 +400,33 @@ export const SchedulerProvider = ({
     }
   }
 
+  function openEditModal(event: Event) {
+    setOpen(
+      <CustomModal title="Edit Event">
+        <AddEventModal />
+      </CustomModal>,
+      async () => ({ default: event })
+    );
+  }
+
   const handlers: Handlers = {
     handleEventStyling,
     handleAddEvent,
     handleUpdateEvent,
     handleDeleteEvent,
+    openEditModal,
   };
 
   return (
     <SchedulerContext.Provider
-      value={{ events: state, dispatch, getters, handlers, weekStartsOn }}
+      value={{
+        events: state,
+        dispatch,
+        getters,
+        handlers,
+        weekStartsOn,
+        refreshEvents, // Add this to expose the function to consumers
+      }}
     >
       <ModalProvider>{children}</ModalProvider>
     </SchedulerContext.Provider>
@@ -352,3 +441,8 @@ export const useScheduler = () => {
   }
   return context;
 };
+
+function setOpen(arg0: React.JSX.Element, arg1: () => Promise<{ default: Event; }>) {
+  throw new Error("Function not implemented.");
+}
+

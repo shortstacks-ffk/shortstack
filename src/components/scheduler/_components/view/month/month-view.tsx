@@ -13,7 +13,7 @@ import { useModal } from "@/src/providers/scheduler/modal-context";
 import AddEventModal from "@/src/components/scheduler/_modals/add-event-modal";
 import ShowMoreEventsModal from "@/src/components/scheduler/_modals/show-more-events-modal";
 import EventStyled from "../event-component/event-styled";
-import { Event, CustomEventModal } from "@/types/scheduler";
+import { Event, CustomEventModal } from "@/src/types/scheduler/index";
 import CustomModal from "@/src/components/ui/custom-modal";
 
 const pageTransitionVariants = {
@@ -119,18 +119,15 @@ export default function MonthView({
     );
   }
 
-  function handleShowMoreEvents(dayEvents: Event[]) {
+  function handleShowMoreEvents(dayEvents: Event[], date: Date) {
     setOpen(
-      <CustomModal title={dayEvents && dayEvents[0]?.startDate.toDateString()}>
+      <CustomModal title={date.toDateString()}>
         <ShowMoreEventsModal />
       </CustomModal>,
-      async () => {
-        return {
-          dayEvents,
-        };
-      }
+      async () => ({ dayEvents, date })
     );
   }
+
 
   const containerVariants = {
     enter: { opacity: 0 },
@@ -269,7 +266,12 @@ export default function MonthView({
           {daysInMonth.map((dayObj) => {
             const dayEvents = getters.getEventsForDay(dayObj.day, currentDate);
             const isCurrentDay = isSameDay(dayObj.day, currentDate);
-            
+            const thisDate = new Date(
+              currentDate.getFullYear(),
+              currentDate.getMonth(),
+              dayObj.day
+            );
+
             return (
               <motion.div
                 className={clsx(
@@ -320,7 +322,7 @@ export default function MonthView({
                     <div
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleShowMoreEvents(dayEvents);
+                        handleShowMoreEvents(dayEvents, thisDate);
                       }}
                       className="text-xs bg-gray-100 hover:bg-gray-200 rounded px-1 py-0.5 text-center cursor-pointer"
                     >

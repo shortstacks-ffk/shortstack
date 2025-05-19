@@ -1,6 +1,6 @@
 import EventStyled from "@/src/components/scheduler/_components/view/event-component/event-styled";
 import { useModal } from "@/src/providers/scheduler/modal-context";
-import { Event } from "@/types";
+import { Event } from "@/src/types/scheduler/index";
 import React, { useEffect, useState } from "react";
 import { CalendarIcon } from "lucide-react";
 

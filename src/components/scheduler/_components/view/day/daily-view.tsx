@@ -9,7 +9,7 @@ import { useScheduler } from "@/src/providers/scheduler/schedular-provider";
 import { useModal } from "@/src/providers/scheduler/modal-context";
 import AddEventModal from "@/src/components/scheduler/_modals/add-event-modal";
 import EventStyled from "../event-component/event-styled";
-import { CustomEventModal, Event } from "@/types";
+import { CustomEventModal, Event } from "@/src/types/scheduler/index";
 import { Button } from "@/src/components/ui/button";
 import { Badge } from "@/src/components/ui/badge";
 import CustomModal from "@/src/components/ui/custom-modal";
@@ -327,7 +327,7 @@ export default function DailyView({
         <div className="">
           <div className="flex justify-between gap-2 flex-wrap mb-3">
             {/* More compact header */}
-            <h1 className="text-2xl font-semibold mb-2">
+            <h1 className="text-2xl font-semibold mb-2 pl-2">
               {getFormattedDayTitle()}
             </h1>
 
@@ -372,7 +372,7 @@ export default function DailyView({
                 x: { type: "spring", stiffness: 300, damping: 30 },
                 opacity: { duration: 0.2 },
               }}
-              className="flex flex-col gap-3"
+              className="flex flex-col gap-3 pl-2"
             >
               {!stopDayEventSummary && (
                 <div className="all-day-events">
@@ -426,81 +426,60 @@ export default function DailyView({
                     ))}
                   </div>
                   <div className="flex relative flex-grow flex-col">
-                    {Array.from({ length: 24 }).map((_, index) => (
+                    {/* 1) 24h background rows */}
+                    {Array.from({ length: 24 }).map((_, hourIndex) => (
                       <div
-                        onClick={() => {
-                          handleAddEventDay(detailedHour as string);
-                        }}
-                        key={`hour-${index}`}
-                        className="cursor-pointer w-full relative border-b hover:bg-default-200/50 transition duration-300 p-2 h-[56px] text-left text-xs text-muted-foreground border-default-200"
+                        key={`hour-${hourIndex}`}
+                        className="h-[56px] relative cursor-pointer border-b border-default-200"
+                        onClick={() => handleAddEventDay(detailedHour!)}
                       >
-                        <div className="absolute bg-accent flex items-center justify-center text-xs opacity-0 transition left-0 top-0 duration-250 hover:opacity-100 w-full h-full">
+                        <div className="absolute inset-0 flex items-center justify-center text-xs opacity-0 hover:opacity-100">
                           Add Event
                         </div>
                       </div>
                     ))}
+
+                    {/* 2) absolutely-position events on top */}
                     <AnimatePresence initial={false}>
-                      {dayEvents && dayEvents?.length
-                        ? dayEvents?.map((event, eventIndex) => {
-                            // Same event group logic
-                            let eventsInSamePeriod = 1;
-                            let periodIndex = 0;
-                            
-                            for (let i = 0; i < timeGroups.length; i++) {
-                              const groupIndex = timeGroups[i].findIndex(e => e.id === event.id);
-                              if (groupIndex !== -1) {
-                                eventsInSamePeriod = timeGroups[i].length;
-                                periodIndex = groupIndex;
-                                break;
-                              }
-                            }
-                            
-                            const {
-                              height,
-                              left,
-                              maxWidth,
-                              minWidth,
-                              top,
-                              zIndex,
-                            } = handlers.handleEventStyling(
-                              event, 
-                              dayEvents,
-                              {
-                                eventsInSamePeriod,
-                                periodIndex,
-                                adjustForPeriod: true
-                              }
-                            );
-                            return (
-                              <motion.div
-                                key={event.id}
-                                style={{
-                                  minHeight: height,
-                                  top: top,
-                                  left: left,
-                                  maxWidth: maxWidth,
-                                  minWidth: minWidth,
-                                  padding: "0 1px", // Tighter padding
-                                  boxSizing: "border-box",
-                                }}
-                                className="flex transition-all duration-1000 flex-grow flex-col z-50 absolute"
-                                initial={{ opacity: 0, scale: 0.9 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.9 }}
-                                transition={{ duration: 0.2 }}
-                              >
-                                <EventStyled
-                                  event={{
-                                    ...event,
-                                    CustomEventComponent,
-                                    minmized: true,
-                                  }}
-                                  CustomEventModal={CustomEventModal}
-                                />
-                              </motion.div>
-                            );
-                          })
-                        : ""}
+                      {dayEvents?.map((event) => {
+                        // overlap logic same as before...
+                        let eventsInSamePeriod = 1, periodIndex = 0;
+                        for (let i = 0; i < timeGroups.length; i++) {
+                          const idx = timeGroups[i].findIndex((e) => e.id === event.id);
+                          if (idx !== -1) {
+                            eventsInSamePeriod = timeGroups[i].length;
+                            periodIndex = idx;
+                            break;
+                          }
+                        }
+
+                        const style = handlers.handleEventStyling(event, dayEvents, {
+                          eventsInSamePeriod,
+                          periodIndex,
+                          adjustForPeriod: true,
+                        });
+
+                        return (
+                          <motion.div
+                            key={event.id}
+                            style={{
+                              position: "absolute",
+                              top: style.top,
+                              height: style.height,
+                              left: style.left,
+                              maxWidth: style.maxWidth,
+                              minWidth: style.minWidth,
+                              zIndex: style.zIndex + 10,
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <EventStyled
+                              event={{ ...event, CustomEventComponent, minmized: true }}
+                              CustomEventModal={CustomEventModal}
+                            />
+                          </motion.div>
+                        );
+                      })}
                     </AnimatePresence>
                   </div>
                 </motion.div>

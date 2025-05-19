@@ -14,8 +14,8 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     
-    // Get eventId directly from params object
-    const eventId = params.eventId;
+    // Access eventId from params
+    const { eventId } = params;
     
     // Authorization check based on role
     let event;
@@ -90,7 +90,7 @@ export async function PUT(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Now that we've checked the session exists, it's safe to use
+    // Access eventId from params
     const { eventId } = params;
     const data = await request.json();
 
@@ -106,37 +106,35 @@ export async function PUT(
       return NextResponse.json({ error: "Event not found or unauthorized" }, { status: 404 });
     }
 
+    // Prepare update data with proper type handling
+    const updateData = {
+      title: data.title,
+      description: data.description,
+      startDate: data.startDate ? new Date(data.startDate) : undefined,
+      endDate: data.endDate ? new Date(data.endDate) : undefined,
+      variant: data.variant,
+      isRecurring: data.isRecurring === true, // Ensure boolean
+      recurringDays: Array.isArray(data.recurringDays) ? data.recurringDays : undefined
+    };
+
     // Update the event
     const updatedEvent = await db.calendarEvent.update({
       where: { id: eventId },
-      data: {
-        title: data.title,
-        description: data.description,
-        startDate: data.startDate ? new Date(data.startDate) : undefined,
-        endDate: data.endDate ? new Date(data.endDate) : undefined,
-        variant: data.variant,
-        isRecurring: data.isRecurring,
-        recurringDays: data.recurringDays
-      }
+      data: updateData
     });
 
     // If this event has children (student events), update those as well
     if (existingEvent.classId) {
       await db.calendarEvent.updateMany({
         where: { parentEventId: eventId },
-        data: {
-          title: data.title,
-          description: data.description,
-          startDate: data.startDate ? new Date(data.startDate) : undefined,
-          endDate: data.endDate ? new Date(data.endDate) : undefined,
-          variant: data.variant,
-          isRecurring: data.isRecurring,
-          recurringDays: data.recurringDays
-        }
+        data: updateData
       });
     }
 
-    return NextResponse.json(updatedEvent);
+    return NextResponse.json({ 
+      success: true, 
+      data: updatedEvent 
+    });
   } catch (error) {
     console.error("Update calendar event error:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
@@ -146,7 +144,7 @@ export async function PUT(
 // Delete a calendar event
 export async function DELETE(
   request: Request, 
-  { params }: { params: { eventId: string }}
+  { params }: { params: Promise<{ eventId: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -154,8 +152,8 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     
-    // Get eventId directly from params object
-    const eventId = params.eventId;
+    // Access eventId from params
+    const { eventId } = await params;
     
     // Check if user can delete this event
     const existingEvent = await db.calendarEvent.findFirst({

@@ -76,8 +76,79 @@ export async function GET(request: Request) {
         student: true
       }
     });
-    
-    return NextResponse.json(events);
+
+    // Format events for consumption by the calendar
+    const formattedEvents = events.map((event) => {
+      // Ensure recurringDays is always an array
+      const recurringDays = Array.isArray(event.recurringDays)
+        ? event.recurringDays
+        : [];
+
+      // Build comprehensive metadata
+      const metadata = {
+        type: event.billId
+          ? "bill"
+          : event.assignmentId
+          ? "assignment"
+          : event.classId
+          ? "class"
+          : "event",
+        billId: event.billId || null,
+        assignmentId: event.assignmentId || null,
+        classId: event.classId || null,
+        studentId: event.studentId || null,
+        classColor: event.class?.color || null,
+        dueDate: (event.billId && event.bill?.dueDate) || 
+                 (event.assignmentId && event.assignment?.dueDate) || null,
+      };
+
+      // For bills and assignments, process dates in a predictable way
+      let startDate: Date | string;
+      let endDate: Date | string;
+      
+      // Modify the bill/assignment date handling in the GET route
+if (event.billId && event.bill?.dueDate) {
+  const dueDate = new Date(event.bill.dueDate);
+  const utcNoon = Date.UTC(
+    dueDate.getUTCFullYear(),
+    dueDate.getUTCMonth(),
+    dueDate.getUTCDate(),
+    12, 0, 0
+  );
+  startDate = new Date(utcNoon).toISOString();
+  endDate = new Date(utcNoon).toISOString();
+} 
+else if (event.assignmentId && event.assignment?.dueDate) {
+  const dueDate = new Date(event.assignment.dueDate);
+  const utcNoon = Date.UTC(
+    dueDate.getUTCFullYear(),
+    dueDate.getUTCMonth(),
+    dueDate.getUTCDate(),
+    12, 0, 0
+  );
+  startDate = new Date(utcNoon).toISOString();
+  endDate = new Date(utcNoon).toISOString();
+}
+      else {
+        // Use regular datetime objects for standard events
+        startDate = new Date(event.startDate);
+        endDate = new Date(event.endDate);
+      }
+
+      return {
+        id: event.id,
+        title: event.title,
+        description: event.description || "",
+        startDate,
+        endDate,
+        variant: event.variant || "primary",
+        isRecurring: !!event.isRecurring,
+        recurringDays,
+        metadata,
+      };
+    });
+
+    return NextResponse.json(formattedEvents);
   } catch (error) {
     console.error("Calendar API error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
@@ -115,8 +186,8 @@ export async function POST(request: Request) {
       data: {
         title,
         description: description || "",
-        startDate: new Date(startDate),
-        endDate: new Date(endDate),
+        startDate: startDate,
+        endDate: endDate,
         variant: variant || "primary",
         isRecurring: isRecurring || false,
         recurringDays: recurringDays || [],

@@ -1,6 +1,6 @@
 "use client";
 
-import { EventFormData } from "@/types";
+import { EventFormData } from "@/src/types/scheduler/index";
 import React, { useEffect, useState } from "react";
 import { UseFormSetValue } from "react-hook-form";
 import { format, setHours, setMinutes, isBefore, addHours } from "date-fns";

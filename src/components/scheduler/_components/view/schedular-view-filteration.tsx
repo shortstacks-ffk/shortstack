@@ -11,7 +11,7 @@ import DailyView from "./day/daily-view";
 import MonthView from "./month/month-view";
 import WeeklyView from "./week/week-view";
 import { useModal } from "@/src/providers/scheduler/modal-context";
-import { ClassNames, CustomComponents, Views } from "@/types/scheduler/index";
+import { ClassNames, CustomComponents, Views } from "@/src/types/scheduler/index";
 import { cn } from "@/src/lib/utils";
 import CustomModal from "@/src/components/ui/custom-modal";
 

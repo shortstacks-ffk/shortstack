@@ -8,7 +8,7 @@ import EventStyled from "../event-component/event-styled";
 import { Button } from "@/src/components/ui/button";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import clsx from "clsx";
-import { Event, CustomEventModal } from "@/types/scheduler/index";
+import { Event, CustomEventModal } from "@/src/types/scheduler/index";
 import CustomModal from "@/src/components/ui/custom-modal";
 import { isSameDay, format, startOfWeek, addDays } from "date-fns";
 
@@ -89,6 +89,18 @@ const pageTransitionVariants = {
   }),
 };
 
+
+const shouldShowRecurringEvent = (event: Event, date: Date) => {
+  if (
+    event.isRecurring &&
+    Array.isArray(event.recurringDays) &&
+    event.recurringDays.length > 0
+  ) {
+    return event.recurringDays.includes(date.getDay());
+  }
+  return isSameDay(event.startDate, date);
+};
+
 export default function WeeklyView({
   prevButton,
   nextButton,
@@ -133,31 +145,41 @@ export default function WeeklyView({
     });
   }, [currentDate]);
 
-  useEffect(() => {
-    console.log("Current date:", currentDate);
-    console.log("Days in week:", daysOfWeek.map((d) => d.toDateString()));
-
-    const allEvents = getters.events || [];
-    console.log("All events:", allEvents);
-
-    daysOfWeek.forEach((day) => {
-      const events = getters.getEventsForDay(
-        day.getDate(), 
-        new Date(day.getFullYear(), day.getMonth(), 1)
-      );
-      if (events && events.length > 0) {
-        console.log(`Events for ${day.toDateString()}:`, events);
-      }
-    });
-  }, [currentDate, daysOfWeek, getters.events]);
+useEffect(() => {
+  console.log("Current week days:", daysOfWeek.map(d => d.toDateString()));
+  console.log("All available events:", getters.events);
+  
+  // Check each event's recurring properties
+  getters.events?.forEach(event => {
+    console.log(`Event: ${event.title}`);
+    console.log(`- isRecurring: ${event.isRecurring}`);
+    console.log(`- recurringDays: ${JSON.stringify(event.recurringDays)}`);
+    console.log(`- startDate: ${event.startDate.toISOString()}`);
+  });
+  
+  // Check if each day has any matching events
+  daysOfWeek.forEach(day => {
+    const dayOfWeek = day.getDay();
+    const matchingEvents = getters.events?.filter(event => 
+      event.isRecurring && 
+      Array.isArray(event.recurringDays) && 
+      event.recurringDays.includes(dayOfWeek)
+    );
+    
+    if (matchingEvents?.length) {
+      console.log(`Day ${day.toDateString()} (${dayOfWeek}) has recurring events:`, 
+        matchingEvents.map(e => e.title));
+    }
+  });
+}, [daysOfWeek, getters.events]);
 
   useEffect(() => {
     // Debug log to check all events
     const allEvents = getters.events || [];
     console.log("All available events:", allEvents);
-    
+
     // Debug log for the current week's events
-    const eventsThisWeek = daysOfWeek.flatMap(day => 
+    const eventsThisWeek = daysOfWeek.flatMap((day) =>
       getters.getEventsForDay(
         day.getDate(),
         new Date(day.getFullYear(), day.getMonth(), 1)
@@ -193,20 +215,21 @@ export default function WeeklyView({
 
   useEffect(() => {
     console.log("getters object:", getters);
-    console.log("Available events:", getters.events);
+    console.log("Available EVENTS:", getters.events);
     console.log("handleEventStyling function:", handlers.handleEventStyling);
-    
+
     // Check if any week day matches today's date
     const today = new Date();
-    const todayMatches = daysOfWeek.some(day => 
-      day.getDate() === today.getDate() && 
-      day.getMonth() === today.getMonth() && 
-      day.getFullYear() === today.getFullYear()
+    const todayMatches = daysOfWeek.some(
+      (day) =>
+        day.getDate() === today.getDate() &&
+        day.getMonth() === today.getMonth() &&
+        day.getFullYear() === today.getFullYear()
     );
-    
+
     console.log("Week contains today:", todayMatches);
     console.log("Today:", today.toDateString());
-    console.log("Week days:", daysOfWeek.map(d => d.toDateString()));
+    console.log("Week days:", daysOfWeek.map((d) => d.toDateString()));
   }, [getters, daysOfWeek]);
 
   const handleMouseMove = useCallback(
@@ -354,7 +377,7 @@ export default function WeeklyView({
           const current = stack.pop()!;
           group.push(current);
 
-          for (const neighborId of graph[current.id]) {
+          for (const neighborId of Array.from(graph[current.id])) {
             if (!visited.has(neighborId)) {
               const neighbor = sortedEvents.find((e) => e.id === neighborId);
               if (neighbor) {
@@ -381,10 +404,7 @@ export default function WeeklyView({
     <div className="mina-scheduler-week-container flex flex-col">
       <div className="flex-1 overflow-auto">
         <div className="flex justify-between items-center mb-2">
-          <h2 className="text-lg font-semibold">
-            Week {getters.getWeekNumber(currentDate)}
-          </h2>
-          <div className="flex gap-2">
+          <div className="flex gap-2 pl-2">
             {prevButton ? (
               <div onClick={handlePrevWeek}>{prevButton}</div>
             ) : (
@@ -425,9 +445,9 @@ export default function WeeklyView({
             transition={{
               opacity: { duration: 0.2 },
             }}
-            className="grid grid-cols-8 gap-0 week-view-grid"
+            className="grid grid-cols-8 gap-0 week-view-grid pl-2 border-l border-gray-200"
           >
-            <div className="sticky top-0 left-0 z-30 week-number-cell rounded-tl-lg h-10 flex items-center justify-center">
+            <div className="sticky top-0 left-0 z-30 week-number-cell h-10 flex items-center justify-center">
               <span className="text-sm font-semibold tracking-tight text-center px-2">
                 Week {getters.getWeekNumber(currentDate)}
               </span>
@@ -512,107 +532,93 @@ export default function WeeklyView({
                 ))}
               </div>
 
-              <div
-                className="col-span-7 bg-white grid h-full"
-                style={{
-                  gridTemplateColumns: colWidth.map((w) => `${w}fr`).join(" "),
-                  transition: isResizing
-                    ? "none"
-                    : "grid-template-columns 0.3s ease-in-out",
-                }}
-              >
-                {Array.from({ length: 7 }, (_, dayIndex) => {
-                  const day = daysOfWeek[dayIndex % 7];
-                  const isCurrentDay = isSameDay(day, new Date());
-                  
-                  // FIXED: Use the proper date reference for each day
-                  const dayEvents = getters.getEventsForDay(
-                    day.getDate(),
-                    new Date(day.getFullYear(), day.getMonth(), 1)
-                  );
+              {daysOfWeek.map((day, dayIndex) => {
+                const isCurrentDay = isSameDay(day, new Date());
+                const dayEvents = getters.getEventsForDay(day.getDate(), day);
+                const filteredEvents = dayEvents.filter((ev) =>
+                  shouldShowRecurringEvent(ev, day)
+                );
+                const timeGroups = groupEventsByTimePeriod(filteredEvents);
 
-                  // If we have events, process them
-                  const timeGroups = groupEventsByTimePeriod(dayEvents);
-
-                  return (
-                    <div
-                      key={`day-${dayIndex}`}
-                      className={`col-span-1 z-20 relative transition duration-300 cursor-pointer border-r 
-                      text-center text-xs text-muted-foreground overflow-hidden 
-                      ${isCurrentDay ? "current-week-day-column" : ""}`}
-                      onClick={() => {
-                        handleAddEventWeek(dayIndex, detailedHour as string);
-                      }}
-                    >
-                      <AnimatePresence initial={false}>
-                        {timeGroups.map((group, groupIndex) => {
-                          return group.map((event, eventIndex) => {
-                            const {
-                              height,
-                              left,
-                              maxWidth,
-                              minWidth,
-                              top,
-                            } = handlers.handleEventStyling(event, dayEvents, {
-                              eventsInSamePeriod: group.length,
-                              periodIndex: eventIndex,
-                              adjustForPeriod: true,
-                            });
-
-                            return (
-                              <motion.div
-                                key={event.id}
-                                style={{
-                                  minHeight: height,
-                                  height,
-                                  top: top,
-                                  left: left ? `${left}%` : '1%',
-                                  width: maxWidth ? `${maxWidth}%` : '98%',
-                                  position: 'absolute',
-                                  boxSizing: 'border-box',
-                                  zIndex: 50,
-                                  pointerEvents: 'all',
-                                }}
-                                className="flex transition-all duration-200 flex-col absolute"
-                                initial={{ opacity: 0, scale: 0.95 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.95 }}
-                                transition={{ duration: 0.2 }}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                }}
-                              >
-                                <div className="event-card-weekview w-full h-full p-1">
-                                  <EventStyled
-                                    event={{
-                                      ...event,
-                                      CustomEventComponent,
-                                      minmized: true,
-                                    }}
-                                    CustomEventModal={CustomEventModal}
-                                  />
-                                </div>
-                              </motion.div>
-                            );
-                          });
-                        })}
-                      </AnimatePresence>
-
-                      {Array.from({ length: 24 }, (_, hourIndex) => (
-                        <div
-                          key={`day-${dayIndex}-hour-${hourIndex}`}
-                          className={`h-[56px] relative transition duration-300 cursor-pointer text-center text-xs text-muted-foreground week-view-hour-cell
-                          ${isCurrentDay ? "current-week-day-hour" : ""}`}
-                        >
-                          <div className="absolute bg-accent z-40 flex items-center justify-center text-xs opacity-0 transition duration-250 hover:opacity-100 w-full h-full">
-                            Add Event
-                          </div>
+                return (
+                  <div
+                    key={`day-${dayIndex}`}
+                    className={`col-span-1 relative z-20 transition duration-300 cursor-pointer border-r 
+                  text-center text-xs text-muted-foreground overflow-hidden 
+                  ${isCurrentDay ? "current-week-day-column" : ""}`}
+                    onClick={() =>
+                      handleAddEventWeek(dayIndex, detailedHour as string)
+                    }
+                  >
+                    {/* 1) render the 24 hour slots first */}
+                    {Array.from({ length: 24 }, (_, hourIndex) => (
+                      <div
+                        key={`day-${dayIndex}-hour-${hourIndex}`}
+                        className={`h-[56px] relative week-view-hour-cell
+                      ${isCurrentDay ? "current-week-day-hour" : ""}`}
+                      >
+                        <div className="absolute inset-0 z-10 flex items-center justify-center text-xs opacity-0 hover:opacity-100">
+                          Add Event
                         </div>
-                      ))}
-                    </div>
-                  );
-                })}
-              </div>
+                      </div>
+                    ))}
+
+                    {/* 2) then absolutely-position your events on top */}
+                    <AnimatePresence initial={false}>
+                      {filteredEvents.map((event) => {
+                        let eventsInSamePeriod = 1;
+                        let periodIndex = 0;
+                        for (let i = 0; i < timeGroups.length; i++) {
+                          const idx = timeGroups[i].findIndex(
+                            (e) => e.id === event.id
+                          );
+                          if (idx !== -1) {
+                            eventsInSamePeriod = timeGroups[i].length;
+                            periodIndex = idx;
+                            break;
+                          }
+                        }
+
+                        const style = handlers.handleEventStyling(
+                          event,
+                          filteredEvents,
+                          {
+                            eventsInSamePeriod,
+                            periodIndex,
+                            adjustForPeriod: true,
+                          }
+                        );
+
+                        return (
+                          <motion.div
+                            key={event.id}
+                            style={{
+                              height: style.height,
+                              top: style.top,
+                              left: style.left,
+                              maxWidth: style.maxWidth,
+                              minWidth: style.minWidth,
+                              position: "absolute",
+                              zIndex: style.zIndex + 20, // above the z-20 container
+                            }}
+                            className="event-container"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <EventStyled
+                              event={{
+                                ...event,
+                                CustomEventComponent,
+                                minmized: true,
+                              }}
+                              CustomEventModal={CustomEventModal}
+                            />
+                          </motion.div>
+                        );
+                      })}
+                    </AnimatePresence>
+                  </div>
+                );
+              })}
             </div>
           </motion.div>
         </AnimatePresence>
@@ -620,3 +626,5 @@ export default function WeeklyView({
     </div>
   );
 }
+
+
