@@ -80,6 +80,19 @@ CREATE TABLE "Class" (
 );
 
 -- CreateTable
+CREATE TABLE "ClassSession" (
+    "id" TEXT NOT NULL,
+    "dayOfWeek" INTEGER NOT NULL,
+    "startTime" TEXT NOT NULL,
+    "endTime" TEXT NOT NULL,
+    "classId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "ClassSession_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "Student" (
     "id" TEXT NOT NULL,
     "firstName" TEXT NOT NULL,
@@ -152,6 +165,25 @@ CREATE TABLE "Assignment" (
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "Assignment_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "StudentAssignmentSubmission" (
+    "id" TEXT NOT NULL,
+    "assignmentId" TEXT NOT NULL,
+    "studentId" TEXT NOT NULL,
+    "fileUrl" TEXT,
+    "textContent" TEXT,
+    "comments" TEXT,
+    "fileName" TEXT,
+    "fileType" TEXT,
+    "fileSize" INTEGER,
+    "grade" INTEGER,
+    "status" TEXT NOT NULL DEFAULT 'SUBMITTED',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "StudentAssignmentSubmission_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -256,6 +288,28 @@ CREATE TABLE "Transaction" (
 );
 
 -- CreateTable
+CREATE TABLE "CalendarEvent" (
+    "id" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "description" TEXT,
+    "startDate" TIMESTAMP(3) NOT NULL,
+    "endDate" TIMESTAMP(3) NOT NULL,
+    "variant" TEXT NOT NULL DEFAULT 'primary',
+    "isRecurring" BOOLEAN NOT NULL DEFAULT false,
+    "recurringDays" INTEGER[],
+    "createdById" TEXT NOT NULL,
+    "billId" TEXT,
+    "assignmentId" TEXT,
+    "classId" TEXT,
+    "studentId" TEXT,
+    "parentEventId" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "CalendarEvent_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "_LessonPlanFiles" (
     "A" TEXT NOT NULL,
     "B" TEXT NOT NULL,
@@ -298,6 +352,9 @@ CREATE INDEX "Class_code_idx" ON "Class"("code");
 CREATE INDEX "Class_userId_idx" ON "Class"("userId");
 
 -- CreateIndex
+CREATE INDEX "ClassSession_classId_idx" ON "ClassSession"("classId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "Student_schoolEmail_key" ON "Student"("schoolEmail");
 
 -- CreateIndex
@@ -314,6 +371,12 @@ CREATE UNIQUE INDEX "Enrollment_studentId_classId_key" ON "Enrollment"("studentI
 
 -- CreateIndex
 CREATE INDEX "LessonPlan_classId_idx" ON "LessonPlan"("classId");
+
+-- CreateIndex
+CREATE INDEX "StudentAssignmentSubmission_assignmentId_idx" ON "StudentAssignmentSubmission"("assignmentId");
+
+-- CreateIndex
+CREATE INDEX "StudentAssignmentSubmission_studentId_idx" ON "StudentAssignmentSubmission"("studentId");
 
 -- CreateIndex
 CREATE INDEX "Bill_creatorId_idx" ON "Bill"("creatorId");
@@ -355,6 +418,24 @@ CREATE INDEX "Transaction_accountId_idx" ON "Transaction"("accountId");
 CREATE INDEX "Transaction_receivingAccountId_idx" ON "Transaction"("receivingAccountId");
 
 -- CreateIndex
+CREATE INDEX "CalendarEvent_createdById_idx" ON "CalendarEvent"("createdById");
+
+-- CreateIndex
+CREATE INDEX "CalendarEvent_billId_idx" ON "CalendarEvent"("billId");
+
+-- CreateIndex
+CREATE INDEX "CalendarEvent_assignmentId_idx" ON "CalendarEvent"("assignmentId");
+
+-- CreateIndex
+CREATE INDEX "CalendarEvent_classId_idx" ON "CalendarEvent"("classId");
+
+-- CreateIndex
+CREATE INDEX "CalendarEvent_studentId_idx" ON "CalendarEvent"("studentId");
+
+-- CreateIndex
+CREATE INDEX "CalendarEvent_parentEventId_idx" ON "CalendarEvent"("parentEventId");
+
+-- CreateIndex
 CREATE INDEX "_LessonPlanFiles_B_index" ON "_LessonPlanFiles"("B");
 
 -- CreateIndex
@@ -373,6 +454,9 @@ ALTER TABLE "Account" ADD CONSTRAINT "Account_userId_fkey" FOREIGN KEY ("userId"
 ALTER TABLE "Class" ADD CONSTRAINT "Class_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "ClassSession" ADD CONSTRAINT "ClassSession_classId_fkey" FOREIGN KEY ("classId") REFERENCES "Class"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "Student" ADD CONSTRAINT "Student_classId_fkey" FOREIGN KEY ("classId") REFERENCES "Class"("code") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -389,6 +473,12 @@ ALTER TABLE "File" ADD CONSTRAINT "File_classId_fkey" FOREIGN KEY ("classId") RE
 
 -- AddForeignKey
 ALTER TABLE "Assignment" ADD CONSTRAINT "Assignment_classId_fkey" FOREIGN KEY ("classId") REFERENCES "Class"("code") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "StudentAssignmentSubmission" ADD CONSTRAINT "StudentAssignmentSubmission_assignmentId_fkey" FOREIGN KEY ("assignmentId") REFERENCES "Assignment"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "StudentAssignmentSubmission" ADD CONSTRAINT "StudentAssignmentSubmission_studentId_fkey" FOREIGN KEY ("studentId") REFERENCES "Student"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Bill" ADD CONSTRAINT "Bill_creatorId_fkey" FOREIGN KEY ("creatorId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -419,6 +509,24 @@ ALTER TABLE "Transaction" ADD CONSTRAINT "Transaction_accountId_fkey" FOREIGN KE
 
 -- AddForeignKey
 ALTER TABLE "Transaction" ADD CONSTRAINT "Transaction_receivingAccountId_fkey" FOREIGN KEY ("receivingAccountId") REFERENCES "BankAccount"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "CalendarEvent" ADD CONSTRAINT "CalendarEvent_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "CalendarEvent" ADD CONSTRAINT "CalendarEvent_billId_fkey" FOREIGN KEY ("billId") REFERENCES "Bill"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "CalendarEvent" ADD CONSTRAINT "CalendarEvent_assignmentId_fkey" FOREIGN KEY ("assignmentId") REFERENCES "Assignment"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "CalendarEvent" ADD CONSTRAINT "CalendarEvent_classId_fkey" FOREIGN KEY ("classId") REFERENCES "Class"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "CalendarEvent" ADD CONSTRAINT "CalendarEvent_studentId_fkey" FOREIGN KEY ("studentId") REFERENCES "Student"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "CalendarEvent" ADD CONSTRAINT "CalendarEvent_parentEventId_fkey" FOREIGN KEY ("parentEventId") REFERENCES "CalendarEvent"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "_LessonPlanFiles" ADD CONSTRAINT "_LessonPlanFiles_A_fkey" FOREIGN KEY ("A") REFERENCES "File"("id") ON DELETE CASCADE ON UPDATE CASCADE;

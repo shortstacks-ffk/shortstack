@@ -1,20 +1,13 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
+  devIndicators: false,
   eslint: {
     ignoreDuringBuilds: true,
   },
   reactStrictMode: true,
   images: {
     remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'clerk.com',
-      },
-      {
-        protocol: 'https',
-        hostname: 'images.clerk.dev',
-      },
       {
         protocol: 'https',
         hostname: 'storage.googleapis.com',
