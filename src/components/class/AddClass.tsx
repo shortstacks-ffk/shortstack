@@ -1,19 +1,24 @@
 "use client"
 
-
 import { useState, useRef } from "react"
-
-import EmojiPicker, { type EmojiClickData } from "emoji-picker-react"
 import { Button } from "@/src/components/ui/button"
 import { Input } from "@/src/components/ui/input"
 import { Label } from "@/src/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/src/components/ui/select"
-import { Popover, PopoverContent, PopoverTrigger } from "@/src/components/ui/popover"
-
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/src/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/src/components/ui/dialog"
 import { createClass } from "@/src/app/actions/classActions"
 import { toast } from "react-toastify"
-import { EmojiPickerButton } from "@/src/components/ui/emoji-picker-button";
+import { EmojiPickerButton } from "@/src/components/ui/emoji-picker-button"
+import ClassScheduleForm from "./ClassScheduleForm"
+import { ColorDropdown } from "@/src/components/ui/color-dropdown"
+import { DatePicker } from "@/src/components/ui/date-picker"
+import { formatDateForInput } from "@/src/lib/date-utils"
+
+interface ClassScheduleItem {
+  days: number[];
+  startTime: string;
+  endTime: string;
+}
 
 type AddClassProps = {
   isOpen?: boolean;
@@ -22,68 +27,96 @@ type AddClassProps = {
 };
 
 const AddClass = ({ isOpen, onClose, onSuccess }: AddClassProps) => {
-
   const formRef = useRef<HTMLFormElement>(null);
   const [selectedEmoji, setSelectedEmoji] = useState("📚")
+  const [selectedColor, setSelectedColor] = useState("primary") // Default to blue
+  const [schedules, setSchedules] = useState<ClassScheduleItem[]>([
+    { days: [1], startTime: "09:00", endTime: "10:00" } // Default: Monday 9-10am
+  ]);
+  const [startDate, setStartDate] = useState<Date>(new Date());
+  const [endDate, setEndDate] = useState<Date>(() => {
+    const date = new Date();
+    date.setMonth(date.getMonth() + 3);
+    return date;
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const clientAction = async (formData: FormData) => {
     try {
-      console.log("Submitting class form data...");
+      setIsSubmitting(true);
       
-      // Make sure emoji is included in form data
       formData.set('emoji', selectedEmoji);
+      formData.set('color', selectedColor);
+      formData.set('schedules', JSON.stringify(schedules));
+      formData.set('startDate', formatDateForInput(startDate));
+      formData.set('endDate', formatDateForInput(endDate));
       
       const result = await createClass(formData);
-      console.log("Create class response:", result);
 
       if (!result.success) {
         toast.error(result.error || "Failed to create class");
       } else {
-        toast.success(`Class created successfully! Class code: ${result.data.code}`);
-        formRef.current?.reset();
-        setSelectedEmoji("📚"); // Reset emoji
-        onSuccess?.(); // This should trigger a refresh in the parent component
         onClose?.();
+        formRef.current?.reset();
+        setSelectedEmoji("📚");
+        setSelectedColor("primary");
+        setSchedules([{ days: [1], startTime: "09:00", endTime: "10:00" }]);
+        setStartDate(new Date());
+        const newEndDate = new Date();
+        newEndDate.setMonth(newEndDate.getMonth() + 3);
+        setEndDate(newEndDate);
+        onSuccess?.();
+        setTimeout(() => {
+          toast.success(`Class created successfully! Class code: ${result.data.code}`);
+        }, 100);
       }
     } catch (error) {
       console.error("Create class client error:", error);
       toast.error("Failed to create class");
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
-  const onEmojiClick = (emojiData: EmojiClickData) => {
-    setSelectedEmoji(emojiData.emoji)
-  }
+  const handleScheduleChange = (newSchedules: ClassScheduleItem[]) => {
+    setSchedules(newSchedules);
+  };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
+    <Dialog 
+      open={isOpen} 
+      onOpenChange={(open) => {
+        if (!isSubmitting && !open) {
+          onClose?.();
+        }
+      }}
+    >
+      <DialogContent className="max-w-md p-3 sm:p-4 overflow-y-auto max-h-[90vh]">
+        <DialogHeader className="pb-2">
           <DialogTitle>Add New Class</DialogTitle>
         </DialogHeader>
-        <form ref={formRef} action={clientAction} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Class Name</Label>
-              <Input id="name" name="name" placeholder="Class Name" required />
+        <form ref={formRef} action={clientAction} className="space-y-3">
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <Label htmlFor="name" className="text-xs">Class Name</Label>
+              <Input id="name" name="name" placeholder="Class Name" required className="h-8" />
             </div>
 
-            <div className="space-y-2">
-              <Label>Class Emoji</Label>
+            <div className="space-y-1">
+              <Label className="text-xs">Class Emoji</Label>
               <input type="hidden" name="emoji" value={selectedEmoji} />
               <EmojiPickerButton 
                 value={selectedEmoji}
                 onChange={setSelectedEmoji}
-                className="w-full text-2xl h-10"
+                className="w-full text-xl h-8"
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="cadence">Cadence</Label>
+            <div className="space-y-1">
+              <Label htmlFor="cadence" className="text-xs">Cadence</Label>
               <Select name="cadence" defaultValue="Weekly">
-
-                <SelectTrigger>
-                  <SelectValue placeholder="Select cadence" />
+                <SelectTrigger className="h-8">
+                  <SelectValue placeholder="Select" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Daily">Daily</SelectItem>
@@ -94,66 +127,95 @@ const AddClass = ({ isOpen, onClose, onSuccess }: AddClassProps) => {
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="day">Day</Label>
-              <Select name="day" defaultValue="Monday">
-
-                <SelectTrigger>
-                  <SelectValue placeholder="Select day" />
-                </SelectTrigger>
-                <SelectContent>
-
-                  {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map((day) => (
-                    <SelectItem key={day} value={day.toLowerCase()}>
-                      {day}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="time">Time</Label>
-              <Input 
-                id="time" 
-                name="time" 
-                type="time" 
-                defaultValue="09:00" 
-                required 
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="grade">Grade</Label>
+            <div className="space-y-1">
+              <Label htmlFor="grade" className="text-xs">Grade</Label>
               <Select name="grade" defaultValue="9th">
-                <SelectTrigger>
-                  <SelectValue placeholder="Select grade" />
+                <SelectTrigger className="h-8">
+                  <SelectValue placeholder="Select" />
                 </SelectTrigger>
                 <SelectContent>
-                  {["9th", "10th", "11th", "12th"].map((grade) => (
+                  {["5th", "6th", "7th", "8th", "9th", "10th", "11th", "12th"].map((grade) => (
                     <SelectItem key={grade} value={grade}>
-                      {grade} Grade
+                      {grade}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-
-            
+          </div>
+          
+          <div className="space-y-1 border-t pt-2">
+            <input type="hidden" name="color" value={selectedColor} />
+            <Label className="text-xs">Class Color</Label>
+            <ColorDropdown 
+              value={selectedColor}
+              onChange={setSelectedColor}
+            />
           </div>
 
-          <div className="flex justify-end space-x-4 mt-6">
+          <div className="border-t pt-2">
+            <div className="flex justify-between items-center mb-1">
+              <h3 className="text-xs font-medium">Class Period</h3>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <Label htmlFor="startDate" className="text-xs">Start Date</Label>
+                <Input 
+                  id="startDate" 
+                  name="startDate" 
+                  type="date" 
+                  value={formatDateForInput(startDate)}
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      setStartDate(new Date(e.target.value));
+                    }
+                  }}
+                  className="h-8"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="endDate" className="text-xs">End Date</Label>
+                <Input 
+                  id="endDate" 
+                  name="endDate" 
+                  type="date"
+                  value={formatDateForInput(endDate)}
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      setEndDate(new Date(e.target.value));
+                    }
+                  }}
+                  className="h-8"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t pt-2">
+            <ClassScheduleForm 
+              value={schedules}
+              onChange={handleScheduleChange}
+            />
+          </div>
+
+          <DialogFooter className="pt-2 border-t">
             <Button 
               type="button" 
               variant="outline" 
-              onClick={onClose}
+              onClick={() => !isSubmitting && onClose?.()}
+              size="sm"
+              disabled={isSubmitting}
             >
               Cancel
             </Button>
-            <Button type="submit">
-              Create Class
+            <Button 
+              type="submit" 
+              size="sm"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? "Creating..." : "Create Class"}
             </Button>
-          </div>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
