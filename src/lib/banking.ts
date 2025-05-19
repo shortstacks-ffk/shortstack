@@ -27,7 +27,7 @@ export async function setupBankAccountsForStudent(studentId: string) {
       data: {
         accountNumber: generateAccountNumber(),
         accountType: "CHECKING",
-        balance: 100, // Starting balance for checking
+        balance: 0, // Starting balance for checking
         studentId
       }
     }),
@@ -37,7 +37,7 @@ export async function setupBankAccountsForStudent(studentId: string) {
       data: {
         accountNumber: generateAccountNumber(),
         accountType: "SAVINGS",
-        balance: 50, // Starting balance for savings
+        balance: 0, // Starting balance for savings
         studentId
       }
     })

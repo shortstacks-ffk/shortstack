@@ -613,6 +613,14 @@ export async function removeBillFromClasses({
         where: { billId }
       });
       
+      // Delete calendar events for this bill (except the main one for the teacher)
+      await db.calendarEvent.deleteMany({
+        where: {
+          billId,
+          studentId: { not: null } // Keep the teacher's main event
+        }
+      });
+      
       revalidatePath("/teacher/dashboard/bills");
       revalidatePath("/teacher/dashboard/classes");
       
@@ -661,6 +669,14 @@ export async function removeBillFromClasses({
             studentId: { in: studentIds }
           }
         });
+        
+        // Also delete calendar events for these students
+        await db.calendarEvent.deleteMany({
+          where: {
+            billId,
+            studentId: { in: studentIds }
+          }
+        });
       }
       
       revalidatePath("/teacher/dashboard/bills");
@@ -697,7 +713,12 @@ export async function deleteBill(id: string): Promise<BillResponse> {
       return { success: false, error: "Bill not found or you don't have permission to delete it" };
     }
 
-    // Delete the bill if it belongs to this user
+    // Delete associated calendar events first
+    await db.calendarEvent.deleteMany({
+      where: { billId: id }
+    });
+
+    // Then delete the bill
     await db.bill.delete({
       where: { id },
     });
