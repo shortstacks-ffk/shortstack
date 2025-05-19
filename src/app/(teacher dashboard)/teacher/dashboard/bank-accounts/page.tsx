@@ -178,19 +178,16 @@ export default function BankAccountsPage() {
   };
 
   return (
-    <div className="flex flex-col h-full"> 
-      
-      <div className="flex-1 overflow-auto"> 
-        <div className="max-w-6xl mx-auto p-2 lg:p-4">
-          <div className="mb-4">
-            <p className="text-gray-500">
-              View and manage student bank accounts for your classes
-            </p>
-          </div>
+    <div className="flex flex-col h-full">
+      <div className="flex-1 overflow-auto">
+        <div className="w-full">
+          <p className="text-gray-500 mb-4">
+            View and manage student bank accounts for your classes
+          </p>
           
-          <div className="flex flex-col md:flex-row items-center justify-between mb-6 gap-4">
-            <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
-              <div className="w-full sm:w-64">
+          <div className="flex flex-col space-y-4 md:flex-row md:space-y-0 md:items-center md:justify-between mb-4 md:mb-6">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 md:gap-4 w-full md:w-auto">
+              <div className="w-full sm:w-48 md:w-64">
                 <Select
                   value={selectedClass}
                   onValueChange={(value) => {
@@ -211,7 +208,7 @@ export default function BankAccountsPage() {
                 </Select>
               </div>
               
-              <div className="relative flex-1 w-full sm:w-auto">
+              <div className="relative flex-1 w-full">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
                 <Input
                   type="search"
@@ -233,7 +230,7 @@ export default function BankAccountsPage() {
               </Button>
             </div>
             
-            <div className="flex items-center gap-3 shrink-0"> 
+            <div className="flex items-center gap-3 shrink-0">
               <Button 
                 variant="outline" 
                 onClick={() => setIsAddFundsOpen(true)}
@@ -257,7 +254,7 @@ export default function BankAccountsPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="bg-orange-500 text-white">
-                      <th className="p-3 text-left w-12">
+                      <th className="p-1 md:p-2 text-left w-10">
                         <Checkbox 
                           checked={
                             filteredStudents.length > 0 && 
@@ -267,12 +264,12 @@ export default function BankAccountsPage() {
                           aria-label="Select all students"
                         />
                       </th>
-                      <th className="p-3 text-left">Name</th>
-                      <th className="p-3 text-left">E-mail</th>
-                      <th className="p-3 text-left">Last Login</th>
-                      <th className="p-3 text-right">Checking</th>
-                      <th className="p-3 text-right">Savings</th>
-                      <th className="p-3 text-center">Action</th>
+                      <th className="p-1 md:p-2 text-left">Name</th>
+                      <th className="hidden sm:table-cell p-1 md:p-2 text-left">E-mail</th>
+                      {/* <th className="hidden md:table-cell p-2 md:p-3 text-left">Last Login</th> */}
+                      <th className="p-1 md:p-2 text-center">Checking</th>
+                      <th className="p-1 md:p-2 text-center">Savings</th>
+                      <th className="p-1 md:p-2 text-center">Action</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -291,7 +288,7 @@ export default function BankAccountsPage() {
                     ) : (
                       filteredStudents.map((student) => (
                         <tr key={student.id} className="border-t hover:bg-gray-50">
-                          <td className="p-3">
+                          <td className="p-2 md:p-3">
                             <Checkbox 
                               checked={selectedStudents.includes(student.id)}
                               onCheckedChange={(checked) => { 
@@ -304,33 +301,45 @@ export default function BankAccountsPage() {
                               aria-label={`Select student ${student.firstName} ${student.lastName}`}
                             />
                           </td>
-                          <td className="p-3 flex items-center gap-2">
-                            <div className="h-8 w-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500">
-                              {student.firstName.charAt(0) + student.lastName.charAt(0)}
+                          <td className="p-2 md:p-3">
+                            <div className="flex items-center gap-2">
+                              <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 text-xs sm:text-sm">
+                                {student.firstName.charAt(0) + student.lastName.charAt(0)}
+                              </div>
+                              <span className="text-sm sm:text-base">{student.firstName} {student.lastName}</span>
                             </div>
-                            <span>{student.firstName} {student.lastName}</span>
                           </td>
-                          <td className="p-3">{student.email}</td>
-                          <td className="p-3">{student.lastLogin}</td>
-                          <td className="p-3 text-right">{formatCurrency(student.checking.balance)}</td>
-                          <td className="p-3 text-right">{formatCurrency(student.savings.balance)}</td>
-                          <td className="p-3">
-                            <div className="flex justify-center gap-2">
+                          <td className="hidden sm:table-cell p-2 md:p-3 text-sm">
+                            {student.email}
+                          </td>
+                          {/* <td className="hidden md:table-cell p-2 md:p-3 text-sm">
+                            {student.lastLogin}
+                          </td> */}
+                          <td className="p-2 md:p-3 text-right text-sm">
+                            {formatCurrency(student.checking.balance)}
+                          </td>
+                          <td className="p-2 md:p-3 text-right text-sm">
+                            {formatCurrency(student.savings.balance)}
+                          </td>
+                          <td className="p-2 md:p-3">
+                            <div className="flex justify-center gap-1 sm:gap-2">
                               <Button
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => viewStudentTransactions(student.id)}
                                 title="View account details"
+                                className="h-7 w-7 sm:h-8 sm:w-8"
                               >
-                                <Eye className="h-4 w-4" />
+                                <Eye className="h-3 w-3 sm:h-4 sm:w-4" />
                               </Button>
                               <Button
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => router.push(`/teacher/dashboard/bank-accounts/statement/${student.id}`)}
                                 title="Download statement"
+                                className="h-7 w-7 sm:h-8 sm:w-8"
                               >
-                                <Download className="h-4 w-4" />
+                                <Download className="h-3 w-3 sm:h-4 sm:w-4" />
                               </Button>
                             </div>
                           </td>

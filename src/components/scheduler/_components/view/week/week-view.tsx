@@ -468,16 +468,16 @@ useEffect(() => {
                   return (
                     <div key={idx} className="relative group flex flex-col">
                       <div
-                        className={`sticky week-header-cell top-0 z-20 h-10 flex items-center justify-center 
+                        className={`sticky week-header-cell top-0 z-20 h-8 sm:h-10 flex items-center justify-center 
                         ${isCurrentDay ? "current-week-day-header" : ""}`}
                       >
                         <div className="text-center">
-                          <div className="text-xs font-medium text-gray-600 uppercase">
+                          <div className="text-[10px] sm:text-xs font-medium text-gray-600 uppercase">
                             {getters.getDayName(day.getDay())}
                           </div>
                           <div
                             className={clsx(
-                              "text-sm font-semibold",
+                              "text-xs sm:text-sm font-semibold",
                               isCurrentDay ? "text-green-600" : "text-gray-700"
                             )}
                           >
@@ -525,7 +525,7 @@ useEffect(() => {
                   <motion.div
                     key={`hour-${index}`}
                     variants={itemVariants}
-                    className="cursor-pointer border-b border-gray-200 p-2 h-[56px] text-center text-xs text-muted-foreground border-r hour-label"
+                    className="cursor-pointer border-b border-gray-200 p-1 sm:p-2 h-10 sm:h-12 md:h-[56px] text-center text-[10px] sm:text-xs text-muted-foreground border-r hour-label"
                   >
                     {hour}
                   </motion.div>

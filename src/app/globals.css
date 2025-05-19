@@ -782,3 +782,217 @@ body {
   object-fit: contain;
   margin-right: 8px;
 }
+
+/* Responsive calendar styles */
+@media (max-width: 640px) {
+  .calendar-panel {
+    height: calc(100vh - 110px) !important;
+    padding-bottom: 60px !important;
+  }
+  
+  .mina-scheduler-header {
+    padding: 0.25rem 0.5rem !important;
+  }
+  
+  .mina-scheduler-container {
+    touch-action: pan-y;
+  }
+  
+  .calendar-day-name {
+    font-size: 0.75rem !important;
+  }
+  
+  .calendar-day-number {
+    font-size: 0.875rem !important;
+  }
+}
+
+/* Allow pinch-zoom on mobile */
+.calendar-panel {
+  touch-action: pan-x pan-y pinch-zoom;
+}
+
+/* Add these responsive calendar styles */
+
+/* Calendar responsive styling */
+.month-day-cell {
+  @apply relative min-h-[80px] sm:min-h-[90px] md:min-h-[100px] border p-1 hover:bg-gray-50;
+}
+
+.calendar-day-number {
+  @apply text-xs sm:text-sm font-medium;
+}
+
+/* Current day highlight */
+.current-day {
+  @apply bg-green-50 border-green-500 border-2;
+}
+
+/* Make tabs scrollable on mobile */
+.calendar-tab-list {
+  @apply flex flex-nowrap overflow-x-auto scrollbar-hide pb-1;
+}
+
+.calendar-tab {
+  @apply flex-shrink-0 px-2 py-1;
+}
+
+/* Mobile calendar adjustments */
+@media (max-width: 640px) {
+  .mina-scheduler-header {
+    @apply text-xs flex-wrap;
+  }
+  
+  .month-grid {
+    @apply grid grid-cols-7 gap-px;
+  }
+  
+  .month-day-cell {
+    @apply p-0.5 min-h-[60px];
+  }
+  
+  .calendar-panel {
+    @apply h-full overflow-y-auto;
+  }
+  
+  /* Week view adjustments */
+  .week-view-hour-cell {
+    @apply h-10 sm:h-12 md:h-14;
+  }
+  
+  /* Hour label text size */
+  .hour-label {
+    @apply text-[10px] sm:text-xs;
+  }
+  
+  /* Hide scrollbar but allow scrolling */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Add these at the bottom of your globals.css file */
+
+/* Calendar-specific styles */
+.calendar-tabs-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.calendar-tab-list {
+  padding: 0.25rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.calendar-tab {
+  font-size: 0.875rem;
+  padding: 0.375rem 0.75rem;
+}
+
+.calendar-panel {
+  flex: 1;
+  overflow: auto;
+  height: calc(100% - 40px);
+}
+
+/* Fix todo sidebar toggle button positioning */
+.todo-sidebar-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.todo-sidebar-toggle:hover {
+  background-color: #e8f5eb;
+}
+
+/* Ensure proper sidebar transition */
+.todo-sidebar {
+  transition: width 0.3s ease, transform 0.3s ease;
+}
+
+/* Proper height for calendar content */
+.calendar-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Ensure the calendar component takes up full height */
+.mina-scheduler-container {
+  height: 100% !important;
+  max-height: 100% !important;
+}
+
+/* Ensure the month view properly fills height */
+.month-grid-container {
+  height: calc(100% - 40px) !important;
+  overflow: auto;
+}
+
+/* Prevent nested scrolling issues */
+.calendar-panel {
+  height: calc(100% - 40px) !important; 
+  overflow: auto !important;
+  padding-bottom: 0 !important;
+}
+
+/* Ensure todo sidebar has proper height */
+@media (min-width: 768px) {
+  .todo-sidebar {
+    box-shadow: none !important;
+  }
+}
+
+/* Fix Day/Week/Month tab overflow issues */
+.calendar-tabs-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.calendar-tab-list {
+  display: flex;
+  padding: 0;
+  margin: 0;
+  background-color: white;
+  border-bottom: 1px solid #e5e7eb;
+  overflow: visible !important;
+}
+
+.calendar-tab {
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  border: none;
+  background: transparent;
+  color: #4b5563;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+
+.calendar-tab[data-state="active"] {
+  border-bottom: 2px solid #f97316;
+  color: #f97316;
+  font-weight: 500;
+}
+
+.calendar-panel {
+  flex: 1;
+  overflow: auto;
+  height: calc(100% - 40px) !important;
+  padding-bottom: 0 !important;
+}
+
+/* Todo sidebar transitions */
+.todo-sidebar {
+  transition: width 0.3s ease, opacity 0.2s ease;
+}

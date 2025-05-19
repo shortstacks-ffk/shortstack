@@ -59,8 +59,7 @@ async function BillsContent() {
 // Main page component
 export default function BillsPage() {
   return (
-    <div className="p-2 lg:p-4">
-      
+    <div className="w-full">
       <Suspense fallback={<div className="text-center py-4">Loading bills...</div>}>
         <BillsContent />
       </Suspense>

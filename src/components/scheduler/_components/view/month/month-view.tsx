@@ -241,7 +241,7 @@ export default function MonthView({
           initial="enter"
           animate="center"
           exit="exit"
-          className="month-grid"
+          className="month-grid grid grid-cols-7 gap-px text-center"
         >
           {/* Day names header row */}
           {daysOfWeek.map((day, idx) => (
@@ -284,7 +284,7 @@ export default function MonthView({
               >
                 <div
                   className={clsx(
-                    "text-sm font-medium mb-1",
+                    "text-xs sm:text-sm font-medium mb-1",
                     dayEvents.length > 0 ? "text-primary-600" : "text-gray-700",
                     new Date().getDate() === dayObj.day &&
                       new Date().getMonth() === currentDate.getMonth() &&

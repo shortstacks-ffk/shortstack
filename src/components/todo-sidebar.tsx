@@ -14,7 +14,11 @@ import { TimePicker } from "@/src/components/ui/time-picker";
 import { SchedulerProvider, useScheduler } from "@/src/providers/scheduler/schedular-provider";
 import { HEADER_HEIGHT } from "@/src/lib/constants/header_height";
 
-const TodoSidebarInner = () => {
+interface TodoSidebarInnerProps {
+  showCollapseButton?: boolean;
+}
+
+const TodoSidebarInner = ({ showCollapseButton = true }: TodoSidebarInnerProps) => {
   const [newTodoTitle, setNewTodoTitle] = useState("");
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [priority, setPriority] = useState<TodoPriority>("UPCOMING");
@@ -83,17 +87,17 @@ const TodoSidebarInner = () => {
 
   const groupedTodos: Record<string, typeof todos> = {};
 
-todos.forEach(todo => {
-  // Create a date that's normalized to avoid timezone issues
-  const dueDate = new Date(todo.dueDate);
-  // Format the date in a timezone-safe way
-  const dateKey = format(dueDate, "yyyy-MM-dd");
-  
-  if (!groupedTodos[dateKey]) {
-    groupedTodos[dateKey] = [];
-  }
-  groupedTodos[dateKey].push(todo);
-});
+  todos.forEach(todo => {
+    // Create a date that's normalized to avoid timezone issues
+    const dueDate = new Date(todo.dueDate);
+    // Format the date in a timezone-safe way
+    const dateKey = format(dueDate, "yyyy-MM-dd");
+    
+    if (!groupedTodos[dateKey]) {
+      groupedTodos[dateKey] = [];
+    }
+    groupedTodos[dateKey].push(todo);
+  });
 
   const sortedDateKeys = Object.keys(groupedTodos).sort((a, b) => {
     return new Date(a).getTime() - new Date(b).getTime();
@@ -113,29 +117,10 @@ todos.forEach(todo => {
     }
   };
 
-  // Update height to account for header and ensure it reaches the bottom
-  const sidebarHeight = `calc(100vh - ${HEADER_HEIGHT}px)`;
-
-  if (!isExpanded) {
-    return (
-      <div 
-        className={`p-2 bg-[#f2fbf4] rounded-lg flex flex-col justify-between cursor-pointer`}
-        onClick={() => setIsExpanded(true)}
-        style={{ height: sidebarHeight }}
-      >
-        <div></div> {/* Empty div for spacing */}
-        <div className="flex justify-center mb-4 mt-4">
-          <ChevronLeft />
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div 
       ref={sidebarRef}
-      className={`flex flex-col p-4 bg-[#f2fbf4] rounded-lg relative w-80 overflow-hidden`}
-      style={{ height: sidebarHeight }}
+      className="flex flex-col p-4 bg-[#f2fbf4] rounded-lg relative h-full w-full overflow-hidden"
     >
       {/* Add task button that triggers form display */}
       <Button 
@@ -189,11 +174,9 @@ todos.forEach(todo => {
                       value={format(selectedDate, 'yyyy-MM-dd')}
                       onChange={(e) => {
                         if (e.target.value) {
-                          // Preserve the time when changing the date
                           const dateParts = e.target.value.split('-').map(Number);
                           const newDate = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
                           
-                          // Transfer time from the existing selectedDate
                           newDate.setHours(
                             selectedDate.getHours(),
                             selectedDate.getMinutes(),
@@ -206,7 +189,6 @@ todos.forEach(todo => {
                       }}
                       className="bg-white pl-1 pr-2 text-center cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0"
                       onClick={(e) => {
-                        // This ensures clicking anywhere on the input opens the date picker
                         (e.target as HTMLInputElement).showPicker();
                       }}
                     />
@@ -370,23 +352,15 @@ todos.forEach(todo => {
           )}
         </div>
       </div>
-      
-      {/* Collapse button at bottom left */}
-      <div 
-        className="bottom-4 mb-2 mt-2 cursor-pointer p-2"
-        onClick={() => setIsExpanded(false)}
-      >
-        <ChevronRight />
-      </div>
     </div>
   );
 };
 
 // Wrap the inner component with the provider
-export function TodoSidebar() {
+export function TodoSidebar({ showCollapseButton = true }: { showCollapseButton?: boolean }) {
   return (
     <SchedulerProvider>
-      <TodoSidebarInner />
+      <TodoSidebarInner showCollapseButton={showCollapseButton} />
     </SchedulerProvider>
   );
 }

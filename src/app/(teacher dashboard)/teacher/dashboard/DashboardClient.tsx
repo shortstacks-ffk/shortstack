@@ -4,7 +4,6 @@
 import { ClassCard } from "@/src/components/class/ClassCard";
 import DashboardAddClassCard from "@/src/components/class/dashboard-add-class-card";
 import { PerformanceChart } from "@/src/components/dashboard/performance-chart";
-import DashboardRightSidebar from "@/src/components/dashboard/DashboardRightSidebar";
 import { useSession } from "next-auth/react";
 
 interface ClassSession {
@@ -64,44 +63,40 @@ const DashboardClient = ({ classes }: DashboardClientProps) => {
   };
 
   return (
-    <div className="flex h-full relative">
-      <main className="flex-1 flex flex-col items-center p-4 lg:p-8 overflow-y-auto">
-        <div className="w-full max-w-5xl mx-auto">
-          <section className="mb-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {displayedClasses.map((cls) => (
-                <ClassCard
-                  key={cls.id}
-                  id={cls.id}
-                  emoji={cls.emoji}
-                  name={cls.name}
-                  code={cls.code}
-                  color={cls.color || "primary"}
-                  grade={cls.grade}
-                  numberOfStudents={cls.numberOfStudents}
-                  schedule={formatClassSchedule(cls.classSessions)}
-                  overview={cls.overview}
-                />
-              ))}
-              {displayedClasses.length < 3 && <DashboardAddClassCard />}
-            </div>
-          </section>
+    <div className="w-full">
+      <div className="w-full">
+        <section className="mb-6 md:mb-8">
+          <h2 className="text-xl md:text-2xl font-semibold mb-3 md:mb-4 px-1">Recent Classes</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+            {displayedClasses.map((cls) => (
+              <ClassCard
+                key={cls.id}
+                id={cls.id}
+                emoji={cls.emoji}
+                name={cls.name}
+                code={cls.code}
+                color={cls.color || "primary"}
+                grade={cls.grade}
+                numberOfStudents={cls.numberOfStudents}
+                schedule={formatClassSchedule(cls.classSessions)}
+                overview={cls.overview}
+              />
+            ))}
+            {displayedClasses.length < 3 && <DashboardAddClassCard />}
+          </div>
+        </section>
 
-          <section>
-            <h2 className="text-xl font-semibold mb-4">Performance Overview</h2>
-            <div className="w-full">
-              <div className="rounded-xl p-5 bg-card border shadow-sm">
-                <PerformanceChart 
-                  recentClasses={classesWithCounts.slice(0, Math.min(3, classesWithCounts.length))}
-                />
-              </div>
+        <section>
+          <h2 className="text-xl md:text-2xl font-semibold mb-3 md:mb-4 px-1">Performance Overview</h2>
+          <div className="w-full">
+            <div className="rounded-xl p-2 sm:p-3 md:p-5 bg-card border shadow-sm">
+              <PerformanceChart 
+                recentClasses={classesWithCounts.slice(0, Math.min(3, classesWithCounts.length))}
+              />
             </div>
-          </section>
-        </div>
-      </main>
-      
-      {/* Right Sidebar - always rendered but toggled with CSS */}
-      {/* <DashboardRightSidebar /> */}
+          </div>
+        </section>
+      </div>
     </div>
   )
 }
