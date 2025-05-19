@@ -11,7 +11,7 @@ import {
 } from "@/src/components/ui/sidebar"
 
 export function NavMain({
-  items,
+  items, className
 }: {
   items: {
     title: string
@@ -19,6 +19,7 @@ export function NavMain({
     icon: LucideIcon
     isActive?: boolean
   }[]
+  className?: string
 }) {
   const pathname = usePathname()
   return (

@@ -28,14 +28,13 @@ export function NavLogo({
                 alt="Icon" 
                 width={35} 
                 height={35}
-                // style={{ width: "auto", height: "auto" }} 
               />
               <Image 
                 src={item.title} 
                 alt="Title" 
-                width={110} 
-                height={100}
-                style={{ width: "auto", height: "auto" }}
+                width={120} 
+                height={160}
+                // style={{ width: "120", height: "40" }}
               />
             </a>
           </SidebarMenuButton>
