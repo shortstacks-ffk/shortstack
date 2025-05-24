@@ -57,3 +57,38 @@ export const dashboardData = {
     },
   ],
 };
+
+export const studentDashboardData = {
+  dashLogo: [{
+    title: simple_logo,
+    url: "/student/dashboard",
+    icon: mascot,
+  }],
+  navMain: [
+    {
+      title: "Home",
+      url: "/student/dashboard",
+      icon: Home,
+    },
+    {
+      title: "Classes",
+      url: "/student/dashboardclasses",
+      icon: SquarePen,
+    },
+    {
+      title: "Calendar",
+      url: "/student/dashboardcalendar",
+      icon: Calendar,
+    },
+    {
+      title: "Bank Accounts",
+      url: "/student/dashboardbank-accounts",
+      icon: Landmark,
+    },
+    {
+      title: "Storefront",
+      url: "/teacher/dashboard/storefront",
+      icon: ShoppingBag,
+    },
+  ],
+};
