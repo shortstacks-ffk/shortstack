@@ -9,6 +9,7 @@ import { StudentClassCard } from '@/src/components/class/StudentClassCard';
 import Link from 'next/link';
 import { PlusCircle } from "lucide-react";
 import { Button } from '@/src/components/ui/button';
+import { SessionDebugger } from '@/src/components/debug/SessionDebug';
 
 // Define the color options for class cards
 const CLASS_COLORS = ["primary", "secondary", "success", "warning", "destructive", "default"];
@@ -183,6 +184,7 @@ export default function StudentDashboardClient({ student, classes }: StudentDash
             </CardContent>
           </Card>
         </div>
+        <SessionDebugger />
       </section>
     </div>
   );

@@ -557,7 +557,7 @@ export async function updateStudent(formData: FormData, classCode: string, stude
             className: classDetails?.name || "your class",
             classCode,
             email: schoolEmail,
-            password, // Include the new password
+            password: password, // Include the new password
             isNewStudent: false, // IMPORTANT: This must be false
             isPasswordReset: true  // IMPORTANT: This must be true
           }),
@@ -711,5 +711,97 @@ export async function createStudentBankAccounts(studentId: string) {
   } catch (error) {
     console.error("Error creating bank accounts:", error);
     return { success: false, error: "Failed to create bank accounts" };
+  }
+}
+
+// Get all classes that a student has joined with full details
+export async function getStudentClasses() {
+  try {
+    const session = await getAuthSession();
+    if (!session?.user?.id) {
+      return { success: false, error: "Not authenticated" };
+    }
+    
+    if (session.user.role !== "STUDENT") {
+      return { success: false, error: "Unauthorized: Student role required" };
+    }
+
+    // Try multiple ways to find the student profile
+    let student = await db.student.findUnique({
+      where: {
+        userId: session.user.id
+      },
+      select: { id: true }
+    });
+    
+    // If not found by userId, try finding by the email
+    if (!student && session.user.email) {
+      student = await db.student.findFirst({
+        where: { 
+          schoolEmail: session.user.email 
+        },
+        select: { id: true }
+      });
+    }
+    
+    // If still not found, try directly by ID as a last resort
+    if (!student) {
+      student = await db.student.findUnique({
+        where: { id: session.user.id },
+        select: { id: true }
+      });
+    }
+
+    if (!student) {
+      console.error(`Student profile not found for user ${session.user.id} with email ${session.user.email}`);
+      return { success: false, error: "Student profile not found" };
+    }
+
+    // Get all classes the student is enrolled in
+    const enrolledClasses = await db.enrollment.findMany({
+      where: {
+        studentId: student.id,
+        enrolled: true // Only get classes where the student is actively enrolled
+      },
+      select: {
+        class: {
+          include: {
+            classSessions: true,
+            _count: {
+              select: { 
+                enrollments: {
+                  where: { enrolled: true }
+                } 
+              }
+            }
+          }
+        }
+      }
+    });
+
+    // Format the classes for easier consumption in the frontend
+    const classes = enrolledClasses.map(enrollment => {
+      const classData = enrollment.class;
+      return {
+        id: classData.id,
+        name: classData.name,
+        code: classData.code,
+        emoji: classData.emoji,
+        color: classData.color,
+        grade: classData.grade,
+        classSessions: classData.classSessions,
+        _count: classData._count,
+        createdAt: classData.createdAt.toISOString(),
+        overview: classData.overview,
+      };
+    });
+
+    return { success: true, data: classes };
+  } catch (error) {
+    console.error("Get student classes error:", error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : "Failed to fetch student classes" 
+    };
   }
 }
