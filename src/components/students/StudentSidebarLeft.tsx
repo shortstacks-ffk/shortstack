@@ -1,40 +1,35 @@
 "use client";
 
-import React, { useState } from "react";
-import Image from "next/image";
-import Link from "next/link";
+import { useState, useEffect } from "react";
+import { useToast } from "@/src/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { useToast } from "@/src/hooks/use-toast";
-import {
-  Menu,
-  X,
-  ShoppingBag ,
-  Home,
-  SquarePen,
-  Calendar,
-  Wallet,
-  LogOut,
-  ChevronLeft,
-  ChevronRight,
-} from "lucide-react";
+import Link from "next/link";
+import { Home, SquarePen, Calendar, Wallet, ShoppingBag, X, ChevronLeft, ChevronRight, LogOut } from "lucide-react";
+import Image from "next/image";
+import { cn } from "@/src/lib/utils";
+import { usePathname } from "next/navigation";
+import { NavLogo } from "@/src/components/nav-logo";
+import { studentDashboardData } from "@/src/lib/constants/nav-data";
 
-// Import images
-import mascot from "@/public/assets/img/Mascout 9ldpi.png";
-import simpleLogo from "@/public/assets/img/logo simple - greenldpi.png";
+// Add props interface to receive mobile state
+interface DashboardSidebarProps {
+  isMobileOpen: boolean;
+  setIsMobileOpen: (open: boolean) => void;
+}
 
-export function DashboardSidebar() {
-  const [isMobileOpen, setIsMobileOpen] = useState(false);
+export function StudentSidebarLeft({ isMobileOpen, setIsMobileOpen }: DashboardSidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
+  const pathname = usePathname();
 
   const navItems = [
-    { href: "/student/dashboard", icon: Home, label: "Dashboard" },
+    { href: "/student/dashboard", icon: Home, label: "Dashboard", exact: true },
     { href: "/student/dashboard/classes", icon: SquarePen, label: "Classes" },
     { href: "/student/dashboard/calendar", icon: Calendar, label: "Calendar" },
     { href: "/student/dashboard/bank", icon: Wallet, label: "Bank" },
-    { href: "/student/dashboard/storefront", icon: ShoppingBag , label: "Storefront" },
+    { href: "/student/dashboard/storefront", icon: ShoppingBag, label: "Storefront" },
   ];
   
   const handleLogout = async () => {
@@ -55,140 +50,158 @@ export function DashboardSidebar() {
     }
   };
 
+  // Check if a nav item is active
+  const isNavItemActive = (href: string, exact?: boolean) => {
+    if (exact) {
+      return pathname === href;
+    }
+    return pathname === href || pathname.startsWith(`${href}/`);
+  };
+
   return (
     <>
-      {/* MOBILE HEADER (sticky) */}
-      <header className="md:hidden sticky top-0 z-10 bg-white p-2 border-b flex items-center justify-between">
-        {/* Left: Mascot + Logo */}
-        <div className="flex items-center gap-2">
-          <Image src={mascot} alt="Mascot" width={32} height={32} />
-          <Image src={simpleLogo} alt="ShortStacks" width={80} height={20} />
-        </div>
-        {/* Right: Hamburger Icon */}
-        <button
-          onClick={() => setIsMobileOpen(true)}
-          className="p-1 focus:outline-none"
-          aria-label="Open menu"
-        >
-          <Menu className="h-6 w-6" />
-        </button>
-      </header>
+      {/* Mobile Sidebar Overlay */}
+      {isMobileOpen && (
+        <div 
+          className="fixed inset-0 bg-black/30 z-30 md:hidden"
+          onClick={() => setIsMobileOpen(false)}
+          aria-hidden="true"
+        />
+      )}
 
-      {/* MOBILE DRAWER */}
+      {/* MOBILE SIDEBAR */}
       <aside
         className={`fixed top-0 left-0 h-full w-64 bg-[#f1faf3] z-50 transform transition-transform duration-300
           md:hidden
           ${isMobileOpen ? "translate-x-0" : "-translate-x-full"}
         `}
       >
-        {/* Drawer Header */}
-        <div className="flex items-center justify-between p-4 border-b bg-[#f1faf3]">
-          <div className="flex items-center">
-            <Image src={mascot} alt="Mascot" width={32} height={32} />
-            <Image src={simpleLogo} alt="ShortStacks" width={120} height={32} />
-          </div>
+        <div className="h-full overflow-y-auto">
+          {/* Close button */}
           <button
             onClick={() => setIsMobileOpen(false)}
-            className="p-1 focus:outline-none"
-            aria-label="Close menu"
+            className="absolute top-4 right-4 p-2 rounded-full hover:bg-gray-100 transition-colors z-50"
+            aria-label="Close sidebar"
           >
-            <X className="h-5 w-5" />
+            <X className="h-5 w-5 text-gray-700" />
           </button>
-        </div>
 
-        {/* Drawer Navigation */}
-        <nav className="mt-4">
-          {navItems.map((item) => (
-            <Link
-              key={item.label}
-              href={item.href}
-              onClick={() => setIsMobileOpen(false)}
-              className="block px-4 py-2 hover:bg-white/50"
+          {/* Navigation header - Add logo */}
+          <div className="flex items-center justify-center p-4 border-b mt-10">
+            <NavLogo items={studentDashboardData.dashLogo} />
+          </div>
+
+          {/* Navigation items */}
+          <nav className="mt-6 px-3">
+            <ul className="space-y-2">
+              {navItems.map((item) => (
+                <li key={item.href}>
+                  <Link
+                    href={item.href}
+                    className={cn(
+                      "flex items-center gap-3 px-3 py-2 rounded-md transition-colors",
+                      isNavItemActive(item.href, item.exact)
+                        ? "bg-[#c2e8cf] text-gray-800 font-medium"
+                        : "text-gray-700 hover:bg-gray-100"
+                    )}
+                    onClick={() => setIsMobileOpen(false)}
+                  >
+                    <item.icon className="h-5 w-5" />
+                    <span>{item.label}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+
+          {/* Logout button */}
+          <div className="absolute bottom-4 left-0 right-0 px-3">
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-3 px-3 py-2 w-full text-left text-red-600 rounded-md hover:bg-red-50"
             >
-              <div className="flex items-center gap-2">
-                <item.icon className="h-5 w-5" />
-                <span className="text-sm md:text-base">{item.label}</span>
-              </div>
-            </Link>
-          ))}
-        </nav>
-
-        {/* Drawer Logout */}
-        <div className="mt-2">
-          <button
-            onClick={handleLogout}
-            className="w-full text-left px-4 py-2 hover:bg-white/50"
-          >
-            <div className="flex items-center gap-2">
               <LogOut className="h-5 w-5" />
-              <span className="text-sm md:text-base">Logout</span>
-            </div>
-          </button>
+              <span>Logout</span>
+            </button>
+          </div>
         </div>
       </aside>
 
       {/* DESKTOP SIDEBAR */}
       <aside
-        className={`hidden md:flex md:flex-col bg-[#f1faf3] transition-all duration-300
+        className={`hidden md:flex md:flex-col bg-[#f1faf3] border-r transition-all duration-300 h-full
           ${isCollapsed ? "md:w-16" : "md:w-64"}
         `}
       >
-        {/* Logo Row */}
-        <div className="p-4 flex items-center">
-          <Image src={mascot} alt="Mascot" width={32} height={32} />
-          {!isCollapsed && (
-            <Image
-              src={simpleLogo}
-              alt="ShortStacks"
-              width={80}
-              height={20}
-              className="ml-2"
-            />
+        {/* Collapse button */}
+        <button
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          className="absolute -right-3 top-16 p-1 bg-white rounded-full border shadow-sm z-10"
+          aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          {isCollapsed ? (
+            <ChevronRight className="h-4 w-4" />
+          ) : (
+            <ChevronLeft className="h-4 w-4" />
           )}
-        </div>
+        </button>
 
-        {/* Nav Items */}
-        <nav className="flex-1 px-2">
-          {navItems.map((item) => (
-            <Link
-              key={item.label}
-              href={item.href}
-              className="flex items-center gap-3 px-4 py-2 hover:bg-white/50"
-            >
-              <item.icon className="h-5 w-5" />
-              {!isCollapsed && (
-                <span className="text-sm md:text-base">{item.label}</span>
-              )}
-            </Link>
-          ))}
-        </nav>
-
-        {/* Logout */}
-        <div className="px-2 pb-2">
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-4 py-2 text-left hover:bg-white/50"
-          >
-            <LogOut className="h-5 w-5" />
-            {!isCollapsed && (
-              <span className="text-sm md:text-base">Logout</span>
-            )}
-          </button>
-        </div>
-
-        {/* Chevron Toggle at bottom-right */}
-        <div className="px-2 pb-4 flex justify-end">
-          <button
-            onClick={() => setIsCollapsed(!isCollapsed)}
-            className="p-2 focus:outline-none"
-            aria-label="Toggle sidebar"
-          >
+        {/* Content */}
+        <div className="flex flex-col h-full">
+          {/* Header */}
+          <div className={`px-4 py-4 border-b flex ${isCollapsed ? "justify-center" : ""}`}>
             {isCollapsed ? (
-              <ChevronRight className="h-5 w-5" />
+              <div className="flex justify-center">
+                <Image
+                  src="/assets/img/Mascout 9ldpi.png"
+                  alt="ShortStacks Mascot"
+                  width={32}
+                  height={32}
+                  className="mascot-image"
+                />
+              </div>
             ) : (
-              <ChevronLeft className="h-5 w-5" />
+              <NavLogo items={studentDashboardData.dashLogo} />
             )}
-          </button>
+          </div>
+
+          {/* Navigation */}
+          <nav className="mt-6 px-3 flex-1">
+            <ul className="space-y-2">
+              {navItems.map((item) => (
+                <li key={item.href}>
+                  <Link
+                    href={item.href}
+                    className={cn(
+                      "flex items-center gap-3 px-3 py-2 rounded-md transition-colors",
+                      isNavItemActive(item.href, item.exact)
+                        ? "bg-[#c2e8cf] text-gray-800 font-medium"
+                        : "text-gray-700 hover:bg-gray-100"
+                    )}
+                    title={isCollapsed ? item.label : undefined}
+                  >
+                    <item.icon className="h-5 w-5" />
+                    {!isCollapsed && <span>{item.label}</span>}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+
+          {/* Logout */}
+          <div className="px-3 py-4 border-t">
+            <button
+              onClick={handleLogout}
+              className={cn(
+                "flex items-center gap-3 px-3 py-2 w-full text-left rounded-md hover:bg-red-50",
+                isCollapsed ? "justify-center" : ""
+              )}
+              title={isCollapsed ? "Logout" : undefined}
+            >
+              <LogOut className="h-5 w-5 text-red-600" />
+              {!isCollapsed && <span className="text-red-600">Logout</span>}
+            </button>
+          </div>
         </div>
       </aside>
     </>
