@@ -4,6 +4,8 @@ import { Suspense } from "react";
 import AddAnything from "@/src/components/AddAnything";
 import AddBill from "@/src/components/bills/AddBill";
 
+export const dynamic = 'force-dynamic';
+
 // Bills content component to handle data fetching
 async function BillsContent() {
   const response = await getBills({ includeUnassigned: true });

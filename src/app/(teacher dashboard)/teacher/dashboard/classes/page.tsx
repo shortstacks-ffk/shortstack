@@ -2,6 +2,8 @@ import { getClasses } from "@/src/app/actions/classActions";
 import DashboardAddClassCard from "@/src/components/class/dashboard-add-class-card";
 import { ClassCard } from "@/src/components/class/ClassCard";
 
+export const dynamic = 'force-dynamic';
+
 export default async function ClassesPage() {
   const response = await getClasses();
 

@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
+import { NextRequest, NextResponse } from "next/server";
 
 export async function middleware(req: NextRequest) {
   const session = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
@@ -32,13 +32,20 @@ export async function middleware(req: NextRequest) {
     }
   }
 
+  // Prevent access to the missing main-app.js which causes 404s
+  if (req.nextUrl.pathname.includes('/static/chunks/main-app.js')) {
+    return NextResponse.redirect(new URL('/', req.url));
+  }
+
   return NextResponse.next();
 }
 
 export const config = {
   matcher: [
-    "/teacher/dashboard/:path*", 
+    "/teacher/dashboard/:path*",
     "/student/dashboard/:path*",
-    "/api/restricted/:path*"
-  ]
+    "/api/:path*",
+    "/api/restricted/:path*",
+    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+  ],
 };

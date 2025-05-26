@@ -749,11 +749,6 @@ body {
   color: black !important; /* Orange text on hover */
 }
 
-/* Calendar item highlight - make consistent with sidebar */
-/* .calendar-view-button.active {
-  background-color: #c2e8cf !important;
-  color: black !important;
-} */
 
 /* Ensure the currently selected menu item has the proper styling */
 [data-sidebar="menu-button"][data-active="true"] {
@@ -995,4 +990,47 @@ body {
 /* Todo sidebar transitions */
 .todo-sidebar {
   transition: width 0.3s ease, opacity 0.2s ease;
+}
+
+
+/* Landing page styles */
+
+@keyframes bounce-slow {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-20px);
+  }
+}
+
+@keyframes bounce-delayed {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-15px);
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-10px) rotate(5deg);
+  }
+}
+
+.animate-bounce-slow {
+  animation: bounce-slow 3s infinite;
+}
+
+.animate-bounce-delayed {
+  animation: bounce-delayed 2.5s infinite;
+  animation-delay: 0.5s;
+}
+
+.animate-float {
+  animation: float 4s infinite;
 }

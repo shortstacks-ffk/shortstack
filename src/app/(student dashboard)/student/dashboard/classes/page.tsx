@@ -9,7 +9,6 @@ import { StudentJoinClass } from "@/src/components/students/StudentJoinClass";
 import { StudentClassCard } from "@/src/components/class/StudentClassCard";
 import { getStudentClasses } from '@/src/app/actions/studentActions';
 import { Card, CardContent } from "@/src/components/ui/card";
-import { Button } from "@/src/components/ui/button";
 
 // Define the color options for class cards
 const CLASS_COLORS = ["primary", "secondary", "success", "warning", "destructive", "default"];
@@ -25,14 +24,15 @@ interface Class {
   name: string;
   code: string;
   emoji: string;
-  color?: string;
-  grade?: string;
+  color?: string | null; // Changed from string? to string | null
+  grade?: string | null; // Changed from string? to string | null
   schedule?: string | null;
   classSessions?: ClassSession[];
   createdAt: string;
   _count?: {
     enrollments: number;
   };
+  overview?: string | null; // Added this property from the API response
 }
 
 const DaysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -131,9 +131,19 @@ export default function StudentClassesPage() {
     if (!classExists) {
       // Add the new class to the list with a color and empty counts
       const colorIndex = classes.length % CLASS_COLORS.length;
+      
+      // Format the schedule if it's an array of objects
+      let schedule = newClass.schedule;
+      if (Array.isArray(schedule)) {
+        schedule = schedule.map(session => 
+          `${session.day} ${session.startTime}-${session.endTime}`
+        ).join(', ');
+      }
+      
       const coloredClass = {
         ...newClass,
         color: newClass.color || CLASS_COLORS[colorIndex],
+        schedule: schedule,
         _count: { enrollments: 0 }
       };
       setClasses(prevClasses => [...prevClasses, coloredClass]);
@@ -170,8 +180,8 @@ export default function StudentClassesPage() {
               emoji={cls.emoji}
               name={cls.name}
               code={cls.code}
-              color={cls.color}
-              grade={cls.grade}
+              color={cls.color || undefined}
+              grade={cls.grade || undefined}
               schedule={cls.schedule}
               numberOfStudents={cls._count?.enrollments}
             />

@@ -36,7 +36,7 @@ export default function DashboardHeader({
       
       {/* Right side - Notifications and user dropdown */}
       <div className="flex items-center gap-3">
-        <Notification />
+        {/* <Notification /> */}
         <UserDropdown
           teacherImage={teacherImage}
           teacherInitial={teacherInitial}
