@@ -3,12 +3,12 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from "@/src/components/ui/dropdown-menu";
 import { User, Settings, LogOut, ChevronDown } from "lucide-react";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 
 interface StudentUserDropdownProps {
   studentImage: string | null | undefined;
@@ -25,12 +25,34 @@ export default function StudentUserDropdown({
   studentEmail,
   onLogout 
 }: StudentUserDropdownProps) {
+  // State to track image loading errors
+  const [imageError, setImageError] = useState(false);
+  // State to ensure we're using the latest image URL
+  const [imageUrl, setImageUrl] = useState<string | null | undefined>(studentImage);
+  
+  // Update image URL when prop changes
+  useEffect(() => {
+    setImageUrl(studentImage);
+    setImageError(false);
+  }, [studentImage]);
+
+  // Handle image load error
+  const handleImageError = () => {
+    setImageError(true);
+  };
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button className="flex items-center gap-2 px-3 py-1.5 rounded-full hover:bg-gray-100 transition-colors">
           <Avatar className="h-8 w-8 border">
-            <AvatarImage src={studentImage || ""} />
+            {imageUrl && !imageError ? (
+              <AvatarImage 
+                src={imageUrl} 
+                alt={studentName} 
+                onError={handleImageError}
+              />
+            ) : null}
             <AvatarFallback className="bg-green-100 text-green-800">
               {studentInitials}
             </AvatarFallback>
@@ -46,15 +68,15 @@ export default function StudentUserDropdown({
         </div>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link href="/student/dashboard/account" className="flex items-center gap-2 cursor-pointer w-full">
+          <Link href="/student/dashboard/settings/account" className="flex items-center gap-2 cursor-pointer w-full">
             <User className="h-4 w-4" />
             <span>My Profile</span>
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
-          <Link href="/student/dashboard/account/settings" className="flex items-center gap-2 cursor-pointer w-full">
+          <Link href="/student/dashboard/settings/account?tab=security" className="flex items-center gap-2 cursor-pointer w-full">
             <Settings className="h-4 w-4" />
-            <span>Settings</span>
+            <span>Security</span>
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />

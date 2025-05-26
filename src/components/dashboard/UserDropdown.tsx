@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/src/components/ui/avatar";
 import {
   DropdownMenu,
@@ -8,6 +7,7 @@ import {
   DropdownMenuTrigger
 } from "@/src/components/ui/dropdown-menu";
 import { User, Settings, LogOut, ChevronDown } from "lucide-react";
+import Link from "next/link";
 
 interface UserDropdownProps {
   teacherImage: string;
@@ -42,13 +42,17 @@ export default function UserDropdown({
           <p className="text-gray-500 truncate">{teacherName}</p>
         </div>
         <DropdownMenuSeparator />
-        <DropdownMenuItem className="gap-2 cursor-pointer">
-          <User className="h-4 w-4" />
-          <span>My Account</span>
+        <DropdownMenuItem asChild>
+          <Link href="/teacher/dashboard/settings/account" className="flex items-center gap-2 cursor-pointer w-full">
+            <User className="h-4 w-4" />
+            <span>My Account</span>
+          </Link>
         </DropdownMenuItem>
-        <DropdownMenuItem className="gap-2 cursor-pointer">
-          <Settings className="h-4 w-4" />
-          <span>Settings</span>
+        <DropdownMenuItem asChild>
+          <Link href="/teacher/dashboard/settings/account?tab=security" className="flex items-center gap-2 cursor-pointer w-full">
+            <Settings className="h-4 w-4" />
+            <span>Security</span>
+          </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem className="gap-2 text-red-600 focus:text-red-600 cursor-pointer" onClick={onLogout}>
