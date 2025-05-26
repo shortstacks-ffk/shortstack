@@ -160,3 +160,877 @@ body {
   line-height: 1;
   margin: 0.1rem 0;
 }
+
+/* Calendar Styles */
+
+/* Make scheduler view headers sticky */
+.sticky-header-calendar .mina-scheduler-header {
+  position: sticky;
+  top: 60px; 
+  z-index: 30;
+  background-color: white;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.sticky-header-calendar .mina-scheduler-date-header {
+  position: sticky;
+  top: 110px;
+  z-index: 29;
+  background-color: white;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.sticky-header-calendar .mina-scheduler-column-header {
+  position: sticky;
+  top: 140px;
+  z-index: 28;
+  background-color: white;
+}
+
+.sticky-header-calendar .mina-scheduler-time-column {
+  position: sticky;
+  left: 0;
+  z-index: 20;
+  background-color: white;
+}
+
+/* Orange & Green Theme */
+.mina-scheduler-header {
+  background-color: #fff8f0; /* Light orange background */
+}
+
+.mina-scheduler-container {
+  max-width: 100%; /* Full width */
+  height: calc(100vh - 170px); /* Adjust for header, nav */
+  overflow: auto;
+}
+
+/* Current day highlight in month view */
+.current-day {
+  background-color: rgba(76, 175, 80, 0.1) !important; /* Light green background */
+  border: 2px solid #4caf50 !important; /* Green border */
+  position: relative;
+}
+
+/* Event color styles - Orange & Green theme */
+.scheduler-event-primary {
+  background-color: #ff9800 !important; /* Orange */
+}
+
+.scheduler-event-secondary {
+  background-color: #4caf50 !important; /* Green */
+}
+
+.scheduler-event-destructive {
+  background-color: #f44336 !important; /* Red */
+}
+
+.scheduler-event-success {
+  background-color: #8bc34a !important; /* Light green */
+}
+
+.scheduler-event-warning {
+  background-color: #ffc107 !important; /* Amber */
+}
+
+.scheduler-event-default {
+  background-color: #9e9e9e !important; /* Gray */
+}
+
+/* Calendar view buttons */
+.calendar-view-button {
+  background-color: white;
+  border: 1px solid #e5e7eb;
+  color: #666;
+}
+
+.calendar-view-button.active {
+  background-color: #ff9800;
+  color: white;
+}
+
+/* Calendar header - smaller text */
+.calendar-title {
+  font-size: 1.5rem !important;
+  font-weight: 600 !important;
+}
+
+.calendar-day-name {
+  font-size: 0.875rem !important; 
+  font-weight: 500 !important;
+  margin: 0.5rem 0 !important;
+}
+
+.calendar-day-number {
+  font-size: 1rem !important;
+}
+
+/* Calendar container */
+.mina-scheduler-container {
+  max-width: 100%;
+  height: 100%;
+  overflow: auto;
+}
+
+/* Make scheduler view headers sticky */
+.sticky-header-calendar .mina-scheduler-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background-color: white;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  padding: 0.5rem 0.75rem;
+}
+
+.sticky-header-calendar .mina-scheduler-date-header {
+  position: sticky;
+  top: 40px;
+  z-index: 29;
+  background-color: white;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 0.25rem 0.75rem;
+}
+
+/* Column headers in day/week views */
+.sticky-header-calendar .mina-scheduler-column-header {
+  position: sticky;
+  top: 80px;
+  z-index: 28;
+  background-color: white;
+  font-size: 0.75rem;
+  padding: 0.25rem;
+}
+
+/* For time slots in week view */
+.sticky-header-calendar .mina-scheduler-time-column {
+  position: sticky;
+  left: 0;
+  z-index: 20;
+  background-color: white;
+  font-size: 0.75rem;
+  padding: 0.25rem;
+}
+
+/* Current day styling */
+.current-day {
+  background-color: rgba(76, 175, 80, 0.1) !important;
+  border: 2px solid #4caf50 !important;
+  position: relative;
+}
+
+/* Current day highlighting for week view */
+.current-week-day-header {
+  background-color: rgba(134, 239, 172, 0.2) !important; /* Light green background */
+}
+
+.current-week-day-column {
+  background-color: rgba(134, 239, 172, 0.2) !important; /* Light green background */
+}
+
+.current-week-day-hour {
+  background-color: rgba(134, 239, 172, 0.2) !important; /* Light green background */
+}
+
+/* Smaller, more compact calendar UI */
+.calendar-tabs-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.calendar-tab-list {
+  padding: 0.25rem;
+}
+
+.calendar-tab {
+  font-size: 0.875rem;
+  padding: 0.375rem 0.75rem;
+}
+
+.calendar-panel {
+  flex: 1;
+  overflow: auto;
+  height: calc(100vh - 130px);
+  padding-bottom: 100px; /* Add extra padding at bottom */
+}
+
+/* Event color styles - Orange & Green theme */
+.scheduler-event-primary {
+  background-color: #ff9800 !important; /* Orange */
+}
+
+.scheduler-event-secondary {
+  background-color: #4caf50 !important; /* Green */
+}
+
+.scheduler-event-destructive {
+  background-color: #f44336 !important; /* Red */
+}
+
+.scheduler-event-success {
+  background-color: #8bc34a !important; /* Light green */
+}
+
+.scheduler-event-warning {
+  background-color: #ffc107 !important; /* Amber */
+}
+
+.scheduler-event-default {
+  background-color: #9e9e9e !important; /* Gray */
+}
+
+/* Add the smallest text size option */
+.text-2xs {
+  font-size: 0.625rem;
+  line-height: 0.75rem;
+}
+
+/* Day and week views for more compact display */
+.mina-scheduler-day-container, .mina-scheduler-week-container {
+  font-size: 0.75rem;
+}
+
+.mina-scheduler-day-container .hour-marker, 
+.mina-scheduler-week-container .hour-marker {
+  font-size: 0.7rem;
+  padding: 0.125rem;
+}
+
+/* Scrollable container for all views */
+.mina-scheduler-scrollable-container {
+  height: calc(100vh - 160px); /* Adjust based on header height */
+  overflow-y: auto;
+  overflow-x: hidden;
+  scroll-behavior: smooth;
+}
+
+/* Fix for TabsContent container to ensure it takes up available space */
+.mina-scheduler-scrollable-container > div {
+  min-height: 100%;
+}
+
+/* Ensure day and week views have proper height */
+.mina-scheduler-day-container,
+.mina-scheduler-week-container {
+  min-height: 1344px; /* 24 hours x 56px per hour */
+}
+
+/* Calendar Container */
+.mina-scheduler-container {
+  width: 100%;
+  height: 100%;
+}
+
+/* Make scheduler view headers sticky */
+.sticky-header-calendar .mina-scheduler-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background-color: white;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  padding: 0.5rem;
+}
+
+.sticky-header-calendar .mina-scheduler-date-header {
+  position: sticky;
+  top: 40px;
+  z-index: 29;
+  background-color: white;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 0.25rem;
+}
+
+/* Column headers in day/week views */
+.sticky-header-calendar .mina-scheduler-column-header {
+  position: sticky;
+  top: 80px;
+  z-index: 28;
+  background-color: white;
+}
+
+/* For time slots in week view */
+.sticky-header-calendar .mina-scheduler-time-column {
+  position: sticky;
+  left: 0;
+  z-index: 20;
+  background-color: white;
+}
+
+/* Current time indicator */
+.current-time-indicator {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background-color: #000;
+  z-index: 50;
+}
+
+.current-time-indicator .dot {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: #000;
+  border: 1px solid #fff;
+  left: 60px;
+  top: -3px;
+}
+
+/* Current day styling */
+.current-day {
+  background-color: rgba(76, 175, 80, 0.1) !important;
+  border: 2px solid #4caf50 !important;
+  position: relative;
+}
+
+/* Current day highlighting for week view */
+.current-week-day-header {
+  background-color: rgba(163, 230, 155, 0.2) !important; /* Light pastel green background */
+  border-top: 1px solid #d1fac6 !important;
+}
+
+.current-week-day-column {
+  background-color: rgba(163, 230, 155, 0.2) !important; /* Light pastel green background */
+}
+
+.current-week-day-hour {
+  background-color: rgba(163, 230, 155, 0.2) !important; /* Light pastel green background */
+  border-color: rgba(163, 230, 155, 0.3) !important;
+}
+
+/* Calendar scrolling container */
+.mina-scheduler-scrollable-container {
+  height: calc(100vh - 160px);
+  max-height: calc(100vh - 160px);
+  overflow-y: auto !important;
+  overflow-x: hidden;
+  scroll-behavior: smooth;
+  padding-bottom: 20px;
+  display: block !important;
+}
+
+/* Month view grid styling - squared boxes with no gaps */
+.month-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0;
+  border: 1px solid #e5e7eb;
+}
+
+.month-day-cell {
+  min-height: 110px;
+  border: 1px solid #e5e7eb;
+  padding: 4px;
+  border-radius: 0;
+  position: relative;
+}
+
+/* Week/day view styling */
+.week-grid {
+  display: grid;
+  grid-template-columns: 60px repeat(7, 1fr);
+  gap: 0;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.5rem;
+  position: relative;
+  min-height: 1540px; /* 24 hours x 64px + some padding */
+}
+
+/* Style adjustments for daily view container */
+.daily-view-container {
+  min-height: 1540px;
+}
+
+.week-hour-cell {
+  height: 64px;
+  border-bottom: 1px solid hsl(var(--border));
+  padding: 4px;
+  position: relative;
+}
+
+/* Current time indicator */
+.current-time-indicator {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background-color: #000;
+  z-index: 50;
+}
+
+.current-time-indicator .dot {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: #000;
+  border: 1px solid #fff;
+  left: 60px;
+  top: -3px;
+}
+
+/* Hover time indicator */
+.hover-time-indicator {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background-color: rgba(79, 70, 229, 0.4); /* Primary color with transparency */
+  z-index: 20;
+  pointer-events: none;
+  transition: top 0.1s ease;
+}
+
+/* Event styling for continuous display */
+.scheduler-event-container {
+  position: absolute;
+  border-radius: 3px;
+  overflow: hidden;
+  pointer-events: auto;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: box-shadow 0.2s ease;
+  z-index: 5;
+}
+
+.scheduler-event-container:hover {
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  z-index: 10;
+}
+
+/* Event styling for Orange/Green theme */
+.scheduler-event-primary {
+  background-color: #ff9800 !important; /* Orange */
+  color: white !important;
+}
+
+.scheduler-event-secondary {
+  background-color: #4caf50 !important; /* Green */
+  color: white !important;
+}
+
+.scheduler-event-destructive {
+  background-color: #f44336 !important; /* Red */
+  color: white !important;
+}
+
+.scheduler-event-success {
+  background-color: #8bc34a !important; /* Light green */
+  color: white !important;
+}
+
+.scheduler-event-warning {
+  background-color: #ffc107 !important; /* Amber */
+  color: #333 !important;
+}
+
+.scheduler-event-default {
+  background-color: #9e9e9e !important; /* Gray */
+  color: white !important;
+}
+
+/* Make the event cards match the style in the screenshot */
+.event-card-weekview {
+  border-radius: 4px;
+  overflow: hidden;
+  border-left: 3px solid #ff9636; /* Orange border on the left side */
+  background-color: #fff8f0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Event card styling for both week and day views */
+.event-card-weekview {
+  border-radius: 4px;
+  overflow: hidden;
+  border-left: 3px solid #ff9636; /* Orange border on the left */
+  background-color: #fff8f0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Event cards for different variants */
+.scheduler-event-primary {
+  border-left-color: #3b82f6;
+  background-color: #eff6ff;
+}
+
+.scheduler-event-success {
+  border-left-color: #22c55e;
+  background-color: #f0fdf4;
+}
+
+.scheduler-event-warning {
+  border-left-color: #f59e0b;
+  background-color: #fffbeb;
+}
+
+.scheduler-event-danger {
+  border-left-color: #ef4444;
+  background-color: #fef2f2;
+}
+
+/* Week view styling */
+.week-view-grid {
+  border-collapse: collapse;
+}
+
+.week-view-hour-cell {
+  height: 56px;
+  border-bottom: 1px solid rgba(235, 235, 235, 0.8);
+  position: relative;
+}
+
+/* Week view header styling */
+.week-header-cell {
+  background-color: #f5f5f7;
+  border-top: 1px solid #e2e2e7;
+  border-bottom: 1px solid #e2e2e7;
+  padding: 8px 4px;
+}
+
+.week-number-cell {
+  background-color: #f5f5f7;
+  border-top: 1px solid #e2e2e7;
+  border-bottom: 1px solid #e2e2e7;
+  border-right: 1px solid #e2e2e7;
+  padding: 8px 12px;
+}
+
+/* Calendar hour labels */
+.hour-label {
+  color: #6b7280;
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+/* Layout improvements */
+.calendar-tabs-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.calendar-tab-list {
+  padding: 0.25rem;
+}
+
+.calendar-tab {
+  font-size: 0.875rem;
+  padding: 0.375rem 0.75rem;
+}
+
+.calendar-panel {
+  flex: 1;
+  overflow: auto;
+  height: calc(100vh - 130px);
+  padding-bottom: 100px; /* Add extra padding at bottom */
+}
+
+/* Sidebar active and hover styles */
+.data-\[active\=true\]\:bg-sidebar-accent[data-active="true"] {
+  background-color: #c2e8cf !important; /* Change to your orange color */
+}
+
+.data-\[active\=true\]\:text-sidebar-accent-foreground[data-active="true"] {
+  color: black !important; /* Text color on active item */
+}
+
+.hover\:bg-sidebar-accent:hover {
+  background-color:rgb(194, 220, 203) !important; /* Light orange background on hover */
+}
+
+.hover\:text-sidebar-accent-foreground:hover {
+  color: black !important; /* Orange text on hover */
+}
+
+
+/* Ensure the currently selected menu item has the proper styling */
+[data-sidebar="menu-button"][data-active="true"] {
+  background-color: #c2e8cf !important;
+  color: black !important;
+}
+
+/* Logo and mascot image styling */
+.nav-logo-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.nav-logo-image {
+  height: auto;
+  max-width: 100%;
+  max-height: 60px;
+  object-fit: contain;
+}
+
+.mascot-image {
+  height: auto;
+  width: 48px;
+  object-fit: contain;
+  margin-right: 8px;
+}
+
+/* Responsive calendar styles */
+@media (max-width: 640px) {
+  .calendar-panel {
+    height: calc(100vh - 110px) !important;
+    padding-bottom: 60px !important;
+  }
+  
+  .mina-scheduler-header {
+    padding: 0.25rem 0.5rem !important;
+  }
+  
+  .mina-scheduler-container {
+    touch-action: pan-y;
+  }
+  
+  .calendar-day-name {
+    font-size: 0.75rem !important;
+  }
+  
+  .calendar-day-number {
+    font-size: 0.875rem !important;
+  }
+}
+
+/* Allow pinch-zoom on mobile */
+.calendar-panel {
+  touch-action: pan-x pan-y pinch-zoom;
+}
+
+/* Add these responsive calendar styles */
+
+/* Calendar responsive styling */
+.month-day-cell {
+  @apply relative min-h-[80px] sm:min-h-[90px] md:min-h-[100px] border p-1 hover:bg-gray-50;
+}
+
+.calendar-day-number {
+  @apply text-xs sm:text-sm font-medium;
+}
+
+/* Current day highlight */
+.current-day {
+  @apply bg-green-50 border-green-500 border-2;
+}
+
+/* Make tabs scrollable on mobile */
+.calendar-tab-list {
+  @apply flex flex-nowrap overflow-x-auto scrollbar-hide pb-1;
+}
+
+.calendar-tab {
+  @apply flex-shrink-0 px-2 py-1;
+}
+
+/* Mobile calendar adjustments */
+@media (max-width: 640px) {
+  .mina-scheduler-header {
+    @apply text-xs flex-wrap;
+  }
+  
+  .month-grid {
+    @apply grid grid-cols-7 gap-px;
+  }
+  
+  .month-day-cell {
+    @apply p-0.5 min-h-[60px];
+  }
+  
+  .calendar-panel {
+    @apply h-full overflow-y-auto;
+  }
+  
+  /* Week view adjustments */
+  .week-view-hour-cell {
+    @apply h-10 sm:h-12 md:h-14;
+  }
+  
+  /* Hour label text size */
+  .hour-label {
+    @apply text-[10px] sm:text-xs;
+  }
+  
+  /* Hide scrollbar but allow scrolling */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Add these at the bottom of your globals.css file */
+
+/* Calendar-specific styles */
+.calendar-tabs-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.calendar-tab-list {
+  padding: 0.25rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.calendar-tab {
+  font-size: 0.875rem;
+  padding: 0.375rem 0.75rem;
+}
+
+.calendar-panel {
+  flex: 1;
+  overflow: auto;
+  height: calc(100% - 40px);
+}
+
+/* Fix todo sidebar toggle button positioning */
+.todo-sidebar-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.todo-sidebar-toggle:hover {
+  background-color: #e8f5eb;
+}
+
+/* Ensure proper sidebar transition */
+.todo-sidebar {
+  transition: width 0.3s ease, transform 0.3s ease;
+}
+
+/* Proper height for calendar content */
+.calendar-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Ensure the calendar component takes up full height */
+.mina-scheduler-container {
+  height: 100% !important;
+  max-height: 100% !important;
+}
+
+/* Ensure the month view properly fills height */
+.month-grid-container {
+  height: calc(100% - 40px) !important;
+  overflow: auto;
+}
+
+/* Prevent nested scrolling issues */
+.calendar-panel {
+  height: calc(100% - 40px) !important; 
+  overflow: auto !important;
+  padding-bottom: 0 !important;
+}
+
+/* Ensure todo sidebar has proper height */
+@media (min-width: 768px) {
+  .todo-sidebar {
+    box-shadow: none !important;
+  }
+}
+
+/* Fix Day/Week/Month tab overflow issues */
+.calendar-tabs-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.calendar-tab-list {
+  display: flex;
+  padding: 0;
+  margin: 0;
+  background-color: white;
+  border-bottom: 1px solid #e5e7eb;
+  overflow: visible !important;
+}
+
+.calendar-tab {
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  border: none;
+  background: transparent;
+  color: #4b5563;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+
+.calendar-tab[data-state="active"] {
+  border-bottom: 2px solid #f97316;
+  color: #f97316;
+  font-weight: 500;
+}
+
+.calendar-panel {
+  flex: 1;
+  overflow: auto;
+  height: calc(100% - 40px) !important;
+  padding-bottom: 0 !important;
+}
+
+/* Todo sidebar transitions */
+.todo-sidebar {
+  transition: width 0.3s ease, opacity 0.2s ease;
+}
+
+
+/* Landing page styles */
+
+@keyframes bounce-slow {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-20px);
+  }
+}
+
+@keyframes bounce-delayed {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-15px);
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-10px) rotate(5deg);
+  }
+}
+
+.animate-bounce-slow {
+  animation: bounce-slow 3s infinite;
+}
+
+.animate-bounce-delayed {
+  animation: bounce-delayed 2.5s infinite;
+  animation-delay: 0.5s;
+}
+
+.animate-float {
+  animation: float 4s infinite;
+}

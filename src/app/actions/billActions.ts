@@ -28,6 +28,51 @@ interface RemoveBillFromClassesParams {
   classIds: string[]; // Empty array means remove from all classes
 }
 
+// Add calendar events for a bill
+async function createBillCalendarEvents(bill: any, students: any[]) {
+  try {
+    // Create the main calendar event for the bill
+    const mainEvent = await db.calendarEvent.create({
+      data: {
+        title: `Bill Due: ${bill.title}`,
+        description: `Amount: $${bill.amount.toFixed(2)}\n${bill.description || ''}`,
+        startDate: bill.dueDate, 
+        endDate: new Date(new Date(bill.dueDate).getTime() + 60 * 60 * 1000), // One hour duration
+        variant: "destructive", // Red for bills
+        isRecurring: bill.frequency !== "ONCE",
+        recurringDays: [], // Would need to extract recurring days based on frequency
+        createdById: bill.creatorId,
+        billId: bill.id
+      }
+    });
+
+    // Create calendar events for each student assigned to this bill
+    for (const student of students) {
+      await db.calendarEvent.create({
+        data: {
+          title: `Bill Due: ${bill.title}`,
+          description: `Amount: $${bill.amount.toFixed(2)}\n${bill.description || ''}`,
+          startDate: bill.dueDate,
+          endDate: new Date(new Date(bill.dueDate).getTime() + 60 * 60 * 1000),
+          variant: "destructive",
+          isRecurring: bill.frequency !== "ONCE",
+          recurringDays: [],
+          createdById: bill.creatorId,
+          billId: bill.id,
+          studentId: student.id,
+          parentEventId: mainEvent.id
+        }
+      });
+    }
+
+    return mainEvent;
+  } catch (error) {
+    console.error("Error creating bill calendar events:", error);
+    // Don't throw, just log the error as this is a secondary function
+    return null;
+  }
+}
+
 // Create Bill with class selection
 export async function createBill(formData: FormData): Promise<BillResponse> {
   try {
@@ -103,6 +148,9 @@ export async function createBill(formData: FormData): Promise<BillResponse> {
         }))
       });
     }
+
+    // Create calendar events for the bill
+    await createBillCalendarEvents(newBill, students);
 
     revalidatePath("/teacher/dashboard/bills");
     return { success: true, data: newBill };
@@ -565,6 +613,14 @@ export async function removeBillFromClasses({
         where: { billId }
       });
       
+      // Delete calendar events for this bill (except the main one for the teacher)
+      await db.calendarEvent.deleteMany({
+        where: {
+          billId,
+          studentId: { not: null } // Keep the teacher's main event
+        }
+      });
+      
       revalidatePath("/teacher/dashboard/bills");
       revalidatePath("/teacher/dashboard/classes");
       
@@ -613,6 +669,14 @@ export async function removeBillFromClasses({
             studentId: { in: studentIds }
           }
         });
+        
+        // Also delete calendar events for these students
+        await db.calendarEvent.deleteMany({
+          where: {
+            billId,
+            studentId: { in: studentIds }
+          }
+        });
       }
       
       revalidatePath("/teacher/dashboard/bills");
@@ -649,7 +713,12 @@ export async function deleteBill(id: string): Promise<BillResponse> {
       return { success: false, error: "Bill not found or you don't have permission to delete it" };
     }
 
-    // Delete the bill if it belongs to this user
+    // Delete associated calendar events first
+    await db.calendarEvent.deleteMany({
+      where: { billId: id }
+    });
+
+    // Then delete the bill
     await db.bill.delete({
       where: { id },
     });

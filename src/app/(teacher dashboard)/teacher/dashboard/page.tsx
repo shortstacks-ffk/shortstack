@@ -1,5 +1,4 @@
 import { getClasses } from "@/src/app/actions/classActions"
-import { getRandomColorClass } from "@/src/lib/colorUtils"
 import DashboardClient from "./DashboardClient"
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/src/lib/auth/config"
@@ -24,10 +23,7 @@ export default async function DashboardPage() {
     return <div>Failed to load classes</div>
   }
 
-  const classesWithColors = response.data.map((cls: { id: string }) => ({
-    ...cls,
-    colorClass: getRandomColorClass(cls.id)
-  }))
-
-  return <DashboardClient classes={classesWithColors} />
+  // No need to add random colors - use the color stored in the database
+  // The ClassCard component already handles default values for missing colors
+  return <DashboardClient classes={response.data} />
 }

@@ -1,143 +1,103 @@
 "use client"
-import SearchBar from "@/src/components/search-bar"
-import Notification from "@/src/components/notification"
-import { useSession, signOut } from "next-auth/react";
-import { DefaultSession } from "next-auth";
-import { redirect } from "next/navigation";
-import { useState, useEffect } from "react";
 
-import { Button } from "@/src/components/ui/button";
-import { ClassCard } from "@/src/components/class/ClassCard"
-import { Avatar, AvatarFallback, AvatarImage } from "@/src/components/ui/avatar";
+// Custom Components
+import { ClassCard } from "@/src/components/class/ClassCard";
 import DashboardAddClassCard from "@/src/components/class/dashboard-add-class-card";
-import UserDropdown from "./UserDropdown";
+import { PerformanceChart } from "@/src/components/dashboard/performance-chart";
+import { useSession } from "next-auth/react";
+
+interface ClassSession {
+  id: string;
+  dayOfWeek: number;  // 0 = Sunday, 1 = Monday, etc.
+  startTime: string;  // Format: HH:MM (24hr)
+  endTime: string;    // Format: HH:MM (24hr)
+}
 
 interface DashboardClientProps {
   classes: Array<{
-    id: string
-    name: string
-    code: string
-    emoji: string
-    colorClass: string
-    cadence?: string
-    day?: string
-    time?: string
-    grade?: string
-    backgroundColor: string
-    numberOfStudents?: number
+    id: string;
+    name: string;
+    code: string;
+    emoji: string;
+    color?: string;
+    grade?: string;
+    overview?: string;
+    classSessions?: ClassSession[];
+    students?: { id: string }[];
   }>
 }
+
 declare module "next-auth" {
   interface User {
     id: string;
     firstName?: string;
     lastName?: string;
-    role: "TEACHER" | "STUDENT";
+    role: "TEACHER" | "STUDENT" | "SUPER";
   }
 }
 
+const DaysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
 const DashboardClient = ({ classes }: DashboardClientProps) => {
-
-
-  const { data: session, status } = useSession({
+  const { data: session } = useSession({
     required: true,
-    // onUnauthenticated() {
-    //   redirect("/teacher");
-    // },
   });
+  
+  // Get the number of students for each class
+  const classesWithCounts = classes.map(cls => ({
+    ...cls,
+    numberOfStudents: cls.students?.length || 0
+  }));
 
+  // Limit the displayed classes to 3 maximum
+  const displayedClasses = classesWithCounts.slice(0, 3);
 
-  // For debugging - add this inside your component (but not in render)
-  useEffect(() => {
-    if (session) {
-      console.log(
-        "Session data:",
-        JSON.stringify(
-          {
-            id: session.user.id,
-            email: session.user.email,
-            role: session.user.role,
-            name: session.user.name,
-          },
-          null,
-          2
-        )
-      );
-    }
-  }, [session]);
-
-
-   // Check for teacher role
-  //  if (session?.user?.role !== "TEACHER") {
-  //   redirect("/student/dashboard");
-  // }
-
-  // Get teacher info for avatar
-  const teacherName =
-    session?.user?.name ||
-    `${session?.user?.firstName || ""} ${session?.user?.lastName || ""}`.trim() ||
-    "Teacher";
-  const teacherInitial = teacherName.charAt(0);
-  const teacherImage = session?.user?.image;
-
-
-  const handleLogout = async () => {
-    await signOut({ redirect: true, callbackUrl: "/teacher" });
-    // Optionally, you can clear any local state or perform other cleanup here  
-    redirect("/teacher");
+  // Format class sessions into a readable schedule string
+  const formatClassSchedule = (sessions?: ClassSession[]) => {
+    if (!sessions || sessions.length === 0) return null;
+    
+    return sessions.map(session => {
+      const day = DaysOfWeek[session.dayOfWeek];
+      return `${day} ${session.startTime}-${session.endTime}`;
+    }).join(', ');
   };
 
-  const getColumnColor = (index: number) => {
-    switch (index % 3) {
-      case 0:
-        return "bg-green-500";
-      case 1:
-        return "bg-orange-500";
-      case 2:
-        return "bg-pink-500";
-      default:
-        return "bg-blue-500";
-    }
-  };
   return (
-    <>
-      <header className="flex h-10 shrink-0 items-center gap-2 bg-background">
-        <div className="flex flex-1 items-center gap-2 px-3 rounded-half mx-auto bg-muted/50 pt-8 pl-8">
-          <SearchBar />
-          <Notification />
-          <UserDropdown
-            teacherImage={teacherImage || ""}
-            teacherInitial={teacherInitial}
-            teacherName={teacherName}
-            onLogout={handleLogout}
-          />
-        </div>
-      </header>
-      <main className="flex flex-col p-4 h-[80vh]">
-        <h1 className="text-2xl font-semibold my-4 py-4">Most Recent</h1>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-          {classes.map((cls, index) => (
-            <ClassCard
-              key={cls.id}
-              id={cls.id}
-              emoji={cls.emoji}
-              name={cls.name}
-              code={cls.code}
-              backgroundColor={getColumnColor(index)}
-              cadence={cls.cadence}
-              day={cls.day}
-              time={cls.time}
-              grade={cls.grade}
-            />
-          ))}
-          {classes.length < 3 && <DashboardAddClassCard />}
-        </div>
-        <h1 className="text-2xl font-semibold py-4">Performance</h1>
-        <div className="flex gap-4">
-          <div className="h-[40vh] w-[60vw] rounded-xl bg-muted/50"></div>
-        </div>
-      </main>
-    </>
+    <div className="w-full">
+      <div className="w-full">
+        <section className="mb-6 md:mb-8">
+          <h2 className="text-xl md:text-2xl font-semibold mb-3 md:mb-4 px-1">Recent Classes</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+            {displayedClasses.map((cls) => (
+              <ClassCard
+                key={cls.id}
+                id={cls.id}
+                emoji={cls.emoji}
+                name={cls.name}
+                code={cls.code}
+                color={cls.color || "primary"}
+                grade={cls.grade}
+                numberOfStudents={cls.numberOfStudents}
+                schedule={formatClassSchedule(cls.classSessions)}
+                overview={cls.overview}
+              />
+            ))}
+            {displayedClasses.length < 3 && <DashboardAddClassCard />}
+          </div>
+        </section>
+
+        <section>
+          <h2 className="text-xl md:text-2xl font-semibold mb-3 md:mb-4 px-1">Performance Overview</h2>
+          <div className="w-full">
+            <div className="rounded-xl p-2 sm:p-3 md:p-5 bg-card border shadow-sm">
+              <PerformanceChart 
+                recentClasses={classesWithCounts.slice(0, Math.min(3, classesWithCounts.length))}
+              />
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
   )
 }
 

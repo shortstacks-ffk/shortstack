@@ -4,29 +4,20 @@ import { Suspense } from "react";
 import AddAnything from "@/src/components/AddAnything";
 import AddBill from "@/src/components/bills/AddBill";
 
-interface BillClass {
-  id: string;
-  name: string;
-  emoji?: string;
-  code?: string;
-}
+export const dynamic = 'force-dynamic';
 
 // Bills content component to handle data fetching
 async function BillsContent() {
-  // Get bills with includeUnassigned=true to get all bills created by the user
   const response = await getBills({ includeUnassigned: true });
 
   if (!response.success || !response.data) {
     return <div className="text-center py-8 opacity-0">No bills found</div>;
   }
 
-  // Sort the bills
   const sortedBills = [...response.data].sort((a, b) => {
-    // First compare by frequency
     if (a.frequency !== "ONCE" && b.frequency === "ONCE") return -1;
     if (a.frequency === "ONCE" && b.frequency !== "ONCE") return 1;
 
-    // If frequencies are the same, sort by due date
     const dateA = new Date(a.dueDate).getTime();
     const dateB = new Date(b.dueDate).getTime();
     return dateA - dateB;
@@ -42,7 +33,7 @@ async function BillsContent() {
   };
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
       {sortedBills.map((bill, index) => (
         <BillCard
           key={bill.id}
@@ -55,7 +46,7 @@ async function BillsContent() {
           status={bill.status}
           description={bill.description || ""}
           backgroundColor={getColumnColor(index)}
-          classes={bill.class} // Use class instead of classes
+          classes={bill.class}
         />
       ))}
       
@@ -70,12 +61,10 @@ async function BillsContent() {
 // Main page component
 export default function BillsPage() {
   return (
-    <main className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-8">Bills</h1>
-      
-      <Suspense fallback={<div className="text-center py-8">Loading bills...</div>}>
+    <div className="w-full">
+      <Suspense fallback={<div className="text-center py-4">Loading bills...</div>}>
         <BillsContent />
       </Suspense>
-    </main>
+    </div>
   );
 }

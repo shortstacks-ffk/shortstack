@@ -4,7 +4,6 @@ import { db } from "@/src/lib/db";
 import { revalidatePath } from "next/cache";
 import { getAuthSession } from "@/src/lib/auth";
 import * as bcrypt from 'bcryptjs';
-import { sendStudentInvitation } from "@/src/lib/email";
 import { generateAccountNumber } from "@/src/lib/utils";
 import { setupBankAccountsForStudent } from "@/src/lib/banking";
 
@@ -202,32 +201,39 @@ export async function createStudent(formData: FormData, classCode: string) {
       // Continue with the process even if enrollment fails
     }
 
-    // Send invitation email with appropriate message based on whether student is new or existing
-    const isNewStudent = student.createdAt > new Date(Date.now() - 5000); // Created within last 5 seconds
+    // Send invitation email using our API
+    const isNewStudent = student.createdAt > new Date(Date.now() - 5000);
+    
     try {
-      await sendStudentInvitation({
-        to: schoolEmail,
-        subject: `Your Class Invitation for ${classData.name}`,
-        text: isNewStudent 
-          ? `Hello ${firstName} ${lastName},
-
-You have been added to ${classData.name} by your teacher.
-Use the following credentials to log in:
-
-Email: ${schoolEmail}
-Password: ${finalPassword}
-Class Code: ${classCode}
-
-Please log in and join the class using the provided code.`
-          : `Hello ${firstName} ${lastName},
-
-You have been added to a new class: ${classData.name}.
-Use your existing login credentials to access the class.
-
-Class Code: ${classCode}
-
-Please log in and join the class using the provided code.`
+      // Use direct fetch to our email API endpoint
+      const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          to: schoolEmail,
+          firstName,
+          lastName,
+          className: classData.name,
+          classCode,
+          email: schoolEmail,
+          password: isNewStudent ? finalPassword : undefined,
+          isNewStudent
+        }),
       });
+      
+      const result = await response.json();
+      
+      if (!result.success) {
+        console.error("Email API error:", result.error);
+        revalidatePath(`/teacher/dashboard/classes/${classCode}`);
+        return { 
+          success: true, 
+          data: { student, enrollment: true },
+          warning: "Student was added but the invitation email couldn't be sent. Please provide login details manually."
+        };
+      }
     } catch (emailError) {
       console.error("Failed to send invitation email:", emailError);
       // Continue with enrollment even if email fails
@@ -312,20 +318,35 @@ export async function addExistingStudentToClass(studentId: string, classCode: st
       }
     });
 
-    // Send notification email to the student
+    // Send notification email using our API
     try {
-      await sendStudentInvitation({
-        to: student.schoolEmail,
-        subject: `You've Been Added to ${classData.name}`,
-        text: `Hello ${student.firstName} ${student.lastName},
-
-You have been added to a new class: ${classData.name}.
-Use your existing login credentials to access the class.
-
-Class Code: ${classCode}
-
-Please log in and join the class using the provided code.`
+      const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          to: student.schoolEmail,
+          firstName: student.firstName,
+          lastName: student.lastName,
+          className: classData.name,
+          classCode,
+          email: student.schoolEmail,
+          isNewStudent: false
+        }),
       });
+      
+      const result = await response.json();
+      
+      if (!result.success) {
+        console.error("Email API error:", result.error);
+        revalidatePath(`/dashboard/classes/${classCode}`);
+        return { 
+          success: true, 
+          data: enrollment,
+          warning: "Student was added but the notification email couldn't be sent. Please notify them manually."
+        };
+      }
     } catch (emailError) {
       console.error("Failed to send class addition email:", emailError);
       // Continue even if email fails
@@ -470,26 +491,12 @@ export async function updateStudent(formData: FormData, classCode: string, stude
     if (!session?.user?.id || session.user.role !== "TEACHER") {
       return { success: false, error: "Unauthorized" };
     }
-
-    // Find the class by code
-    const classData = await db.class.findUnique({ 
-      where: { code: classCode },
-      select: { id: true, userId: true }
-    });
     
-    if (!classData) {
-      return { success: false, error: "Class not found" };
-    }
-    
-    // Verify the teacher owns this class
-    if (classData.userId !== session.user.id) {
-      return { success: false, error: "You don't have permission to access this class" };
-    }
-
     // Extract fields from form data
     const firstName = formData.get('firstName')?.toString().trim();
     const lastName = formData.get('lastName')?.toString().trim();
     const schoolEmail = formData.get('schoolEmail')?.toString().trim();
+    const password = formData.get('password')?.toString().trim();
     
     // Validate fields
     if (!firstName || !lastName || !schoolEmail) {
@@ -508,15 +515,62 @@ export async function updateStudent(formData: FormData, classCode: string, stude
       return { success: false, error: "Email is already in use by another student" };
     }
     
+    // Prepare update data
+    const updateData: any = {
+      firstName,
+      lastName,
+      schoolEmail,
+    };
+
+    // Only hash and update password if provided
+    if (password) {
+      const hashedPassword = await bcrypt.hash(password, 10);
+      updateData.password = hashedPassword;
+    }
+    
     // Update the student
     const updatedStudent = await db.student.update({
       where: { id: studentId },
-      data: {
-        firstName,
-        lastName,
-        schoolEmail,
-      }
+      data: updateData
     });
+
+    // Find the class name for the email
+    const classDetails = await db.class.findUnique({
+      where: { code: classCode },
+      select: { name: true }
+    });
+    
+    // Send email notification if password was updated
+    if (password) {
+      try {
+        // THIS IS THE CRITICAL PART THAT NEEDS FIXING:
+        const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/email`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            to: schoolEmail,
+            firstName,
+            lastName,
+            className: classDetails?.name || "your class",
+            classCode,
+            email: schoolEmail,
+            password: password, // Include the new password
+            isNewStudent: false, // IMPORTANT: This must be false
+            isPasswordReset: true  // IMPORTANT: This must be true
+          }),
+        });
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+          console.error("Email API error:", result.error);
+        }
+      } catch (emailError) {
+        console.error("Failed to send password update email:", emailError);
+      }
+    }
     
     revalidatePath(`/dashboard/classes/${classCode}`);
     return { success: true, data: updatedStudent };
@@ -656,5 +710,97 @@ export async function createStudentBankAccounts(studentId: string) {
   } catch (error) {
     console.error("Error creating bank accounts:", error);
     return { success: false, error: "Failed to create bank accounts" };
+  }
+}
+
+// Get all classes that a student has joined with full details
+export async function getStudentClasses() {
+  try {
+    const session = await getAuthSession();
+    if (!session?.user?.id) {
+      return { success: false, error: "Not authenticated" };
+    }
+    
+    if (session.user.role !== "STUDENT") {
+      return { success: false, error: "Unauthorized: Student role required" };
+    }
+
+    // Try multiple ways to find the student profile
+    let student = await db.student.findUnique({
+      where: {
+        userId: session.user.id
+      },
+      select: { id: true }
+    });
+    
+    // If not found by userId, try finding by the email
+    if (!student && session.user.email) {
+      student = await db.student.findFirst({
+        where: { 
+          schoolEmail: session.user.email 
+        },
+        select: { id: true }
+      });
+    }
+    
+    // If still not found, try directly by ID as a last resort
+    if (!student) {
+      student = await db.student.findUnique({
+        where: { id: session.user.id },
+        select: { id: true }
+      });
+    }
+
+    if (!student) {
+      console.error(`Student profile not found for user ${session.user.id} with email ${session.user.email}`);
+      return { success: false, error: "Student profile not found" };
+    }
+
+    // Get all classes the student is enrolled in
+    const enrolledClasses = await db.enrollment.findMany({
+      where: {
+        studentId: student.id,
+        enrolled: true // Only get classes where the student is actively enrolled
+      },
+      select: {
+        class: {
+          include: {
+            classSessions: true,
+            _count: {
+              select: { 
+                enrollments: {
+                  where: { enrolled: true }
+                } 
+              }
+            }
+          }
+        }
+      }
+    });
+
+    // Format the classes for easier consumption in the frontend
+    const classes = enrolledClasses.map(enrollment => {
+      const classData = enrollment.class;
+      return {
+        id: classData.id,
+        name: classData.name,
+        code: classData.code,
+        emoji: classData.emoji,
+        color: classData.color,
+        grade: classData.grade,
+        classSessions: classData.classSessions,
+        _count: classData._count,
+        createdAt: classData.createdAt.toISOString(),
+        overview: classData.overview,
+      };
+    });
+
+    return { success: true, data: classes };
+  } catch (error) {
+    console.error("Get student classes error:", error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : "Failed to fetch student classes" 
+    };
   }
 }

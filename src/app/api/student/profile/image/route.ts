@@ -2,74 +2,82 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/src/lib/auth/config";
 import { db } from "@/src/lib/db";
-import { writeFile } from 'fs/promises';
-import { join } from 'path';
-import { v4 as uuidv4 } from 'uuid';
-
-// You need to install uuid: npm install uuid @types/uuid
+import { put } from "@vercel/blob";
 
 export async function POST(request: Request) {
   try {
-    // Get session from NextAuth
     const session = await getServerSession(authOptions);
-    
-    if (!session?.user || session.user.role !== "STUDENT") {
+
+    if (!session?.user?.id || session.user.role !== "STUDENT") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Get student ID from session
-    const studentId = session.user.id;
-    
-    // Parse form data
+    // Find the student record
+    const student = await db.student.findFirst({
+      where: { 
+        OR: [
+          { userId: session.user.id },
+          ...(session.user.email ? [{ schoolEmail: session.user.email }] : [])
+        ]
+      }
+    });
+
+    if (!student) {
+      return NextResponse.json({ error: "Student profile not found" }, { status: 404 });
+    }
+
+    // Process form data
     const formData = await request.formData();
-    const file = formData.get('profileImage') as File;
+    const file = formData.get('file') as File;
 
     if (!file) {
-      return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
+      return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
-    // Check file type
-    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-    if (!validTypes.includes(file.type)) {
-      return NextResponse.json({ error: "Invalid file type" }, { status: 400 });
+    // Validate file (type and size)
+    if (!file.type.startsWith('image/')) {
+      return NextResponse.json({ error: "File must be an image" }, { status: 400 });
     }
 
-    // Check file size (5MB max)
-    if (file.size > 5 * 1024 * 1024) {
-      return NextResponse.json({ error: "File too large" }, { status: 400 });
+    if (file.size > 5 * 1024 * 1024) { // 5MB limit
+      return NextResponse.json({ error: "File too large (max 5MB)" }, { status: 400 });
     }
 
-    // Create a unique filename
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    const fileName = `${uuidv4()}-${file.name.replace(/\s/g, '_')}`;
+    console.log("Student profile image upload - starting process");
     
-    // Define path to save image
-    // For production, you'd likely want to use a cloud storage solution
-    // This is a simple local storage example - in production use S3/Cloudinary/etc.
-    const path = join(process.cwd(), 'public/uploads', fileName);
-    
-    // Write file
-    await writeFile(path, buffer);
-    
-    // URL path for the image
-    const imageUrl = `/uploads/${fileName}`;
-    
-    // Update user profile in the database
+    // Upload to Vercel Blob
+    const blob = await put(`student-profiles/${student.id}/${Date.now()}-${file.name.replace(/\s/g, '-')}`, file, {
+      access: 'public',
+      contentType: file.type
+    });
+
+    console.log("Blob upload successful:", blob.url);
+
+    // Update student profile with new image URL
     await db.student.update({
-      where: { id: studentId },
-      data: { profileImage: imageUrl }
+      where: { id: student.id },
+      data: { profileImage: blob.url }
     });
 
-    return NextResponse.json({ 
-      success: true, 
-      imageUrl: imageUrl 
+    // Update session if user record exists
+    if (student.userId) {
+      await db.user.update({
+        where: { id: student.userId },
+        data: { image: blob.url }
+      });
+    }
+
+    console.log("Database updated with new image URL");
+
+    return NextResponse.json({
+      success: true,
+      imageUrl: blob.url,
+      message: "Profile image updated successfully"
     });
-    
   } catch (error) {
     console.error("Error uploading profile image:", error);
     return NextResponse.json(
-      { error: "Failed to upload image" },
+      { error: "Failed to upload profile image" },
       { status: 500 }
     );
   }

@@ -1,22 +1,13 @@
 "use client"
 
 import * as React from "react"
-import {
-  Calendar,
-  Home,
-  Search,
-  LogOut,
-  NotebookPen, 
-  CreditCard, 
-  ReceiptText, 
-  Store, 
-  BookOpenCheck,
-  Settings,
-  ChevronLeft
-} from "lucide-react"
+import { signOut } from "next-auth/react"
+import { toast } from "sonner"
+import { useRouter } from "next/navigation"
 
 import { NavMain } from "@/src/components/nav-main"
 import { NavLogo } from "@/src/components/nav-logo"
+import { dashboardData } from "@/src/lib/constants/nav-data"
 
 import {
   Sidebar,
@@ -27,75 +18,34 @@ import {
   SidebarTrigger,
 } from "@/src/components/ui/sidebar"
 
-import mascot from '../../public/assets/img/Mascout 9ldpi.png'
-import simple_logo from '../../public/assets/img/logo simple - greenldpi.png'
-
-const data = {
-  dashLogo: [{
-         
-    title: simple_logo,
-    url: "/dashboard",
-    icon: mascot,
-  }
-  ],
-  navMain: [
-    {
-      title: "Home",
-      url: "/teacher/dashboard",
-      icon: Home,
-    },
-    // {
-    //   title: "Search",
-    //   url: "#",
-    //   icon: Search,
-    // },  
-    {
-      title: "Classes",
-      url: "/teacher/dashboard/classes",
-      icon: NotebookPen,
-    },
-    {
-      title: "Calendar",
-      url: "/teacher/dashboard/calendar",
-      icon: Calendar,
-    },
-    {
-      title: "Bank Accounts",
-      url: "/teacher/dashboard/bank-accounts",
-      icon: CreditCard ,
-    },
-    {
-      title: "Bills",
-      url: "/teacher/dashboard/bills",
-      icon: ReceiptText,
-    },
-    {
-      title: "Storefront",
-      url: "/teacher/dashboard/storefront",
-      icon: Store,
-    },
-    {
-      title: "Lesson Plans",
-      url: "/teacher/dashboard/lesson-plans",
-      icon: BookOpenCheck,
-    },
-    
-  ],
-}
-
 export function SidebarLeft({
   ...props
 }: React.ComponentProps<typeof Sidebar>) {
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    try {
+      await signOut({ redirect: false });
+      router.push('/teacher');
+      toast.success("Logged out successfully");
+    } catch (error) {
+      console.error("Logout error:", error);
+      toast.error("Failed to log out");
+    }
+  };
+
   return (
-    <Sidebar collapsible="icon" className="border-r-0" {...props}>
+    <Sidebar collapsible="icon" className="border-r-0 bg-[#f1faf3]" {...props}>
       <SidebarHeader className="items-center mb-4">
-        <NavLogo items={data.dashLogo} />
+        <NavLogo items={dashboardData.dashLogo} />
       </SidebarHeader>
-      <SidebarContent className="pl-4 pt-10 mb-4">
-        <NavMain items={data.navMain} />
+      <SidebarContent className="pl-4 pt-10 mb-4 flex flex-col">
+        <div className="space-y-6">
+          <NavMain items={dashboardData.navMain} />
+        </div>
       </SidebarContent>
       <SidebarFooter>
-      <SidebarTrigger />
+        <SidebarTrigger />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

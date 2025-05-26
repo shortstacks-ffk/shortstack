@@ -1,144 +1,204 @@
-'use client'
+"use client"
 
-import { Button } from "@/src/components/ui/button"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/src/components/ui/dialog"
-import { Input } from "@/src/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/src/components/ui/select"
-import { updateClass } from "@/src/app/actions/classActions"
 import { useState } from "react"
-import { EmojiPickerButton } from "@/src/components/ui/emoji-picker-button";
+import { Button } from "@/src/components/ui/button"
+import { Input } from "@/src/components/ui/input"
+import { Label } from "@/src/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/src/components/ui/select"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/src/components/ui/dialog"
+import { updateClass } from "@/src/app/actions/classActions"
+import { toast } from "react-toastify"
+import { EmojiPickerButton } from "@/src/components/ui/emoji-picker-button"
+import { ColorDropdown } from "@/src/components/ui/color-dropdown"
+import ClassScheduleForm from "./ClassScheduleForm"
+
+interface ClassScheduleItem {
+  days: number[];
+  startTime: string;
+  endTime: string;
+}
+
+interface ClassData {
+  id: string
+  name: string
+  emoji: string
+  color?: string
+  cadence?: string
+  grade?: string
+  classSessions?: any[]
+}
 
 interface EditClassFormProps {
   isOpen: boolean
   onClose: () => void
-  classData: {
-    id: string
-    name: string
-    emoji: string
-    cadence?: string
-    day?: string
-    time?: string
-    grade?: string
-  }
+  classData: ClassData
 }
 
 export function EditClassForm({ isOpen, onClose, classData }: EditClassFormProps) {
-  const [formData, setFormData] = useState({
-    name: classData.name,
-    emoji: classData.emoji,
-    cadence: classData.cadence || '',
-    day: classData.day || '',
-    time: classData.time || '',
-    grade: classData.grade || '',
-  })
+  const [name, setName] = useState(classData.name)
+  const [emoji, setEmoji] = useState(classData.emoji)
+  const [cadence, setCadence] = useState(classData.cadence || "Weekly")
+  const [grade, setGrade] = useState(classData.grade || "9th")
+  const [color, setColor] = useState(classData.color || "primary")
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  
+  // Initialize schedules from class sessions if available, or use default
+  const defaultSchedule = [{ days: [1], startTime: "09:00", endTime: "10:00" }];
+  const [schedules, setSchedules] = useState<ClassScheduleItem[]>(
+    classData.classSessions?.map(session => ({
+      days: [session.dayOfWeek],
+      startTime: session.startTime,
+      endTime: session.endTime
+    })) || defaultSchedule
+  );
 
-  const handleUpdate = async () => {
-    // Extract only valid fields to send to the server
-    const validFormData = {
-      name: formData.name,
-      emoji: formData.emoji,
-      cadence: formData.cadence,
-      day: formData.day,
-      time: formData.time,
-      grade: formData.grade,
-    };
+  const handleScheduleChange = (newSchedules: ClassScheduleItem[]) => {
+    setSchedules(newSchedules);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
     
-    const result = await updateClass(classData.id, validFormData);
-    if (result.success) {
-      onClose();
+    try {
+      const result = await updateClass(classData.id, {
+        name,
+        emoji,
+        cadence,
+        grade,
+        color,
+        schedule: {
+          days: schedules.flatMap(s => s.days),
+          startTime: schedules[0]?.startTime || "09:00",
+          endTime: schedules[0]?.endTime || "10:00"
+        }
+      });
+
+      if (!result.success) {
+        toast.error(result.error || "Failed to update class");
+      } else {
+        onClose();
+        setTimeout(() => {
+          toast.success("Class updated successfully");
+        }, 100);
+      }
+    } catch (error) {
+      console.error("Update class error:", error);
+      toast.error("Failed to update class");
+    } finally {
+      setIsSubmitting(false);
     }
-  }
+  };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Update Class</DialogTitle>
+    <Dialog 
+      open={isOpen} 
+      onOpenChange={(open) => {
+        // Only allow closing if we're not submitting
+        if (!isSubmitting && !open) {
+          onClose();
+        }
+      }}
+    >
+      <DialogContent className="max-w-4xl p-4">
+        <DialogHeader className="mb-2">
+          <DialogTitle>Edit Class</DialogTitle>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid gap-2">
-            <label htmlFor="name">Class Name</label>
-            <Input
-              id="name"
-              placeholder="Class Name"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            />
-          </div>
+        
+        <form onSubmit={handleSubmit} className="space-y-3">
+          {/* Top section - Name, Emoji, Color */}
+          <div className="grid grid-cols-3 gap-2">
+            <div className="space-y-1">
+              <Label htmlFor="name">Class Name</Label>
+              <Input
+                id="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                className="h-9"
+              />
+            </div>
 
-          <div className="grid gap-2">
-            <label htmlFor="emoji">Class Emoji</label>
-            <EmojiPickerButton 
-              value={formData.emoji}
-              onChange={(emoji) => setFormData({ ...formData, emoji })}
-              className="w-full text-2xl h-10"
-            />
+            <div className="space-y-1">
+              <Label>Class Emoji</Label>
+              <EmojiPickerButton 
+                value={emoji}
+                onChange={setEmoji}
+                className="w-full text-2xl h-9"
+              />
+            </div>
+            
+            <div className="space-y-1">
+              <Label>Class Color</Label>
+              <ColorDropdown 
+                value={color}
+                onChange={setColor}
+              />
+            </div>
           </div>
+          
+          {/* Middle section - Cadence, Grade */}
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <Label htmlFor="cadence">Cadence</Label>
+              <Select value={cadence} onValueChange={setCadence}>
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Select cadence" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Daily">Daily</SelectItem>
+                  <SelectItem value="Weekly">Weekly</SelectItem>
+                  <SelectItem value="Biweekly">Biweekly</SelectItem>
+                  <SelectItem value="Monthly">Monthly</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-          <div className="grid gap-2">
-            <label>Cadence</label>
-            <Select
-              value={formData.cadence}
-              onValueChange={(value) => setFormData({ ...formData, cadence: value })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select cadence" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="weekly">Weekly</SelectItem>
-                <SelectItem value="biweekly">Bi-weekly</SelectItem>
-                <SelectItem value="monthly">Monthly</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="grid gap-2">
-            <label>Day</label>
-            <Select
-              value={formData.day}
-              onValueChange={(value) => setFormData({ ...formData, day: value })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select day" />
-              </SelectTrigger>
-              <SelectContent>
-                {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => (
-                  <SelectItem key={day.toLowerCase()} value={day.toLowerCase()}>{day}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="grid gap-2">
-            <label htmlFor="time">Time</label>
-            <Input
-              id="time"
-              type="time"
-              value={formData.time}
-              onChange={(e) => setFormData({ ...formData, time: e.target.value })}
-            />
-          </div>
-
-          <div className="space-y-2">
-              <label htmlFor="grade">Grade</label>
-              <Select name="grade" defaultValue="9th">
-                <SelectTrigger>
+            <div className="space-y-1">
+              <Label htmlFor="grade">Grade</Label>
+              <Select value={grade} onValueChange={setGrade}>
+                <SelectTrigger className="h-9">
                   <SelectValue placeholder="Select grade" />
                 </SelectTrigger>
                 <SelectContent>
-                  {["9th", "10th", "11th", "12th"].map((grade) => (
-                    <SelectItem key={grade} value={grade}>
-                      {grade} Grade
+                  {["9th", "10th", "11th", "12th"].map((g) => (
+                    <SelectItem key={g} value={g}>
+                      {g} Grade
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-        </div>
-        <div className="flex justify-end gap-4">
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleUpdate}>Update Class</Button>
-        </div>
+          </div>
+
+          {/* Schedule section */}
+          <div className="space-y-1 pt-1">
+            <Label>Class Schedule</Label>
+            <ClassScheduleForm 
+              value={schedules}
+              onChange={handleScheduleChange}
+            />
+          </div>
+
+          <DialogFooter className="mt-4 pt-2 border-t">
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={onClose} 
+              size="sm"
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button 
+              type="submit" 
+              size="sm"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? "Updating..." : "Update Class"}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   )

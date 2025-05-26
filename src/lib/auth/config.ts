@@ -52,12 +52,12 @@ export const authOptions: NextAuthOptions = {
 
           if (isValid) {
             return {
-              id: user.id,
-              email: user.email,
-              name: user.name,
-              role: user.role,
-              image: user.image,
-            };
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role as "TEACHER" | "STUDENT" | "SUPER", // Cast to expected role type
+    image: user.image,
+  };
           }
         }
         

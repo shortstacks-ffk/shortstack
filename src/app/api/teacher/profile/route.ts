@@ -9,30 +9,13 @@ export async function GET(req: Request) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session?.user?.email) {
-      return NextResponse.json(
-        { error: "Not authenticated" },
-        { status: 401 }
-      );
-    }
-
-    if (session.user.role !== "TEACHER") {
-      return NextResponse.json(
-        { error: "Unauthorized. Teachers only." },
-        { status: 403 }
-      );
+    if (!session?.user?.id || session.user.role !== "TEACHER") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const user = await db.user.findUnique({
-      where: { email: session.user.email },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        firstName: true,
-        lastName: true,
-        image: true,
-        role: true,
+      where: { id: session.user.id },
+      include: {
         teacherProfile: true,
       },
     });
@@ -41,13 +24,21 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    return NextResponse.json(user);
+    // Return the user and teacherProfile fields
+    return NextResponse.json({
+      id: user.id,
+      firstName: user.name?.split(" ")[0] || "",
+      lastName: user.name?.split(" ")[1] || "",
+      email: user.email,
+      image: user.image,
+      teacherProfile: user.teacherProfile,
+      // Include any teacher specific fields here
+      institution: user.teacherProfile?.institution,
+      bio: user.teacherProfile?.bio,
+    });
   } catch (error) {
-    console.error("Profile fetch error:", error);
-    return NextResponse.json(
-      { error: "Error fetching profile" },
-      { status: 500 }
-    );
+    console.error("Error fetching teacher profile:", error);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
 
@@ -70,7 +61,7 @@ export async function PUT(req: Request) {
       );
     }
 
-    const { firstName, lastName, currentPassword, newPassword } = await req.json();
+    const { firstName, lastName, institution, bio, currentPassword, newPassword } = await req.json();
 
     const user = await db.user.findUnique({
       where: { email: session.user.email },
@@ -87,13 +78,24 @@ export async function PUT(req: Request) {
 
     if (firstName) {
       updateData.firstName = firstName;
+      updateData.name = `${firstName} ${lastName || user.lastName || ''}`;
       updateProfileData.firstName = firstName;
     }
+
     if (lastName) {
       updateData.lastName = lastName;
+      updateData.name = `${user.firstName || firstName || ''} ${lastName}`;
       updateProfileData.lastName = lastName;
     }
-    if (firstName && lastName) updateData.name = `${firstName} ${lastName}`;
+
+    // Add these lines to handle the new fields
+    if (institution !== undefined) {
+      updateProfileData.institution = institution;
+    }
+
+    if (bio !== undefined) {
+      updateProfileData.bio = bio;
+    }
 
     // If password change requested
     if (currentPassword && newPassword) {

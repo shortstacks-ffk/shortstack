@@ -1,18 +1,32 @@
 'use server';
 
-import { db } from '@/src/lib/db';
-import { getAuthSession } from '@/src/lib/auth';
-import { revalidatePath } from 'next/cache';
+import { db } from "@/src/lib/db";
+import { getAuthSession } from "@/src/lib/auth";
+import { revalidatePath } from "next/cache";
+import { Prisma } from '@prisma/client';
 
+// Type definitions
 interface AssignmentData {
   name: string;
   activity?: string;
-  dueDate?: Date;
+  dueDate?: string | Date;
   classId: string;
   lessonPlanIds?: string[];
-  url?: string;       // Added for file URL
-  fileType?: string;  // Added for file type
-  size?: number;      // Added for file size
+  url?: string;
+  fileType?: string;
+  size?: number;
+}
+
+interface CopyAssignmentParams {
+  sourceAssignmentId: string;
+  targetLessonPlanId: string;
+  targetClassId: string;
+}
+
+interface GradeSubmissionParams {
+  submissionId: string;
+  grade: number;
+  feedback?: string;
 }
 
 interface AssignmentResponse {
@@ -21,7 +35,50 @@ interface AssignmentResponse {
   error?: string;
 }
 
-// Create an assignment using the required fields.
+// Add calendar events for an assignment
+async function createAssignmentCalendarEvents(assignment: any, classInfo: any): Promise<void> {
+  const mainEvent = await db.calendarEvent.create({
+    data: {
+      title: `Assignment Due: ${assignment.name}`,
+      description: assignment.activity || 'Assignment due',
+      startDate: assignment.dueDate,
+      endDate: new Date(new Date(assignment.dueDate).getTime() + 60 * 60 * 1000), // One hour duration
+      isRecurring: false,
+      createdById: classInfo.userId, // Teacher's ID
+      assignmentId: assignment.id,
+      classId: classInfo.id,
+      variant: "warning" // Assignments are marked as warning color
+    }
+  });
+
+  // Get all enrolled students for this class
+  const enrolledStudents = await db.enrollment.findMany({
+    where: {
+      classId: classInfo.id,
+      enrolled: true
+    }
+  });
+
+  // Create calendar events for each enrolled student
+  for (const enrollment of enrolledStudents) {
+    await db.calendarEvent.create({
+      data: {
+        title: `Assignment Due: ${assignment.name}`,
+        description: assignment.activity || 'Assignment due',
+        startDate: assignment.dueDate,
+        endDate: new Date(new Date(assignment.dueDate).getTime() + 60 * 60 * 1000),
+        isRecurring: false,
+        assignmentId: assignment.id,
+        studentId: enrollment.studentId,
+        parentEventId: mainEvent.id,
+        createdById: classInfo.userId, // Add the teacher's ID as creator
+        variant: "warning"
+      }
+    });
+  }
+}
+
+// Create an assignment using the required fields
 export async function createAssignment(data: AssignmentData): Promise<AssignmentResponse> {
   try {
     console.log("Starting assignment creation...");
@@ -40,7 +97,7 @@ export async function createAssignment(data: AssignmentData): Promise<Assignment
         code: data.classId, // Use code for lookup
         userId: session.user.id
       },
-      select: { id: true, code: true }
+      select: { id: true, code: true, userId: true }
     });
     
     if (!classObj) {
@@ -50,12 +107,11 @@ export async function createAssignment(data: AssignmentData): Promise<Assignment
     console.log('Class found with code:', classObj.code, 'and ID:', classObj.id);
     
     // Create assignment using class CODE as the classId (not the internal ID)
-    // This is critical because your schema expects classId to reference the code field
     const createdAssignment = await db.assignment.create({
       data: {
         name: data.name,
         activity: data.activity,
-        dueDate: data.dueDate,
+        dueDate: data.dueDate ? new Date(data.dueDate) : undefined,
         classId: classObj.code, // Use the class CODE, not the id
         url: data.url || '', 
         fileType: data.fileType || '',
@@ -70,6 +126,15 @@ export async function createAssignment(data: AssignmentData): Promise<Assignment
 
     console.log('Assignment created successfully:', createdAssignment.id);
     
+    // Create calendar events for the assignment if due date is set
+    if (data.dueDate) {
+      await createAssignmentCalendarEvents(createdAssignment, {
+        id: classObj.id,
+        userId: classObj.userId
+      });
+      console.log('Calendar events created for assignment');
+    }
+    
     revalidatePath(`/teacher/dashboard/classes/${classObj.code}`);
     revalidatePath(`/teacher/dashboard/classes/${classObj.code}/lesson-plans`);
     
@@ -80,7 +145,7 @@ export async function createAssignment(data: AssignmentData): Promise<Assignment
   }
 }
 
-// Get a single assignment by ID including its related lesson plans.
+// Get a single assignment by ID including its related lesson plans
 export async function getAssignmentByID(id: string): Promise<AssignmentResponse> {
   try {
     const session = await getAuthSession();
@@ -88,12 +153,11 @@ export async function getAssignmentByID(id: string): Promise<AssignmentResponse>
       return { success: false, error: 'Unauthorized' };
     }
 
-    // Use the correct relation
     const assignment = await db.assignment.findUnique({
       where: { id },
       include: { 
-        lessonPlans: true, // LessonPlanAssignments relation
-        class: { select: { userId: true } } 
+        lessonPlans: true,
+        class: { select: { userId: true, code: true } }
       },
     });
 
@@ -124,7 +188,7 @@ export async function getAssignmentByID(id: string): Promise<AssignmentResponse>
   }
 }
 
-// Get all assignments and include their associated lesson plans.
+// Get all assignments for a class or user
 export async function getAssignments(classId?: string): Promise<AssignmentResponse> {
   try {
     const session = await getAuthSession();
@@ -132,7 +196,7 @@ export async function getAssignments(classId?: string): Promise<AssignmentRespon
       return { success: false, error: 'Unauthorized' };
     }
     
-    let whereClause = {};
+    let whereClause: Prisma.AssignmentWhereInput = {};
     
     if (classId) {
       // If classId provided, filter by it
@@ -203,7 +267,7 @@ export async function getAssignments(classId?: string): Promise<AssignmentRespon
   }
 }
 
-// Update an assignment by ID using the required fields.
+// Update an assignment by ID using the required fields
 export async function updateAssignment(id: string, data: AssignmentData): Promise<AssignmentResponse> {
   try {
     const session = await getAuthSession();
@@ -214,7 +278,7 @@ export async function updateAssignment(id: string, data: AssignmentData): Promis
     // Verify assignment exists and belongs to teacher
     const existingAssignment = await db.assignment.findUnique({
       where: { id },
-      include: { class: { select: { userId: true, code: true } } }
+      include: { class: { select: { userId: true, code: true, id: true } } }
     });
     
     if (!existingAssignment || existingAssignment.class.userId !== session.user.id) {
@@ -230,7 +294,7 @@ export async function updateAssignment(id: string, data: AssignmentData): Promis
       data: {
         name: data.name,
         activity: data.activity,
-        dueDate: data.dueDate,
+        dueDate: data.dueDate ? new Date(data.dueDate) : null,
         classId: data.classId,
         lessonPlans: data.lessonPlanIds
           ? {
@@ -241,7 +305,21 @@ export async function updateAssignment(id: string, data: AssignmentData): Promis
       include: { lessonPlans: true },
     });
 
-    revalidatePath(`/dashboard/classes/${existingAssignment.class.code}`);
+    // Update any related calendar events if dueDate has changed
+    if (data.dueDate && existingAssignment.dueDate?.toISOString() !== new Date(data.dueDate).toISOString()) {
+      // Delete existing calendar events
+      await db.calendarEvent.deleteMany({
+        where: { assignmentId: id }
+      });
+      
+      // Create new calendar events with updated date
+      await createAssignmentCalendarEvents(updatedAssignment, {
+        id: existingAssignment.class.id,
+        userId: existingAssignment.class.userId
+      });
+    }
+
+    revalidatePath(`/teacher/dashboard/classes/${existingAssignment.class.code}`);
     return { success: true, data: updatedAssignment };
   } catch (error: any) {
     console.error('Update assignment error:', error?.message || 'Unknown error');
@@ -249,13 +327,7 @@ export async function updateAssignment(id: string, data: AssignmentData): Promis
   }
 }
 
-// Copy an assignment to another class via lesson plans.
-interface CopyAssignmentParams {
-  sourceAssignmentId: string;
-  targetLessonPlanId: string;
-  targetClassId: string;
-}
-
+// Copy an assignment to another lesson plan
 export async function copyAssignmentToLessonPlan({
   sourceAssignmentId,
   targetLessonPlanId,
@@ -283,7 +355,7 @@ export async function copyAssignmentToLessonPlan({
         code: targetClassId, // Use code instead of ID
         userId: session.user.id
       },
-      select: { id: true, code: true }
+      select: { id: true, code: true, userId: true }
     });
     
     if (!targetClass) {
@@ -318,7 +390,12 @@ export async function copyAssignmentToLessonPlan({
       include: { lessonPlans: true },
     });
 
-    revalidatePath(`/dashboard/classes/${targetClass.code}`);
+    // Create calendar events for this assignment if it has a due date
+    if (newAssignment.dueDate) {
+      await createAssignmentCalendarEvents(newAssignment, targetClass);
+    }
+
+    revalidatePath(`/teacher/dashboard/classes/${targetClass.code}`);
     return { success: true, data: newAssignment };
   } catch (error: any) {
     console.error('Copy assignment error:', error);
@@ -326,7 +403,7 @@ export async function copyAssignmentToLessonPlan({
   }
 }
 
-// Delete an assignment by ID.
+// Delete an assignment by ID
 export async function deleteAssignment(id: string): Promise<AssignmentResponse> {
   try {
     const session = await getAuthSession();
@@ -344,11 +421,22 @@ export async function deleteAssignment(id: string): Promise<AssignmentResponse> 
       return { success: false, error: 'Assignment not found or you do not have permission' };
     }
 
+    // Delete associated calendar events first
+    await db.calendarEvent.deleteMany({
+      where: { assignmentId: id }
+    });
+
+    // Delete associated student submissions
+    await db.studentAssignmentSubmission.deleteMany({
+      where: { assignmentId: id }
+    });
+
+    // Then delete the assignment
     await db.assignment.delete({
       where: { id },
     });
 
-    revalidatePath(`/dashboard/classes/${existingAssignment.class.code}`);
+    revalidatePath(`/teacher/dashboard/classes/${existingAssignment.class.code}`);
     return { success: true };
   } catch (error: any) {
     console.error('Delete assignment error:', error?.message || 'Unknown error');
@@ -356,12 +444,12 @@ export async function deleteAssignment(id: string): Promise<AssignmentResponse> 
   }
 }
 
-// Submit an assignment.
+// Submit an assignment
 export async function submitAssignment(formData: FormData): Promise<AssignmentResponse> {
   try {
     const session = await getAuthSession();
     if (!session?.user?.id || session.user.role !== "STUDENT") {
-      return { success: false, error: 'Unauthorized' };
+      return { success: false, error: 'Unauthorized: Students only' };
     }
     
     const studentId = session.user.id;
@@ -383,7 +471,8 @@ export async function submitAssignment(formData: FormData): Promise<AssignmentRe
             }
           }
         }
-      }
+      },
+      include: { class: true }
     });
     
     if (!assignment) {
@@ -396,28 +485,106 @@ export async function submitAssignment(formData: FormData): Promise<AssignmentRe
     const comments = formData.get('comments') as string || null;
     const fileName = formData.get('fileName') as string || null;
     const fileType = formData.get('fileType') as string || null;
+    const fileSize = formData.get('fileSize') ? parseInt(formData.get('fileSize') as string) : null;
     
-    // Since we don't have a separate submission model, we'll update the assignment
-    // with submission data for this student. In a real app, you'd create a separate
-    // model for student submissions.
+    // Check if there's already a submission
+    const existingSubmission = await db.studentAssignmentSubmission.findFirst({
+      where: {
+        assignmentId,
+        studentId
+      }
+    });
+
+    let submission;
+
+    if (existingSubmission) {
+      // Update existing submission
+      submission = await db.studentAssignmentSubmission.update({
+        where: { id: existingSubmission.id },
+        data: {
+          fileUrl: fileUrl || existingSubmission.fileUrl,
+          textContent: textContent || existingSubmission.textContent,
+          comments: comments || existingSubmission.comments,
+          fileName: fileName || existingSubmission.fileName,
+          fileType: fileType || existingSubmission.fileType,
+          fileSize: fileSize || existingSubmission.fileSize,
+          status: 'SUBMITTED',
+          updatedAt: new Date()
+        }
+      });
+    } else {
+      // Create new submission
+      submission = await db.studentAssignmentSubmission.create({
+        data: {
+          assignmentId,
+          studentId,
+          fileUrl,
+          textContent,
+          comments,
+          fileName,
+          fileType,
+          fileSize,
+          status: 'SUBMITTED'
+        }
+      });
+    }
+
+    // Create or update a calendar event for this submission
+    try {
+      // Get teacher ID for the class
+      const teacherId = assignment.class.userId;
+      
+      if (teacherId) {
+        // First check if there's an existing calendar event
+        const existingEvent = await db.calendarEvent.findFirst({
+          where: {
+            assignmentId,
+            studentId,
+            title: { contains: 'Submitted:' }
+          }
+        });
+
+        const eventTitle = `Submitted: ${assignment.name}`;
+        const eventDescription = `Assignment submitted by student on ${new Date().toLocaleString()}`;
+        
+        if (existingEvent) {
+          // Update existing event
+          await db.calendarEvent.update({
+            where: { id: existingEvent.id },
+            data: {
+              description: eventDescription,
+              updatedAt: new Date()
+            }
+          });
+        } else {
+          // Create new event
+          await db.calendarEvent.create({
+            data: {
+              title: eventTitle,
+              description: eventDescription,
+              startDate: new Date(),
+              endDate: new Date(new Date().getTime() + 60 * 60 * 1000), // 1 hour duration
+              isRecurring: false,
+              createdById: teacherId,
+              assignmentId,
+              studentId,
+              variant: "success"
+            }
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error updating calendar event for submission:', error);
+      // Don't fail the submission if the calendar event fails
+    }
+
+    // Revalidate relevant paths
+    revalidatePath(`/student/dashboard/classes/${assignment.classId}`);
+    revalidatePath(`/student/dashboard/assignments`);
     
-    // For now, let's just log the submission details
-    console.log('Assignment submission received:');
-    console.log('- Assignment ID:', assignmentId);
-    console.log('- Student ID:', studentId);
-    console.log('- File URL:', fileUrl);
-    console.log('- Text Content:', textContent?.substring(0, 50) + (textContent && textContent.length > 50 ? '...' : ''));
-    console.log('- Comments:', comments);
-    
-    // We'll just return success for now, as if the submission was saved
     return {
       success: true,
-      data: {
-        id: 'submission-placeholder',
-        assignmentId,
-        studentId,
-        submittedAt: new Date()
-      }
+      data: submission
     };
   } catch (error: any) {
     console.error('Error submitting assignment:', error);
@@ -425,61 +592,246 @@ export async function submitAssignment(formData: FormData): Promise<AssignmentRe
   }
 }
 
-// Get a student assignment.
+// Get a student assignment with submission details
 export async function getStudentAssignment(assignmentId: string): Promise<AssignmentResponse> {
   try {
     const session = await getAuthSession();
-    if (!session?.user?.id || session.user.role !== "STUDENT") {
+    if (!session?.user?.id) {
       return { success: false, error: 'Unauthorized' };
     }
-    
-    const studentId = session.user.id;
-    console.log(`Student ${studentId} requesting assignment ${assignmentId}`);
     
     // Find the assignment
     const assignment = await db.assignment.findUnique({
       where: { id: assignmentId },
       include: {
         lessonPlans: true,
-        class: {
-          include: {
-            enrollments: {
-              where: {
-                studentId: studentId,
-                enrolled: true
-              }
-            }
-          }
-        }
+        class: true
       }
     });
     
     if (!assignment) {
       return { success: false, error: "Assignment not found" };
     }
-    
-    // Check if student is enrolled in the class
-    if (!assignment.class.enrollments || assignment.class.enrollments.length === 0) {
-      return { success: false, error: "You don't have access to this assignment" };
+
+    // Check permission based on role
+    if (session.user.role === "STUDENT") {
+      // For students, check if they're enrolled in the class
+      const studentId = session.user.id;
+      const enrollment = await db.enrollment.findFirst({
+        where: {
+          studentId,
+          classId: assignment.class.id,
+          enrolled: true
+        }
+      });
+      
+      if (!enrollment) {
+        return { success: false, error: "You don't have access to this assignment" };
+      }
+
+      // Get this student's submission
+      const submission = await db.studentAssignmentSubmission.findFirst({
+        where: {
+          assignmentId,
+          studentId
+        }
+      });
+
+      // Return assignment data with submission details
+      return { 
+        success: true, 
+        data: {
+          id: assignment.id,
+          name: assignment.name,
+          description: assignment.rubric || '',
+          dueDate: assignment.dueDate,
+          activity: assignment.activity || "Assignment",
+          fileType: assignment.fileType,
+          url: assignment.url,
+          // Include submission details if available
+          submission: submission || null,
+          grade: submission?.grade || null,
+          submittedAt: submission?.createdAt || null,
+          status: submission?.status || "NOT_SUBMITTED"
+        } 
+      };
+    } 
+    else if (session.user.role === "TEACHER") {
+      // For teachers, check if they own the class
+      if (assignment.class.userId !== session.user.id) {
+        return { success: false, error: "You don't have permission to view this assignment" };
+      }
+
+      // Get all submissions for this assignment
+      const submissions = await db.studentAssignmentSubmission.findMany({
+        where: { assignmentId },
+        include: {
+          student: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              profileImage: true
+            }
+          }
+        },
+        orderBy: { updatedAt: 'desc' }
+      });
+
+      // Return assignment data with all submissions
+      return { 
+        success: true, 
+        data: {
+          id: assignment.id,
+          name: assignment.name,
+          description: assignment.rubric || '',
+          dueDate: assignment.dueDate,
+          activity: assignment.activity || "Assignment",
+          fileType: assignment.fileType,
+          url: assignment.url,
+          submissions: submissions
+        } 
+      };
     }
 
-    // Since we don't have a StudentSubmission model yet, we'll 
-    // just return the assignment data without submission info for now
-    return { 
-      success: true, 
-      data: {
-        id: assignment.id,
-        name: assignment.name,
-        description: assignment.rubric,
-        dueDate: assignment.dueDate,
-        activity: assignment.activity || "Assignment",
-        grade: 0, // Default grade since we don't have submissions yet
-        url: assignment.url,
-        fileType: assignment.fileType
-      } 
-    };
+    return { success: false, error: "Invalid user role" };
   } catch (error: any) {
     console.error('Error fetching student assignment:', error);
     return { success: false, error: error.message || 'Failed to load assignment data' };
+  }
+}
+
+// Get all submissions for a specific assignment (teacher only)
+export async function getAssignmentSubmissions(assignmentId: string): Promise<AssignmentResponse> {
+  try {
+    const session = await getAuthSession();
+    if (!session?.user?.id || session.user.role !== "TEACHER") {
+      return { success: false, error: 'Unauthorized: Teachers only' };
+    }
+
+    // Verify the assignment exists and belongs to this teacher
+    const assignment = await db.assignment.findUnique({
+      where: { id: assignmentId },
+      include: {
+        class: {
+          select: { userId: true, code: true }
+        }
+      }
+    });
+
+    if (!assignment) {
+      return { success: false, error: 'Assignment not found' };
+    }
+
+    if (assignment.class.userId !== session.user.id) {
+      return { success: false, error: 'You do not have permission to view these submissions' };
+    }
+
+    // Get all submissions for this assignment
+    const submissions = await db.studentAssignmentSubmission.findMany({
+      where: { assignmentId },
+      include: {
+        student: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            profileImage: true
+          }
+        }
+      },
+      orderBy: { updatedAt: 'desc' }
+    });
+
+    return { 
+      success: true, 
+      data: submissions
+    };
+  } catch (error: any) {
+    console.error('Error fetching assignment submissions:', error);
+    return { success: false, error: error.message || 'Failed to load submissions' };
+  }
+}
+
+// Grade a submission (teacher only)
+export async function gradeSubmission({
+  submissionId, 
+  grade, 
+  feedback
+}: GradeSubmissionParams): Promise<AssignmentResponse> {
+  try {
+    const session = await getAuthSession();
+    if (!session?.user?.id || session.user.role !== "TEACHER") {
+      return { success: false, error: 'Unauthorized: Teachers only' };
+    }
+
+    // Get the submission with assignment info to verify ownership
+    const submission = await db.studentAssignmentSubmission.findUnique({
+      where: { id: submissionId },
+      include: {
+        assignment: {
+          include: {
+            class: { select: { userId: true, code: true } }
+          }
+        }
+      }
+    });
+
+    if (!submission) {
+      return { success: false, error: 'Submission not found' };
+    }
+
+    // Verify the teacher owns the class
+    if (submission.assignment.class.userId !== session.user.id) {
+      return { success: false, error: 'You do not have permission to grade this submission' };
+    }
+
+    // Update the submission with grade and status
+    const updatedSubmission = await db.studentAssignmentSubmission.update({
+      where: { id: submissionId },
+      data: {
+        grade: Math.max(0, Math.min(100, grade)), // Ensure grade is between 0-100
+        comments: feedback || submission.comments,
+        status: 'GRADED',
+        updatedAt: new Date()
+      },
+      include: {
+        student: {
+          select: { id: true, firstName: true, lastName: true }
+        },
+        assignment: { select: { name: true } }
+      }
+    });
+
+    // Create a calendar event for the student about the grading
+    try {
+      await db.calendarEvent.create({
+        data: {
+          title: `Assignment Graded: ${submission.assignment.name}`,
+          description: `Your submission has been graded. Grade: ${grade}%${feedback ? `\nFeedback: ${feedback}` : ''}`,
+          startDate: new Date(),
+          endDate: new Date(new Date().getTime() + 30 * 60 * 1000), // 30 minute duration
+          isRecurring: false,
+          createdById: session.user.id,
+          assignmentId: submission.assignmentId,
+          studentId: submission.studentId,
+          variant: "success"
+        }
+      });
+    } catch (error) {
+      console.error('Error creating calendar event for graded submission:', error);
+      // Don't fail if calendar event creation fails
+    }
+
+    // Revalidate paths
+    revalidatePath(`/teacher/dashboard/classes/${submission.assignment.class.code}`);
+    
+    return {
+      success: true,
+      data: updatedSubmission
+    };
+  } catch (error: any) {
+    console.error('Error grading submission:', error);
+    return { success: false, error: error.message || 'Failed to grade submission' };
   }
 }

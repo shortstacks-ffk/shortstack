@@ -144,7 +144,7 @@ export async function updateStoreItem(
       include: { class: { select: { userId: true, code: true } } }
     });
 
-    if (!item || item.class.userId !== session.user.id) {
+    if (!item || item.class[0].userId !== session.user.id) {
       return { success: false, error: "Forbidden or Item not found" };
     }
 
@@ -153,7 +153,7 @@ export async function updateStoreItem(
       data,
     });
 
-    revalidatePath(`/dashboard/classes/${item.class.code}/store`);
+    revalidatePath(`/dashboard/classes/${item.class[0].code}/store`);
     return { success: true, data: updatedItem };
   } catch (error: any) {
     console.error("Update store item error:", error);
@@ -175,7 +175,7 @@ export async function deleteStoreItem(id: string): Promise<StoreItemResponse> {
       include: { class: { select: { userId: true, code: true } } }
     });
 
-    if (!item || item.class.userId !== session.user.id) {
+    if (!item || item.class[0].userId !== session.user.id) {
       return { success: false, error: "Forbidden or Item not found" };
     }
 
@@ -188,7 +188,7 @@ export async function deleteStoreItem(id: string): Promise<StoreItemResponse> {
 
     await db.storeItem.delete({ where: { id } });
 
-    revalidatePath(`/dashboard/classes/${item.class.code}/store`);
+    revalidatePath(`/dashboard/classes/${item.class[0].code}/store`);
     return { success: true };
   } catch (error: any) {
     console.error("Delete store item error:", error);
@@ -284,8 +284,8 @@ export async function purchaseStoreItem(
     // Revalidate relevant paths (e.g., student balance display, store item list)
     // Need class code for revalidation
     const itemClass = await db.storeItem.findUnique({ where: { id: itemId }, select: { class: { select: { code: true } } } });
-    if (itemClass) {
-      revalidatePath(`/dashboard/classes/${itemClass.class.code}/store`);
+    if (itemClass && itemClass.class[0]) {
+      revalidatePath(`/dashboard/classes/${itemClass.class[0].code}/store`);
       // Revalidate student-specific pages if applicable
     }
 
