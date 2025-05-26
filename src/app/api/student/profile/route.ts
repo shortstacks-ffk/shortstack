@@ -3,91 +3,52 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/src/lib/auth/config";
 import { db } from "@/src/lib/db";
 
-export async function GET(req: Request) {
+export async function GET() {
   try {
     const session = await getServerSession(authOptions);
-
-    if (!session?.user?.id) {
+    
+    if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-
-    // First attempt: find student by direct association with user ID
+    
+    // Try multiple ways to find the student
     let student = await db.student.findFirst({
-      where: { 
-        userId: session.user.id 
-      },
-      include: {
-        enrollments: {
-          where: { enrolled: true },
-          include: {
-            class: {
-              include: {
-                user: true // Teacher info
-              }
-            }
-          }
-        }
+      where: {
+        OR: [
+          { userId: session.user.id },
+          ...(session.user.email ? [{ schoolEmail: session.user.email }] : [])
+        ]
       }
     });
-
-    // Second attempt: if no direct association, check by email
+    
+    // If not found, try one more approach as fallback
     if (!student && session.user.email) {
-      student = await db.student.findFirst({
-        where: { 
-          schoolEmail: session.user.email 
-        },
-        include: {
-          enrollments: {
-            where: { enrolled: true },
-            include: {
-              class: {
-                include: {
-                  user: true // Teacher info
-                }
-              }
-            }
-          }
-        }
+      student = await db.student.findUnique({
+        where: { schoolEmail: session.user.email }
       });
     }
-
-    if (!student) {
-      return NextResponse.json({ error: "Student profile not found" }, { status: 404 });
-    }
-
-    // Format the enrolled classes
-    const classes = student.enrollments.map(enrollment => ({
-      id: enrollment.class.id,
-      name: enrollment.class.name,
-      code: enrollment.class.code,
-      emoji: enrollment.class.emoji || "📚"
-    }));
     
-    // Get teacher info from the first enrolled class
-    const teacherInfo = student.enrollments[0]?.class?.user;
-    const teacher = teacherInfo ? {
-      id: teacherInfo.id,
-      name: teacherInfo.name || `${teacherInfo.firstName || ''} ${teacherInfo.lastName || ''}`.trim(),
-      firstName: teacherInfo.firstName,
-      lastName: teacherInfo.lastName,
-      email: teacherInfo.email,
-      image: teacherInfo.image
-    } : null;
-
+    if (!student) {
+      console.error("Student record not found for user:", {
+        userId: session.user.id,
+        email: session.user.email,
+        role: session.user.role
+      });
+      return NextResponse.json({ error: "Student record not found" }, { status: 404 });
+    }
+    
+    // Return the necessary student info
     return NextResponse.json({
-      student: {
-        id: student.id,
-        firstName: student.firstName,
-        lastName: student.lastName,
-        schoolEmail: student.schoolEmail,
-        progress: student.progress || {},
-        profileImage: student.profileImage,
-        teacher: teacher
-      },
-      classes: classes
+      id: student.id,
+      firstName: student.firstName,
+      lastName: student.lastName,
+      schoolEmail: student.schoolEmail,
+      profileImage: student.profileImage,
+      // Include other fields as needed
     });
+    
   } catch (error) {
     console.error("Error fetching student profile:", error);
-    return NextResponse.json({ error: "Failed to fetch student profile" }, { status: 500 });
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

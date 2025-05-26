@@ -8,22 +8,18 @@ export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session?.user?.id || session.user.role !== "STUDENT") {
+    if (!session?.user?.id || session.user.role !== "TEACHER") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Find the student record
-    const student = await db.student.findFirst({
-      where: { 
-        OR: [
-          { userId: session.user.id },
-          ...(session.user.email ? [{ schoolEmail: session.user.email }] : [])
-        ]
-      }
+    // Find the teacher record
+    const user = await db.user.findUnique({
+      where: { id: session.user.id },
+      include: { teacherProfile: true }
     });
 
-    if (!student) {
-      return NextResponse.json({ error: "Student profile not found" }, { status: 404 });
+    if (!user) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
     // Process form data
@@ -43,37 +39,41 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "File too large (max 5MB)" }, { status: 400 });
     }
 
-    console.log("Student profile image upload - starting process");
+    console.log("Uploading image to Vercel Blob...");
+    console.log("File type:", file.type);
+    console.log("File size:", file.size);
     
     // Upload to Vercel Blob
-    const blob = await put(`student-profiles/${student.id}/${Date.now()}-${file.name.replace(/\s/g, '-')}`, file, {
-      access: 'public',
-      contentType: file.type
-    });
-
-    console.log("Blob upload successful:", blob.url);
-
-    // Update student profile with new image URL
-    await db.student.update({
-      where: { id: student.id },
-      data: { profileImage: blob.url }
-    });
-
-    // Update session if user record exists
-    if (student.userId) {
+    try {
+      const blob = await put(
+        `teacher-profiles/${user.id}/${Date.now()}-${file.name.replace(/\s/g, '-')}`, 
+        file, 
+        {
+          access: 'public',
+          contentType: file.type
+        }
+      );
+      
+      console.log("Blob upload successful:", blob.url);
+      
+      // Update user with new image URL
       await db.user.update({
-        where: { id: student.userId },
+        where: { id: user.id },
         data: { image: blob.url }
       });
+
+      return NextResponse.json({
+        success: true,
+        imageUrl: blob.url,
+        message: "Profile image updated successfully"
+      });
+    } catch (blobError) {
+      console.error("Vercel Blob upload error:", blobError);
+      return NextResponse.json(
+        { error: "Failed to upload image to storage" },
+        { status: 500 }
+      );
     }
-
-    console.log("Database updated with new image URL");
-
-    return NextResponse.json({
-      success: true,
-      imageUrl: blob.url,
-      message: "Profile image updated successfully"
-    });
   } catch (error) {
     console.error("Error uploading profile image:", error);
     return NextResponse.json(
