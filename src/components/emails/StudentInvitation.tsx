@@ -64,7 +64,8 @@ export const StudentInvitation: React.FC<StudentInvitationProps> = ({
           {/* Integrated header with logo */}
           <Section style={header}>
             <Img
-              src={`${appUrl}/assets/img/logo simple - greenldpi.png`}
+              // src={`${appUrl}/assets/img/logo simple - greenldpi.png`}
+              src='https://tskrok7zgyvtkooz.public.blob.vercel-storage.com/email-img/Primary%20Logo%20-%20Colorful%20Orangeldpi-0tET7Jj9hBKRsLSSOV9e6gX1F4vuDv.png'
               width="150"
               height="40"
               alt="ShortStack Education"
@@ -127,7 +128,8 @@ export const StudentInvitation: React.FC<StudentInvitationProps> = ({
             {/* Mascot Image - Positioned to the side */}
             <Section style={sideImageContainer}>
               <Img
-                src={`${appUrl}/assets/img/Mascout 9ldpi.png`}
+                // src={`${appUrl}/assets/img/Mascout 9ldpi.png`}
+                src='https://tskrok7zgyvtkooz.public.blob.vercel-storage.com/email-img/Mascout%205ldpi-z61G0oi34Ww704bftVLgaraBroRYU6.png'
                 width="100"
                 height="100"
                 alt="ShortStack Mascot"

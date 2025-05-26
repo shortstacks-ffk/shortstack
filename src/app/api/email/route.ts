@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import StudentInvitation from '@/src/components/emails/StudentInvitation';
+import PasswordResetNotification from '@/src/components/emails/PasswordResetNotification';
 
 // Define the email payload interface
 export interface EmailPayload {
@@ -14,7 +15,6 @@ export interface EmailPayload {
   isNewStudent: boolean;
   isPasswordReset?: boolean; // Add this field
 }
-
 
 // Main email sending endpoint - POST /api/email
 export async function POST(request: NextRequest) {
@@ -56,15 +56,23 @@ export async function POST(request: NextRequest) {
     } = payload;
     
     // Validate required fields
-    if (!to || !firstName || !lastName || !className || !classCode) {
+    if (!to || !firstName || !lastName) {
       return NextResponse.json({ 
         success: false, 
-        error: 'Missing required fields' 
+        error: 'Missing required fields: to, firstName, lastName' 
       }, { status: 400 });
     }
     
-    // New students should have passwords
-    if (isNewStudent && !password) {
+    // For non-password reset emails, validate class info
+    if (!isPasswordReset && (!className || !classCode)) {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Missing required fields for class invitation: className, classCode' 
+      }, { status: 400 });
+    }
+    
+    // New students should have passwords unless it's a password reset
+    if (isNewStudent && !password && !isPasswordReset) {
       return NextResponse.json({ 
         success: false, 
         error: 'Password is required for new students' 
@@ -74,27 +82,36 @@ export async function POST(request: NextRequest) {
     // Determine the right subject based on all email types
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
     const subject = isPasswordReset
-      ? `Important: Your ShortStack Password Has Been Updated`
+      ? `Important: Your ShortStack Password Has Been Changed`
       : isNewStudent
         ? `Welcome to ${className} - Your Login Information`
         : `You've Been Added to ${className}`;
 
-    // Send the email using React template
+    // Choose the correct email template
+    const emailTemplate = isPasswordReset
+      ? await PasswordResetNotification({ 
+          firstName,
+          lastName,
+          appUrl
+        })
+      : await StudentInvitation({ 
+          firstName,
+          lastName,
+          className, 
+          classCode,
+          email: email || to,
+          password,
+          isNewStudent,
+          isPasswordReset,
+          appUrl
+        });
+
+    // Send the email using the appropriate template
     const { data, error } = await resend.emails.send({
       from: `ShortStack Education <${process.env.RESEND_FROM_EMAIL || 'noreply@shortstack.edu'}>`,
       to: [to],
       subject: subject,
-      react: StudentInvitation({ 
-        firstName,
-        lastName,
-        className, 
-        classCode,
-        email: email || to,
-        password,
-        isNewStudent,
-        isPasswordReset, // Make sure to pass this
-        appUrl
-      }),
+      react: emailTemplate,
     });
 
     if (error) {
@@ -110,7 +127,7 @@ export async function POST(request: NextRequest) {
       data 
     });
   } catch (error: any) {
-    console.error('Error sending invitation email:', error);
+    console.error('Error sending email:', error);
     return NextResponse.json({
       success: false,
       error: error.message || 'Failed to send email' 

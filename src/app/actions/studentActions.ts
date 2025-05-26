@@ -4,7 +4,6 @@ import { db } from "@/src/lib/db";
 import { revalidatePath } from "next/cache";
 import { getAuthSession } from "@/src/lib/auth";
 import * as bcrypt from 'bcryptjs';
-import { sendStudentInvitation } from "@/src/lib/email";
 import { generateAccountNumber } from "@/src/lib/utils";
 import { setupBankAccountsForStudent } from "@/src/lib/banking";
 
