@@ -1,12 +1,14 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/src/lib/auth/config";
 import { db } from "@/src/lib/db";
 
+export const dynamic = 'force-dynamic';
+
 // Get a specific calendar event
 export async function GET(
-  request: Request, 
-  { params }: { params: { eventId: string }}
+  request: NextRequest,
+  context: { params: Promise<{ eventId: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -14,7 +16,8 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     
-    // Access eventId from params
+    // Access eventId from params (now using await)
+    const params = await context.params;
     const { eventId } = params;
     
     // Authorization check based on role
@@ -81,7 +84,7 @@ export async function GET(
 // Update a calendar event
 export async function PUT(
   request: Request,
-  { params }: { params: { eventId: string } }
+  context: { params: Promise<{ eventId: string }> }
 ) {
   try {
     // Get the session first before using it
@@ -90,8 +93,10 @@ export async function PUT(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Access eventId from params
+    // Access eventId from params (now using await)
+    const params = await context.params;
     const { eventId } = params;
+    
     const data = await request.json();
 
     // Check if user can edit this event
@@ -144,7 +149,7 @@ export async function PUT(
 // Delete a calendar event
 export async function DELETE(
   request: Request, 
-  { params }: { params: Promise<{ eventId: string }> }
+  context: { params: Promise<{ eventId: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -152,8 +157,9 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     
-    // Access eventId from params
-    const { eventId } = await params;
+    // Access eventId from params (now using await)
+    const params = await context.params;
+    const { eventId } = params;
     
     // Check if user can delete this event
     const existingEvent = await db.calendarEvent.findFirst({
