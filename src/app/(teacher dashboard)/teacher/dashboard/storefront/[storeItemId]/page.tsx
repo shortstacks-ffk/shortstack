@@ -43,7 +43,17 @@ interface StoreItem {
   description?: string;
   quantity: number;
   isAvailable: boolean;
-  classes?: Array<{ id: string; name: string }>;
+  classes: Array<{
+    id: string;
+    name: string;
+    code: string;
+    emoji: string;
+  }>;
+  purchases?: Array<{
+    id: string;
+    quantity: number;
+    // other purchase fields
+  }>;
 }
 
 export default async function StoreItemPage({ params }: PageProps) {
@@ -54,8 +64,15 @@ export default async function StoreItemPage({ params }: PageProps) {
   }
   const storeItem = response.data;
 
-  //Calculate the payment percentage
-  const itemQuantity = storeItem.quantity;
+  // Calculate purchase statistics with proper type safety
+  const total = storeItem.quantity || 0;
+  const purchased = storeItem.purchases?.reduce(
+    (acc, purchase) => acc + (purchase?.quantity || 0), 
+    0
+  ) || 0;
+  
+  const remaining = Math.max(total - purchased, 0);
+  const percentPurchased = total > 0 ? Math.round((purchased / total) * 100) : 0;
 
   return (
     <main className="container mx-auto p-4">
@@ -81,8 +98,11 @@ export default async function StoreItemPage({ params }: PageProps) {
             </div>
           </div>
           <div className="flex items-center space-x-3">
-            <Badge variant="outline" className="text-sm">
-              {storeItem.isAvailable}
+            <Badge 
+              variant={storeItem.isAvailable ? "success" : "secondary"} 
+              className="text-sm"
+            >
+              {storeItem.isAvailable ? "Available" : "Not Available"}
             </Badge>
           </div>
         </div>
@@ -117,20 +137,20 @@ export default async function StoreItemPage({ params }: PageProps) {
             <CardContent>
               <div className="flex justify-between items-center">
                 <p className="text-2xl font-bold">
-                  {0}/{storeItem.quantity}
+                  {purchased}/{total}
                 </p>
-                <p className="text-xl font-bold text-gray-500">{0}%</p>
+                <p className="text-xl font-bold text-gray-500">{percentPurchased}%</p>
               </div>
-              <Progress value={0} className="h-2 mt-2" />
+              <Progress value={percentPurchased} className="h-2 mt-2" />
               <div className="mt-1 flex items-center justify-between text-xs">
                 <div className="flex items-center gap-1">
                   <CheckCircle2 className="h-3 w-3 text-green-600" />
-                  <span className="text-green-600">{0} purchased</span>
+                  <span className="text-green-600">{purchased} purchased</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <XCircle className="h-3 w-3 text-amber-600" />
                   <span className="text-amber-600">
-                    {storeItem.quantity} left
+                    {remaining} left
                   </span>
                 </div>
               </div>
@@ -143,7 +163,7 @@ export default async function StoreItemPage({ params }: PageProps) {
           <TabsList className="mb-4">
             <TabsTrigger value="description">Description</TabsTrigger>
             <TabsTrigger value="classes">Classes </TabsTrigger>
-            <TabsTrigger value="purchase">Purchase History</TabsTrigger>
+            {/* <TabsTrigger value="purchase">Purchase History</TabsTrigger> */}
           </TabsList>
 
           {/* Description Tab */}
@@ -160,23 +180,43 @@ export default async function StoreItemPage({ params }: PageProps) {
             </Card>
           </TabsContent>
 
-           {/* Classes Tab */}
+          {/* Classes Tab */}
           <TabsContent value="classes" className="mt-0">
             <Card className="overflow-visible h-auto w-full">
               <CardContent className="pt-6 pb-6">
-                <div className="flex flex-col items-center justify-center py-12">
-                  <AlertCircle className="h-8 w-8 text-gray-400 mb-2" />
-                  <p className="text-gray-500">
-                    Classes coming soon...
-                  </p>
-                </div>
+                {Array.isArray(storeItem.classes) && storeItem.classes.length > 0 ? (
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-medium">
+                      This item is assigned to {storeItem.classes.length} {storeItem.classes.length === 1 ? 'class' : 'classes'}:
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                      {storeItem.classes.map((classItem) => (
+                        <Link 
+                          href={`/teacher/dashboard/classes/${classItem.code}`} 
+                          key={classItem.id}
+                          className="flex items-center p-4 border rounded-md hover:bg-gray-50 transition-colors"
+                        >
+                          <span className="text-2xl mr-3">{classItem.emoji || '📚'}</span>
+                          <div>
+                            <p className="font-medium">{classItem.name}</p>
+                            <p className="text-sm text-gray-500">Code: {classItem.code}</p>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-12">
+                    <AlertCircle className="h-8 w-8 text-gray-400 mb-2" />
+                    <p className="text-gray-500">This item is not assigned to any classes.</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
 
-
-           {/* Purchase History Tab */}
-           <TabsContent value="purchase" className="mt-0">
+          {/* Purchase History Tab */}
+          <TabsContent value="purchase" className="mt-0">
             <Card className="overflow-visible h-auto w-full">
               <CardContent className="pt-6 pb-6">
                 <div className="flex flex-col items-center justify-center py-12">
@@ -188,10 +228,6 @@ export default async function StoreItemPage({ params }: PageProps) {
               </CardContent>
             </Card>
           </TabsContent>
-
-
-
-
         </Tabs>
       </div>
     </main>

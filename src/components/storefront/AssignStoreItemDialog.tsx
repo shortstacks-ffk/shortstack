@@ -9,7 +9,7 @@ import {
 } from "@/src/components/ui/dialog";
 import { Button } from "@/src/components/ui/button";
 import { Label } from "@/src/components/ui/label";
-import { assignClassToStoreItem } from "../../app/actions/storeFrontActions";
+import { copyStoreItemToClasses } from "../../app/actions/storeFrontActions";
 import { toast } from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
@@ -42,11 +42,18 @@ export default function AssignStoreItemDialog({
   storeItemTitle,
   assignedClasses,
 }: AssignStoreItemDialogProps) {
+  // Add local dialog open state
+  const [dialogOpen, setDialogOpen] = useState(isOpen);
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [selectedClassIds, setSelectedClassIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
+
+  // Sync with parent's isOpen prop
+  useEffect(() => {
+    setDialogOpen(isOpen);
+  }, [isOpen]);
 
   // Get the IDs of classes this bill is already assigned to
   const assignedClassIds = assignedClasses.map((c) => c.id);
@@ -107,7 +114,7 @@ export default function AssignStoreItemDialog({
 
     setIsSubmitting(true);
     try {
-      const result = await assignClassToStoreItem({
+      const result = await copyStoreItemToClasses({
         storeItemId,
         targetClassIds: selectedClassIds,
       });
@@ -127,14 +134,19 @@ export default function AssignStoreItemDialog({
     }
   };
 
+  const handleClose = () => {
+    setDialogOpen(false);
+    onClose();
+    hasFetchedRef.current = false;
+    setSelectedClassIds([]);
+  };
+
   return (
     <Dialog
-      open={isOpen}
+      open={dialogOpen}
       onOpenChange={(open) => {
         if (!open && !isSubmitting) {
-          onClose();
-          hasFetchedRef.current = false;
-          setSelectedClassIds([]);
+          handleClose();
         }
       }}
     >
@@ -211,11 +223,8 @@ export default function AssignStoreItemDialog({
           <div className="flex justify-end gap-2 mt-6">
             <Button
               type="button"
-              variant="secondary"
-              onClick={() => {
-                onClose();
-                hasFetchedRef.current = false;
-              }}
+              variant="outline"
+              onClick={handleClose}
               disabled={isSubmitting}
             >
               Cancel

@@ -79,6 +79,8 @@ model Class {
   color           String?   // hex for card bg
   grade           String?
   overview        String?
+  endDate        DateTime?
+  startDate      DateTime?
   
   // For multiple class sessions
   classSessions   ClassSession[]

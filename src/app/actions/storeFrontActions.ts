@@ -171,10 +171,50 @@ export async function getAllStoreItems(filters?: {
   }
 }
 
-// Get a single Store Item - ensure it belongs to the user
+// OLD FUNCTIONAL
+// export async function getStoreItem(storeItemId: string): Promise<StoreItemResponse> {
+//   try {
+//     const session = await getAuthSession(); // Use NextAuth session
+//     if (!session?.user?.id) {
+//       return { success: false, error: "User not found" };
+//     }
+
+//     const storeItem = await db.storeItem.findFirst({
+//       where: {
+//         id: storeItemId,
+//         class: {
+//           some: {
+//             userId: session.user.id, // Use session.user.id from NextAuth
+//           },
+//         },
+//       },
+//       include: {
+//         class: {
+//           select: {
+//             id: true,
+//             name: true,
+//             emoji: true,
+//             code: true,
+//           },
+//         },
+//         purchases: true, // Make sure this is included
+//       },
+//     });
+
+//     if (!storeItem) {
+//       return { success: false, error: "Store item not found or doesn't belong to you" };
+//     }
+
+//     return { success: true, data: storeItem };
+//   } catch (error) {
+//     console.error("Error fetching store item:", error);
+//     return { success: false, error: "Failed to fetch store item details" };
+//   }
+// }
+
 export async function getStoreItem(storeItemId: string): Promise<StoreItemResponse> {
   try {
-    const session = await getAuthSession(); // Use NextAuth session
+    const session = await getAuthSession();
     if (!session?.user?.id) {
       return { success: false, error: "User not found" };
     }
@@ -367,5 +407,153 @@ export async function deleteStoreItem(storeItemId: string): Promise<StoreItemRes
   } catch (error) {
     console.error("Error deleting store item:", error);
     return { success: false, error: "Failed to delete store item" };
+  }
+}
+
+// Update an existing store item
+export async function updateStoreItem(
+  storeItemId: string,
+  data: UpdateStoreItemData
+): Promise<StoreItemResponse> {
+  try {
+    const session = await getAuthSession();
+    if (!session?.user?.id || session.user.role !== "TEACHER") {
+      return { success: false, error: "Unauthorized" };
+    }
+
+    // Verify that the store item exists and belongs to one of the teacher's classes
+    const existingItem = await db.storeItem.findFirst({
+      where: {
+        id: storeItemId,
+        class: {
+          some: {
+            userId: session.user.id,
+          },
+        },
+      },
+    });
+
+    if (!existingItem) {
+      return { success: false, error: "Store item not found or you don't have permission to update it" };
+    }
+
+    // Update the store item with the provided data
+    const updatedItem = await db.storeItem.update({
+      where: { id: storeItemId },
+      data: {
+        name: data.name,
+        emoji: data.emoji,
+        price: data.price,
+        description: data.description,
+        quantity: data.quantity,
+        isAvailable: data.isAvailable,
+      },
+      include: {
+        class: {
+          select: {
+            id: true,
+            name: true,
+            emoji: true,
+            code: true,
+          },
+        },
+        purchases: {
+          include: {
+            student: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                profileImage: true,
+              }
+            }
+          },
+        },
+      },
+    });
+
+    // Revalidate the relevant paths to update the UI
+    revalidatePath("/teacher/dashboard/storefront");
+    revalidatePath(`/teacher/dashboard/storefront/${storeItemId}`);
+    
+    // If this item is associated with classes, revalidate those paths too
+    if (updatedItem.class && updatedItem.class.length > 0) {
+      updatedItem.class.forEach(cls => {
+        revalidatePath(`/teacher/dashboard/classes/${cls.code}`);
+      });
+    }
+
+    return { 
+      success: true, 
+      message: "Store item updated successfully",
+      data: updatedItem 
+    };
+  } catch (error) {
+    console.error("Error updating store item:", error);
+    return { success: false, error: "Failed to update store item" };
+  }
+}
+
+// Get store items available to a student
+export async function getStudentStoreItems(): Promise<StoreItemResponse> {
+  try {
+    const session = await getAuthSession();
+    if (!session?.user?.id) {
+      return { success: false, error: "Not authorized" };
+    }
+
+    // Get the student profile
+    const student = await db.student.findUnique({
+      where: { userId: session.user.id },
+    });
+
+    if (!student) {
+      return { success: false, error: "Student profile not found" };
+    }
+
+    // Get the classes the student is enrolled in
+    const enrollments = await db.enrollment.findMany({
+      where: {
+        studentId: student.id,
+        enrolled: true
+      },
+      select: {
+        classId: true
+      }
+    });
+
+    const classIds = enrollments.map(enrollment => enrollment.classId);
+
+    if (classIds.length === 0) {
+      // Student isn't enrolled in any classes
+      return { success: true, data: [] };
+    }
+
+    // Get available store items from those classes
+    const storeItems = await db.storeItem.findMany({
+      where: {
+        isAvailable: true,
+        quantity: { gt: 0 },
+        class: {
+          some: {
+            id: { in: classIds }
+          }
+        }
+      },
+      include: {
+        class: {
+          select: {
+            id: true,
+            name: true,
+            emoji: true
+          }
+        }
+      }
+    });
+
+    return { success: true, data: storeItems };
+  } catch (error) {
+    console.error("Error fetching student store items:", error);
+    return { success: false, error: "Failed to fetch store items" };
   }
 }

@@ -1,62 +1,74 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/src/lib/auth/config";
 import { db } from "@/src/lib/db";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    
     const session = await getServerSession(authOptions);
     
-    if (!session?.user?.id || session.user.role !== "STUDENT") {
+    if (!session?.user?.id) {
+      console.log("❌ No session found");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    
-    // 1. Get the student's ID
+
+    // Step 1: Find the student profile
     const student = await db.student.findFirst({
-      where: { userId: session.user.id },
-      select: { id: true }
+      where: {
+        OR: [
+          { userId: session.user.id },
+          ...(session.user.email ? [{ schoolEmail: session.user.email }] : []),
+          { id: session.user.id }
+        ]
+      }
     });
+    
+    console.log("Student found:", student ? `ID: ${student.id}` : "❌ No student found");
     
     if (!student) {
       return NextResponse.json({ error: "Student profile not found" }, { status: 404 });
     }
-    
-    // 2. Find all classes the student is enrolled in
+
+    // Step 2: Find enrollments
     const enrollments = await db.enrollment.findMany({
-      where: { 
+      where: {
         studentId: student.id,
-        enrolled: true 
+        enrolled: true
       },
-      select: { 
-        classId: true 
+      include: {
+        class: {
+          select: {
+            id: true,
+            name: true,
+            code: true
+          }
+        }
       }
     });
     
-    if (enrollments.length === 0) {
-      return NextResponse.json([]);
-    }
+    console.log("Enrollments found:", enrollments.length);
+    enrollments.forEach(enrollment => {
+      console.log(`- Enrolled in class: ${enrollment.class.name} (${enrollment.class.code})`);
+    });
     
     const classIds = enrollments.map(enrollment => enrollment.classId);
     
-    // 3. Get available store items for these classes
-    const storeItems = await db.storeItem.findMany({
+    if (classIds.length === 0) {
+      console.log("❌ Student not enrolled in any classes");
+      return NextResponse.json([]);
+    }
+
+    // Step 3: Find ALL store items for these classes (no filters first)
+    const allStoreItemsInClasses = await db.storeItem.findMany({
       where: {
-        isAvailable: true,
-        quantity: { gt: 0 },
         class: {
           some: {
             id: { in: classIds }
           }
         }
       },
-      select: {
-        id: true,
-        name: true,
-        emoji: true,
-        price: true,
-        description: true,
-        quantity: true,
-        isAvailable: true,
+      include: {
         class: {
           select: {
             id: true,
@@ -64,16 +76,27 @@ export async function GET() {
             emoji: true
           }
         }
-      },
-      orderBy: { name: "asc" }
+      }
     });
     
-    return NextResponse.json(storeItems);
+    console.log("Total store items in student's classes:", allStoreItemsInClasses.length);
+    allStoreItemsInClasses.forEach(item => {
+      console.log(`- Item: ${item.name}, Available: ${item.isAvailable}, Quantity: ${item.quantity}`);
+    });
+
+    // Step 4: Apply filters
+    const availableItems = allStoreItemsInClasses.filter(item => 
+      item.isAvailable && item.quantity > 0
+    );
+    
+    console.log("Available items after filtering:", availableItems.length);
+    
+    return NextResponse.json(availableItems);
     
   } catch (error) {
-    console.error("Error fetching student store items:", error);
+    console.error("❌ Error in student storefront API:", error);
     return NextResponse.json(
-      { error: "Failed to fetch store items" }, 
+      { error: "Internal server error" },
       { status: 500 }
     );
   }

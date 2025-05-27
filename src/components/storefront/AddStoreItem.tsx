@@ -17,7 +17,7 @@ import {
 } from "@/src/components/ui/dialog";
 import { Input } from "@/src/components/ui/input";
 import { Label } from "@/src/components/ui/label";
-import { toast } from "react-hot-toast";
+import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { Textarea } from "@/src/components/ui/textarea";
 import { Switch } from "@/src/components/ui/switch";
@@ -49,6 +49,9 @@ const AddStoreItem = ({ isOpen, onClose, onSuccess }: AddStoreItemProps) => {
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [isLoadingClasses, setIsLoadingClasses] = useState(true);
   const [selectedClassIds, setSelectedClassIds] = useState<string[]>([]);
+
+  // State for availability
+  const [isAvailableChecked, setIsAvailableChecked] = useState(true);
 
   // Fetch classes when component mounts
   useEffect(() => {
@@ -103,6 +106,15 @@ const AddStoreItem = ({ isOpen, onClose, onSuccess }: AddStoreItemProps) => {
         formData.append("classIds", classId);
       });
 
+      // Handle isAvailable explicitly
+      const isAvailableValue = formData.get("isAvailable");
+      // If the last value is "true" (from the checked switch), use that
+      const isAvailable = isAvailableValue === "true";
+
+      // Replace with the correctly processed boolean value
+      formData.delete("isAvailable");
+      formData.append("isAvailable", isAvailable ? "true" : "false");
+
       const result = await createStoreItem(formData);
 
       if (!result.success) {
@@ -117,8 +129,8 @@ const AddStoreItem = ({ isOpen, onClose, onSuccess }: AddStoreItemProps) => {
         router.refresh();
 
         // Close dialog and trigger success callback
-        onSuccess?.();
-        onClose?.();
+        if (onSuccess) onSuccess();
+        if (onClose) onClose();
       }
     } catch (error) {
       toast.error("Failed to create store item");
@@ -194,7 +206,11 @@ const AddStoreItem = ({ isOpen, onClose, onSuccess }: AddStoreItemProps) => {
             <div className="space-y-2">
               <Label htmlFor="isAvailable">Available for Purchase</Label>
               <div className="flex items-center space-x-2">
-                <Switch id="isAvailable" name="isAvailable" defaultChecked />
+                <Switch
+                  id="isAvailable"
+                  checked={isAvailableChecked}
+                  onCheckedChange={setIsAvailableChecked}
+                />
                 <Label htmlFor="isAvailable">Available</Label>
               </div>
             </div>
@@ -277,6 +293,13 @@ const AddStoreItem = ({ isOpen, onClose, onSuccess }: AddStoreItemProps) => {
               )}
             </Button>
           </div>
+
+          {/* Hidden input for isAvailable */}
+          <input
+            type="hidden"
+            name="isAvailable"
+            value={isAvailableChecked ? "true" : "false"}
+          />
         </form>
       </DialogContent>
     </Dialog>

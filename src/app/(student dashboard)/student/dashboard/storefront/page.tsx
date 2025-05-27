@@ -36,13 +36,15 @@ export default function StudentStoreFrontPage() {
       const response = await fetch('/api/student/storefront');
       
       if (!response.ok) {
-        throw new Error('Failed to fetch store items');
+        const errorText = await response.text();
+        console.error("❌ API Error response:", errorText);
+        throw new Error(`Failed to fetch store items: ${response.status}`);
       }
       
       const data = await response.json();
       setStoreItems(data);
     } catch (error) {
-      console.error("Error fetching store items:", error);
+      console.error("❌ Client error fetching store items:", error);
       toast({
         title: "Error",
         description: "Failed to load store items. Please try again.",
@@ -110,7 +112,7 @@ export default function StudentStoreFrontPage() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {storeItems.map((item) => (
             <Card key={item.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardHeader className="pb-2">

@@ -101,25 +101,38 @@ export function StoreItemCard({
             </div>
           </div>
           <div className="space-y-1 text-sm">
-          <p><span className="font-medium">Quantity:</span> {quantity}</p>
+            <p>
+              <span className="font-medium">Quantity:</span> {quantity}
+            </p>
+            <p>
+              <span className="font-medium">Available:</span>{" "}
+              {isAvailable ? "Yes" : "No"}
+            </p>
 
-          {classes.length > 0 && (
-              <div className="mt-3">
-                <p className="font-medium mb-1">Assigned to:</p>
-                <div className="flex flex-wrap gap-1">
-                  {classes.slice(0, 2).map(cls => (
-                    <span key={cls.id} className="bg-white/50 px-2 py-0.5 rounded text-xs">
-                      {cls.name}
-                    </span>
-                  ))}
-                  {classes.length > 2 && (
-                    <span className="bg-white/50 px-2 py-0.5 rounded text-xs">
-                      +{classes.length - 2} more
-                    </span>
-                  )}
-                </div>
-              </div>
-            )}
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {classes && classes.length > 0 ? (
+                classes.slice(0, 3).map((cls: any) => (
+                  <span
+                    key={cls.id}
+                    className="inline-flex items-center text-xs bg-white rounded-full px-2 py-1 border"
+                  >
+                    <span className="mr-1">{cls.emoji}</span>
+                    <span className="truncate max-w-[80px]">{cls.name}</span>
+                  </span>
+                ))
+              ) : (
+                <span className="inline-flex items-center text-xs bg-white rounded-full px-2 py-1 border text-gray-500">
+                  <span className="mr-1">📝</span>
+                  <span>Unassigned</span>
+                </span>
+              )}
+
+              {classes && classes.length > 3 && (
+                <span className="inline-flex items-center text-xs bg-white rounded-full px-2 py-1 border">
+                  +{classes.length - 3} more
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </Card>
@@ -139,7 +152,7 @@ export function StoreItemCard({
       />
       <AssignStoreItemDialog
         isOpen={showAssignDialog}
-        onClose={() => setIsEditing(false)}
+        onClose={() => setShowAssignDialog(false)} // FIXED
         assignedClasses={classes}
         storeItemId={id}
         storeItemTitle={name}
