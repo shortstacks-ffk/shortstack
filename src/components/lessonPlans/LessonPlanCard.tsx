@@ -18,15 +18,21 @@ interface LessonPlanCardProps {
     description?: string;
     createdAt: string;
     updatedAt: string;
-    classId?: string; // Class code if this is a regular lesson plan
+    classId?: string;
+    grade?: string; 
+    class?: {       
+      name?: string;
+      emoji?: string;
+      grade?: string;
+    };
   };
   backgroundColor: string;
   isTemplate?: boolean;
   isSuperUser?: boolean;
   onEdit?: () => void;
   onDelete?: () => void;
-  onUpdate?: () => void; // Add this missing prop
-  viewContext?: 'class' | 'dashboard'; // Add this prop
+  onUpdate?: () => void;
+  viewContext?: 'class' | 'dashboard';
 }
 
 export default function LessonPlanCard({ 
@@ -37,7 +43,7 @@ export default function LessonPlanCard({
   onEdit,
   onDelete,
   onUpdate,
-  viewContext = 'dashboard', // Default to 'dashboard' if not provided
+  viewContext = 'dashboard',
 }: LessonPlanCardProps) {
   const router = useRouter();
   const [isDeleting, setIsDeleting] = useState(false);
@@ -133,9 +139,29 @@ export default function LessonPlanCard({
           {isTemplate && (
             <Badge 
               variant="secondary" 
-              className="absolute top-2 left-2 bg-white/30 backdrop-blur-sm text-white"
+              className="absolute top-2 left-2 bg-white/30 backdrop-blur-sm text-black"
             >
               Template
+            </Badge>
+          )}
+          
+          {/* Grade badge */}
+          {plan.grade && !isTemplate && (
+            <Badge 
+              variant="outline" 
+              className="absolute top-2 left-2 bg-white/20 backdrop-blur-sm text-black border-black/20"
+            >
+              Grade {plan.grade}
+            </Badge>
+          )}
+          
+          {/* Adjust template badge position if both are present */}
+          {isTemplate && plan.grade && (
+            <Badge 
+              variant="outline" 
+              className="absolute top-11 left-2 bg-white/20 backdrop-blur-sm text-black border-black/20"
+            >
+              Grade {plan.grade}
             </Badge>
           )}
           
@@ -144,7 +170,7 @@ export default function LessonPlanCard({
             <div className="absolute top-2 right-2 z-10 dropdown-menu" onClick={(e) => e.stopPropagation()}>
               <DropdownMenu>
                 <DropdownMenuTrigger className="bg-white/20  rounded-full p-1 hover:bg-white/40 transition-colors">
-                  <MoreHorizontal className="h-5 w-5 text-white" />
+                  <MoreHorizontal className="h-5 w-5 text-black" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem onClick={handleEdit} disabled={isDeleting}>
@@ -173,11 +199,20 @@ export default function LessonPlanCard({
           )}
 
           <CardContent className="flex flex-col items-center justify-center h-full">
-            <h1 className="text-2xl font-bold text-white text-center">{plan.name}</h1>
+            <h1 className="text-2xl font-bold text-black text-center">{plan.name}</h1>
             {plan.description && (
-              <p className="text-white/80 text-sm mt-2 text-center line-clamp-3">
+              <p className="text-black/80 text-sm mt-2 text-center line-clamp-3">
                 {plan.description}
               </p>
+            )}
+            
+            {/* Show class context when viewed from dashboard */}
+            {viewContext === 'dashboard' && plan.class && (
+              <div className="mt-2 text-center">
+                <p className="text-black/60 text-xs">
+                  {plan.class.emoji} {plan.class.name}
+                </p>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -190,7 +225,6 @@ export default function LessonPlanCard({
           onClose={() => setIsEditDialogOpen(false)}
           onSuccess={handleEditSuccess}
           lessonPlan={plan}
-          isTemplate={isTemplate}
         />
       )}
     </>

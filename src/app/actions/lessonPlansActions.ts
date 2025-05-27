@@ -82,12 +82,25 @@ export async function getLessonPlans(userId: string): Promise<any> {
         ],
       },
       include: {
-        class: true,
+        class: {
+          select: {
+            grade: true, 
+            name: true,
+            emoji: true,
+            code: true
+          }
+        },
         genericLessonPlan: true,
       },
     });
 
-    return { success: true, data: lessonPlans };
+    // Map to include grade information
+    const result = lessonPlans.map(plan => ({
+      ...plan,
+      grade: plan.class?.grade 
+    }));
+
+    return { success: true, data: result };
   } catch (error) {
     console.error("Error fetching lesson plans:", error);
     return { success: false, error: "Failed to fetch lesson plans" };
@@ -107,7 +120,7 @@ export async function getLessonPlansByClass(
     // Find the class first
     const classObj = await db.class.findUnique({
       where: { code: classCode },
-      select: { id: true, userId: true, code: true }
+      select: { id: true, userId: true, code: true, grade: true } 
     });
 
     if (!classObj) {
@@ -132,23 +145,29 @@ export async function getLessonPlansByClass(
       return { success: false, error: 'Forbidden: You do not own this class' };
     }
 
-    // This is the key fix - we need to use the class CODE as the foreign key
-    // because that's how your schema is set up
     const lessonPlans = await db.lessonPlan.findMany({
-      where: { classId: classCode }, // Use the original classCode parameter
+      where: { classId: classCode },
       include: { 
         files: true, 
-        assignmentRelations: true
+        assignmentRelations: true,
+        class: { 
+          select: {
+            grade: true,
+            name: true,
+            emoji: true
+          }
+        }
       },
       orderBy: { createdAt: 'asc' }
     });
 
     console.log(`Found ${lessonPlans.length} lesson plans for class code ${classCode}`);
 
-    // Map the results to maintain backward compatibility
+    // Map the results to include grade information
     const result = lessonPlans.map(plan => ({
       ...plan,
-      assignments: plan.assignmentRelations
+      assignments: plan.assignmentRelations,
+      grade: plan.class.grade 
     }));
 
     return { success: true, data: result };

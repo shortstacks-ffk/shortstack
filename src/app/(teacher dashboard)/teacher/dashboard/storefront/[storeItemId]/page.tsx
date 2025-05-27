@@ -43,7 +43,7 @@ interface StoreItem {
   description?: string;
   quantity: number;
   isAvailable: boolean;
-  classes: Array<{
+  classes: Array<{  
     id: string;
     name: string;
     code: string;
@@ -52,7 +52,15 @@ interface StoreItem {
   purchases?: Array<{
     id: string;
     quantity: number;
-    // other purchase fields
+    totalPrice: number;
+    status: string;
+    purchasedAt: string;
+    student: {
+      id: string;
+      firstName: string;
+      lastName: string;
+      profileImage?: string;
+    };
   }>;
 }
 
@@ -187,7 +195,7 @@ export default async function StoreItemPage({ params }: PageProps) {
                 {Array.isArray(storeItem.classes) && storeItem.classes.length > 0 ? (
                   <div className="space-y-4">
                     <h3 className="text-lg font-medium">
-                      This item is assigned to {storeItem.classes.length} {storeItem.classes.length === 1 ? 'class' : 'classes'}:
+                      Assigned Classes
                     </h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                       {storeItem.classes.map((classItem) => (

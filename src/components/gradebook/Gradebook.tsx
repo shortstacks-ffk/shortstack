@@ -204,18 +204,25 @@ export default function Gradebook({ classCode }: GradebookProps) {
         <TabsContent value="grid">
           <div className="rounded-md border overflow-x-auto">
             <Table>
-              <TableHeader>
+              <TableHeader className='bg-orange-500'>
                 <TableRow>
-                  <TableHead className="sticky left-0 bg-white">Student</TableHead>
+                  <TableHead className="sticky left-0 text-white hover:bg-orange-500 hover:text-white pointer-events-none">
+                    Student
+                  </TableHead>
                   {assignments.map(assignment => (
-                    <TableHead key={assignment.id} className="text-center">
+                    <TableHead 
+                      key={assignment.id} 
+                      className="text-center text-white hover:bg-orange-500 hover:text-white pointer-events-none"
+                    >
                       <div className="font-medium">{assignment.name}</div>
                       <div className="text-xs text-muted-foreground">
                         {new Date(assignment.dueDate).toLocaleDateString()}
                       </div>
                     </TableHead>
                   ))}
-                  <TableHead className="text-center">Average</TableHead>
+                  <TableHead className="left-0 text-white hover:bg-orange-500 hover:text-white pointer-events-none">
+                    Average
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

@@ -14,14 +14,10 @@ interface ItemClass {
 async function StoreItemsContent() {
   const getColumnColor = (index: number) => {
     switch (index % 3) {
-      case 0:
-        return "bg-green-200";
-      case 1:
-        return "bg-emerald-200";
-      case 2:
-        return "bg-teal-200";
-      default:
-        return "bg-blue-200";
+      case 0: return "bg-blue-100";
+      case 1: return "bg-green-100";
+      case 2: return "bg-yellow-100";
+      default: return "bg-blue-100";
     }
   };
   const response = await getAllStoreItems();
@@ -51,8 +47,7 @@ async function StoreItemsContent() {
 
 export default async function StoreFrontPage() {
   return (
-    <main className="container mx-auto p-4">
-      <h1 className="text-3xl font-bold mb-4">Storefront</h1>
+    <div className="w-full">
       <Suspense
         fallback={
           <div className="text-center py-8">Loading store items...</div>
@@ -60,6 +55,6 @@ export default async function StoreFrontPage() {
       >
         <StoreItemsContent />
       </Suspense>
-    </main>
+    </div>
   );
 }

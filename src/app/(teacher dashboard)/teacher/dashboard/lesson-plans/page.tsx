@@ -22,6 +22,7 @@ import LessonPlanCard from "@/src/components/lessonPlans/LessonPlanCard";
 import AddLessonPlanDialog from "@/src/components/lessonPlans/AddLessonPlanDialog";
 import AddGenericLessonPlanCard from "@/src/components/lessonPlans/AddGenericLessonPlanCard";
 import GenericLessonPlanDialog from "@/src/components/lessonPlans/GenericLessonPlanDialog";
+import AddAnything from "@/src/components/AddAnything";
 import { toast } from "sonner";
 
 // LessonPlan interface
@@ -156,14 +157,10 @@ export default function LessonPlansPage() {
 
   const getColumnColor = (index: number) => {
     switch (index % 3) {
-      case 0:
-        return "bg-orange-300";
-      case 1:
-        return "bg-green-300";
-      case 2:
-        return "bg-red-300";
-      default:
-        return "bg-orange-300";
+      case 0: return "bg-blue-100";
+      case 1: return "bg-green-100";
+      case 2: return "bg-yellow-100";
+      default: return "bg-blue-100";
     }
   };
 
@@ -173,12 +170,6 @@ export default function LessonPlansPage() {
 
   return (
     <main className="container mx-auto p-4">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">
-          {isSuperUser ? "Lesson Plan Templates" : "Lesson Plans"}
-        </h1>
-      </div>
-
       {isSuperUser ? (
         // For super users, just show the templates content directly (no tabs)
         <div>
@@ -250,13 +241,7 @@ export default function LessonPlansPage() {
                 </div>
               )}
 
-              <div
-                className="border-4 border-dashed border-gray-200 rounded-lg p-8 flex flex-col items-center justify-center cursor-pointer hover:border-gray-300 transition-colors"
-                onClick={() => setIsAddDialogOpen(true)}
-              >
-                <PlusCircle className="h-12 w-12 text-gray-400 mb-2" />
-                <p className="text-gray-500">Create New Lesson Plan</p>
-              </div>
+              <AddAnything title="Create Lesson Plan" FormComponent={AddLessonPlanDialog} />
             </div>
           </TabsContent>
 
