@@ -335,7 +335,8 @@ export const getClassByID = async (id: string): Promise<ClassResponse> => {
 }
 
 // Update class (only teacher owner)
-export async function updateClass(id: string, data: ClassData): Promise<ClassResponse> {
+// Update class (only teacher owner)
+export async function updateClass(id: string, data: any): Promise<ClassResponse> {
   try {
     const session = await getAuthSession();
     if (!session?.user?.id || session.user.role !== "TEACHER") {
@@ -356,7 +357,7 @@ export async function updateClass(id: string, data: ClassData): Promise<ClassRes
       ? data.color 
       : "primary";
 
-    // Update class with clean data, including startDate and endDate
+    // Update class with clean data
     const updatedClass = await db.class.update({
       where: { id },
       data: {
@@ -365,71 +366,75 @@ export async function updateClass(id: string, data: ClassData): Promise<ClassRes
         cadence: data.cadence,
         grade: data.grade,
         color: validColor,
-        startDate: data.startDate, // Include startDate
-        endDate: data.endDate     // Include endDate
+        startDate: data.startDate,
+        endDate: data.endDate
       }
     });
 
-    // If schedule is provided, update class sessions
-    if (data.schedule) {
-      // First delete existing sessions
-      await db.classSession.deleteMany({
-        where: { classId: id }
-      });
+    // Delete existing sessions
+    await db.classSession.deleteMany({
+      where: { classId: id }
+    });
+    
+    // Delete existing recurring calendar events
+    await db.calendarEvent.deleteMany({
+      where: { 
+        classId: id,
+        isRecurring: true
+      }
+    });
 
-      // Ensure days are numeric (0-6)
-      const dayNumbers = data.schedule.days.map(day => 
-        typeof day === "string" ? parseInt(day, 10) : day
-      );
+    // Process each schedule
+    if (data.schedules && data.schedules.length > 0) {
+      for (const schedule of data.schedules) {
+        // Ensure days are numeric (0-6)
+        const dayNumbers = schedule.days.map((day: any) => 
+          typeof day === "string" ? parseInt(day, 10) : day
+        );
+        
+        if (dayNumbers.length === 0) continue;
 
-      // Create new sessions for each day
-      for (const day of dayNumbers) {
-        await db.classSession.create({
+        // Create class session records for this time slot
+        for (const day of dayNumbers) {
+          await db.classSession.create({
+            data: {
+              classId: id,
+              dayOfWeek: day,
+              startTime: schedule.startTime,
+              endTime: schedule.endTime
+            }
+          });
+        }
+        
+        // Create calendar event for this time slot
+        const eventTitle = `${data.emoji} ${data.name} Class`;
+        
+        // Convert start/end times to proper date objects
+        const startHour = parseInt(schedule.startTime.split(':')[0]);
+        const startMinute = parseInt(schedule.startTime.split(':')[1]);
+        const endHour = parseInt(schedule.endTime.split(':')[0]);
+        const endMinute = parseInt(schedule.endTime.split(':')[1]);
+        
+        const startDate = new Date();
+        startDate.setHours(startHour, startMinute, 0, 0);
+        
+        const endDate = new Date();
+        endDate.setHours(endHour, endMinute, 0, 0);
+        
+        await db.calendarEvent.create({
           data: {
+            title: eventTitle,
+            description: `Regular class session for ${data.name}`,
+            startDate: startDate,
+            endDate: endDate,
+            variant: validColor,
+            isRecurring: true,
+            recurringDays: dayNumbers,
+            createdById: session.user.id,
             classId: id,
-            dayOfWeek: day, // Store as number (0-6)
-            startTime: data.schedule.startTime, // Store as string (HH:MM)
-            endTime: data.schedule.endTime // Store as string (HH:MM)
           }
         });
       }
-      
-      // Update existing calendar events or create new ones
-      await db.calendarEvent.deleteMany({
-        where: { 
-          classId: id,
-          isRecurring: true
-        }
-      });
-      
-      const eventTitle = `${data.emoji} ${data.name} Class`;
-      
-      // Convert start/end times to proper date objects
-      const startHour = parseInt(data.schedule.startTime.split(':')[0]);
-      const startMinute = parseInt(data.schedule.startTime.split(':')[1]);
-      const endHour = parseInt(data.schedule.endTime.split(':')[0]);
-      const endMinute = parseInt(data.schedule.endTime.split(':')[1]);
-      
-      const startDate = new Date();
-      startDate.setHours(startHour, startMinute, 0, 0);
-      
-      const endDate = new Date();
-      endDate.setHours(endHour, endMinute, 0, 0);
-      
-      // Create updated calendar event
-      await db.calendarEvent.create({
-        data: {
-          title: eventTitle,
-          description: `Regular class session for ${data.name}`,
-          startDate: startDate,
-          endDate: endDate,
-          variant: validColor,
-          isRecurring: true,
-          recurringDays: dayNumbers,
-          createdById: session.user.id,
-          classId: id,
-        }
-      });
     }
 
     // Ensure revalidation is immediate and covers all necessary paths

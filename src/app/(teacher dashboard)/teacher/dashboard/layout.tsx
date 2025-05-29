@@ -62,6 +62,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   // Find the main content area div and update it for calendar pages:
   const isCalendarPage = pathname.includes("/calendar");
   
+  // Add this improved function to detect active state
+  const isNavItemActive = (href: string) => {
+    // Exact match for dashboard home
+    if (href === '/teacher/dashboard' && pathname === '/teacher/dashboard') {
+      return true;
+    }
+    
+    // For other routes, check if pathname starts with the href
+    // but make sure we're not matching partial segments
+    if (href !== '/teacher/dashboard') {
+      return pathname.startsWith(href + '/') || pathname === href;
+    }
+    
+    return false;
+  };
+
   return (
     <SidebarProvider>
       {/* Mobile Sidebar Overlay */}
@@ -95,41 +111,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <NavLogo items={dashboardData.dashLogo} />
           </div>
           
-          {/* Mobile teacher profile info */}
-          {/* <div className="px-4 py-4 border-b">
-            <div className="flex items-center space-x-3">
-              <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center text-white font-medium">
-                {teacherImage ? (
-                  <img 
-                    src={teacherImage} 
-                    alt={teacherName} 
-                    className="h-full w-full rounded-full object-cover"
-                  />
-                ) : (
-                  <span>{teacherInitial}</span>
-                )}
-              </div>
-              <div>
-                <p className="font-medium">{teacherName}</p>
-                <p className="text-sm text-gray-500">Teacher Dashboard</p>
-              </div>
-            </div>
-          </div> */}
+    
           
           {/* Mobile Navigation */}
           <div className="px-2 py-4 space-y-1">
             <NavMain items={dashboardData.navMain} />
-            
-            {/* Logout Button */}
-            {/* <div className="mt-6 px-2">
-              <button
-                onClick={handleLogout}
-                className="flex w-full items-center gap-2 rounded-md p-2 text-left text-sm text-red-600 hover:bg-red-50"
-              >
-                <LogOut className="h-4 w-4" />
-                <span>Logout</span>
-              </button>
-            </div> */}
           </div>
         </div>
       </div>

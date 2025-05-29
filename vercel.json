@@ -2,5 +2,11 @@
     "buildCommand": "prisma generate && next build",
     "installCommand": "npm install sharp && npm install",
     "framework": "nextjs",
-    "outputDirectory": ".next"
+    "outputDirectory": ".next",
+    "crons": [
+    {
+      "path": "/api/banking/generate-statements",
+      "schedule": "0 0 27 * *"
+    }
+  ]
   }
