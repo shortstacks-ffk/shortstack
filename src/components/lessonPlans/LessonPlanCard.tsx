@@ -200,11 +200,6 @@ export default function LessonPlanCard({
 
           <CardContent className="flex flex-col items-center justify-center h-full">
             <h1 className="text-2xl font-bold text-black text-center">{plan.name}</h1>
-            {plan.description && (
-              <p className="text-black/80 text-sm mt-2 text-center line-clamp-3">
-                {plan.description}
-              </p>
-            )}
             
             {/* Show class context when viewed from dashboard */}
             {viewContext === 'dashboard' && plan.class && (

@@ -213,11 +213,10 @@ export async function getStudentGrades(classCode: string): Promise<GradebookResp
     });
     
     if (!student) {
-      console.error("❌ Student profile not found");
       return { success: false, error: 'Student profile not found' };
     }
 
-    // First, verify the student is enrolled in this class by code
+    // Verify the student is enrolled in this class
     const enrollment = await db.enrollment.findFirst({
       where: {
         studentId: student.id,
@@ -261,9 +260,6 @@ export async function getStudentGrades(classCode: string): Promise<GradebookResp
       }
     });
 
-    console.log("Found submissions:", submissions.length);
-    console.log("Sample submission:", submissions[0]);
-
     return {
       success: true,
       data: {
@@ -274,5 +270,144 @@ export async function getStudentGrades(classCode: string): Promise<GradebookResp
   } catch (error: any) {
     console.error("Get student grades error:", error);
     return { success: false, error: "Failed to fetch grades data" };
+  }
+}
+
+// Get student progress across ALL enrolled classes
+export async function getStudentOverallProgress(): Promise<GradebookResponse> {
+  try {
+    const session = await getAuthSession();
+    
+    if (!session?.user?.id || session.user.role !== "STUDENT") {
+       return { success: false, error: 'Unauthorized: Students only' };
+    }
+
+    // Find the student profile ID
+    const student = await db.student.findFirst({
+      where: {
+        OR: [
+          { userId: session.user.id },
+          ...(session.user.email ? [{ schoolEmail: session.user.email }] : []),
+          { id: session.user.id }
+        ]
+      }
+    });
+    
+    if (!student) {
+      return { success: false, error: 'Student profile not found' };
+    }
+
+    // Get all classes the student is enrolled in
+    const enrollments = await db.enrollment.findMany({
+      where: {
+        studentId: student.id,
+        enrolled: true
+      },
+      include: {
+        class: {
+          select: {
+            id: true,
+            code: true,
+            name: true
+          }
+        }
+      }
+    });
+
+    // Use class codes for assignment lookup
+    const classCodes = enrollments.map(e => e.class.code);
+
+    // Get all assignments across all enrolled classes
+    const assignments = await db.assignment.findMany({
+      where: { 
+        classId: { in: classCodes }
+      },
+      select: {
+        id: true,
+        name: true,
+        classId: true,
+        dueDate: true
+      }
+    });
+
+    // Get all submissions for this student across all classes
+    const submissions = await db.studentAssignmentSubmission.findMany({
+      where: {
+        studentId: student.id,
+        assignmentId: { in: assignments.map(a => a.id) }
+      },
+      select: {
+        id: true,
+        assignmentId: true,
+        grade: true,
+        status: true,
+        createdAt: true
+      }
+    });
+
+    // Calculate progress statistics
+    const totalAssignments = assignments.length;
+    const completedAssignments = submissions.filter(s => 
+      s.status === 'SUBMITTED' || s.status === 'GRADED'
+    ).length;
+    
+    const gradedSubmissions = submissions.filter(s => s.grade !== null && s.grade !== undefined);
+    const totalPoints = gradedSubmissions.reduce((sum, sub) => sum + (sub.grade || 0), 0);
+    
+    // Calculate averages and other metrics
+    const averageGrade = gradedSubmissions.length > 0 
+      ? Math.round(totalPoints / gradedSubmissions.length) 
+      : 0;
+
+    // ✅ NEW: Get actual bank account balances
+    let totalBankBalance = 0;
+    try {
+      const bankAccounts = await db.bankAccount.findMany({
+        where: {
+          studentId: student.id
+        },
+        select: {
+          balance: true,
+          accountType: true
+        }
+      });
+
+      // Sum all account balances (checking + savings)
+      totalBankBalance = bankAccounts.reduce((sum, account) => {
+        return sum + (account.balance || 0);
+      }, 0);
+
+    } catch (bankError) {
+      console.error("Error fetching bank balance:", bankError);
+      // Fall back to points-based calculation if bank fetch fails
+      totalBankBalance = totalPoints;
+    }
+
+    // Mock streak calculation
+    const streak = Math.min(completedAssignments * 2, 30);
+
+    // Progress summary for dashboard
+    const progressSummary = {
+      completedAssignments,
+      totalAssignments,
+      points: totalPoints,
+      balance: totalBankBalance, // ✅ Use real bank balance
+      streak,
+      averageGrade,
+      gradedCount: gradedSubmissions.length
+    };
+
+    return {
+      success: true,
+      data: {
+        progress: progressSummary,
+        assignments,
+        submissions,
+        enrolledClasses: classCodes.length
+      }
+    };
+  } catch (error: any) {
+    console.error("Get student overall progress error:", error);
+    return { success: false, error: "Failed to fetch progress data" };
   }
 }
