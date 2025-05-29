@@ -28,13 +28,13 @@ model User {
 }
 
 model TeacherProfile {
-  id        Int    @id @default(autoincrement())
-  userId    String @unique
-  firstName String
-  lastName  String
-  bio      String?
+  id          Int     @id @default(autoincrement())
+  userId      String  @unique
+  firstName   String
+  lastName    String
+  bio         String?
   institution String?
-  user      User   @relation(fields: [userId], references: [id])
+  user        User    @relation(fields: [userId], references: [id])
 }
 
 model Account {
@@ -112,6 +112,7 @@ model Student {
   createdAt             DateTime                      @default(now())
   updatedAt             DateTime                      @updatedAt
   bankAccounts          BankAccount[]
+  bankStatements        BankStatement[]
   calendarEvents        CalendarEvent[]
   enrollments           Enrollment[]
   class                 Class                         @relation(fields: [classId], references: [code], onDelete: Cascade)
@@ -306,18 +307,36 @@ model StudentPurchase {
 }
 
 model BankAccount {
-  id                String        @id @default(cuid())
-  accountNumber     String        @unique @db.VarChar(12)
+  id                String          @id @default(cuid())
+  accountNumber     String          @unique @db.VarChar(12)
   accountType       AccountType
-  balance           Float         @default(0)
+  balance           Float           @default(0)
   studentId         String
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
-  student           Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  student           Student         @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  bankStatements    BankStatement[]
   transactions      Transaction[]
-  receivedTransfers Transaction[] @relation("TransferTransactions")
+  receivedTransfers Transaction[]   @relation("TransferTransactions")
 
   @@index([studentId])
+}
+
+model BankStatement {
+  id          String      @id @default(cuid())
+  accountId   String
+  studentId   String
+  month       String
+  year        String
+  url         String
+  generatedAt DateTime    @default(now())
+  account     BankAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  student     Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, month, year])
+  @@index([accountId])
+  @@index([studentId])
+  @@index([month, year])
 }
 
 model Transaction {
@@ -384,6 +403,17 @@ model Todo {
 
   @@index([userId])
   @@index([dueDate])
+}
+model PasswordReset {
+  id                  String    @id @default(cuid())
+  email               String    @unique
+  code                String
+  resetToken          String?
+  expiresAt           DateTime
+  resetTokenExpiresAt DateTime?
+  used                Boolean   @default(false)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 }
 
 enum Role {
