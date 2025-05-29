@@ -59,36 +59,44 @@ function AccountSettings() {
     }
   }, [session, status, toast]);
 
-  // Rest of your component code...
   return (
-    <Card className="w-full max-w-4xl mx-auto p-6">
-      <Tabs defaultValue={initialTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="profile">Profile</TabsTrigger>
-          <TabsTrigger value="security">Security</TabsTrigger>
-        </TabsList>
-        
-        {loading ? (
-          <div className="flex justify-center items-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    <div className="w-full h-full">
+          <h1 className="text-2xl md:text-3xl font-bold mb-4">Profile</h1>
+          
+          <div className="bg-white rounded-lg shadow-sm border">
+            <Tabs defaultValue={initialTab} className="w-full">
+              <TabsList className="w-full border-b flex justify-start h-auto p-0 bg-transparent space-x-8">
+                <TabsTrigger 
+                  value="profile" 
+                  className="px-3 py-3 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-orange-500 data-[state=active]:text-orange-600 data-[state=active]:shadow-none"
+                >
+                  Account
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="security" 
+                  className="px-3 py-3 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-orange-500 data-[state=active]:text-orange-600 data-[state=active]:shadow-none"
+                >
+                  Security
+                </TabsTrigger>
+              </TabsList>
+              
+              <div className="p-4">
+                <TabsContent value="profile" className="mt-0">
+                  <AccountProfileTab 
+                    user={user} 
+                    role="student"
+                    isStudent={true}
+                    onUpdate={(updatedUser) => setUser({...user, ...updatedUser})}
+                  />
+                </TabsContent>
+                
+                <TabsContent value="security" className="mt-0">
+                  <AccountSecurityTab user={user} role="student" isStudent={true} />
+                </TabsContent>
+              </div>
+            </Tabs>
           </div>
-        ) : (
-          <>
-            <TabsContent value="profile">
-              <AccountProfileTab 
-                user={user} 
-                role="student" 
-                onUpdate={(updatedUser) => setUser({...user, ...updatedUser})}
-              />
-            </TabsContent>
-            
-            <TabsContent value="security">
-              <AccountSecurityTab user={user} role="student" />
-            </TabsContent>
-          </>
-        )}
-      </Tabs>
-    </Card>
+        </div>
   );
 }
 

@@ -87,20 +87,23 @@ export default function StudentDashboardLayout({ children }: { children: React.R
   useEffect(() => {
     const fetchStudentProfile = async () => {
       if (session?.user) {
-        try {
-          const response = await fetch('/api/student/profile?t=' + new Date().getTime(), {
-            headers: {
-              'Cache-Control': 'no-cache',
-              'Pragma': 'no-cache'
+        // Only fetch student profile if the current user is a student
+        if (session.user.role === "STUDENT") {
+          try {
+            const response = await fetch('/api/student/profile?t=' + new Date().getTime(), {
+              headers: {
+                'Cache-Control': 'no-cache',
+                'Pragma': 'no-cache'
+              }
+            });
+            
+            if (response.ok) {
+              const data = await response.json();
+              setStudentData(data);
             }
-          });
-          
-          if (response.ok) {
-            const data = await response.json();
-            setStudentData(data);
+          } catch (error) {
+            console.error("Failed to fetch student profile:", error);
           }
-        } catch (error) {
-          console.error("Failed to fetch student profile:", error);
         }
       }
     };

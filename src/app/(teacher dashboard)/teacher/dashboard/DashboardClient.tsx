@@ -67,7 +67,6 @@ function formatClassSchedule(sessions?: any[]) {
     <div className="w-full">
       <div className="w-full">
         <section className="mb-6 md:mb-8">
-          <h2 className="text-xl md:text-2xl font-semibold mb-3 md:mb-4 px-1">Recent Classes</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
             {displayedClasses.map((cls) => (
               <ClassCard
