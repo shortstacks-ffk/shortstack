@@ -1034,3 +1034,25 @@ body {
 .animate-float {
   animation: float 4s infinite;
 }
+
+/* Enhanced active states for sidebar */
+[data-sidebar="menu-button"][data-active="true"] {
+  background-color: #C2E8D0 !important;
+  color: black !important;
+  font-weight: 500 !important;
+}
+
+[data-sidebar="menu-button"]:hover {
+  background-color: #C2E8C0 !important;
+}
+
+/* Improve how we show the user which section they're in */
+[data-sidebar="group-title"] {
+  color: #374151 !important;
+  font-weight: 600 !important;
+  font-size: 0.875rem !important;
+}
+
+[data-sidebar="menu-button"][data-active="true"] [data-sidebar="menu-icon"] {
+  color: black !important;
+}
