@@ -122,7 +122,7 @@ export default function LessonPlanDetailPage({ classId, planId }: LessonPlanDeta
         <Breadcrumbs
           items={[
             { label: 'Dashboard', href: '/teacher/dashboard' },
-            { label: 'Back to Class', href: `/teacher/dashboard/classes/${classId}` },
+            { label: 'Back to Class', href: `/teacher/dashboard/classes/${classId}?tab=lessonPlans` },
             { label: lessonPlan.name, href: '#' },
           ]}
         />

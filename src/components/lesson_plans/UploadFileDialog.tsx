@@ -262,12 +262,11 @@ export default function UploadFileDialog({
               onChange={(e) => setActivity(e.target.value)}
               disabled={isUploading}
             >
-              <option value="interactive">Interactive</option>
               <option value="presentation">Presentation</option>
-              <option value="document">Document</option>
+              <option value="document">Teaching file</option>
               <option value="worksheet">Worksheet</option>
               <option value="video">Video</option>
-              <option value="visual">Image</option>
+              <option value="visual">Photo</option>
             </select>
           </div>
           

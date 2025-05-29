@@ -1,10 +1,9 @@
 'use client';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
-import { StudentList } from '../students/StudentList';
-// import { LessonPlans} from '@/src/components/class/LessonPlans';
 import LessonPlansList  from '@/src/components/lesson_plans/LessonPlansList';
 import ClassOverview from './ClassOverview';
+import { useSearchParams } from 'next/navigation';
 
 interface ClassTabsProps {
   classData: {
@@ -17,8 +16,11 @@ interface ClassTabsProps {
 }
 
 export default function ClassTabs({ classData }: ClassTabsProps) {
+  const searchParams = useSearchParams();
+  const initialTab = searchParams.get('tab') || 'overview';
+  
   return (
-    <Tabs defaultValue="overview" className="w-full space-y-6">
+    <Tabs defaultValue={initialTab} className="w-full space-y-6">
       <TabsList className="grid w-full grid-cols-3">
         <TabsTrigger value="overview">Overview</TabsTrigger>
         <TabsTrigger value="lessonPlans">Lesson Plans</TabsTrigger>
