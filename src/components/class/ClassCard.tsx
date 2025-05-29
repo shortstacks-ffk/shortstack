@@ -4,9 +4,47 @@ import { Card } from "@/src/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/src/components/ui/dropdown-menu";
 import { MoreHorizontal, Pencil, Trash2, Users, Calendar, GraduationCap } from "lucide-react";
 import { EditClassForm } from "./EditClassForm";
-import { deleteClass } from "@/src/app/actions/classActions"
+import { deleteClass, getClassByID } from "@/src/app/actions/classActions"
 import { useRouter } from "next/navigation";
-   
+import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/src/components/ui/alert-dialog";
+
+// Define a more comprehensive ClassSession type
+interface ClassSession {
+  id?: string;
+  classId?: string;
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+}
+
+// Define a more comprehensive ClassData type
+interface ClassData {
+  id: string;
+  name: string;
+  emoji: string;
+  code: string;
+  color: string;
+  grade?: string;
+  cadence?: string;
+  userId?: string;
+  startDate?: Date;
+  endDate?: Date;
+  classSessions?: ClassSession[];
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+// Props interface for the card component
 interface ClassCardProps {
   id: string;
   emoji: string;
@@ -32,6 +70,11 @@ export const ClassCard = ({
 }: ClassCardProps) => {
   const router = useRouter();
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
+  // Use the proper type instead of any
+  const [classData, setClassData] = useState<ClassData | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   // Get background color directly using a simple mapping function
   const getBackgroundColor = () => {
@@ -54,6 +97,28 @@ export const ClassCard = ({
   const bgClass = getBackgroundColor();
   const textClass = getTextColor();
   
+  // Fetch class data including sessions when opening the edit dialog
+  const handleOpenEditDialog = async () => {
+    try {
+      setIsLoading(true);
+      const result = await getClassByID(id);
+      
+      if (result.success && result.data) {
+        // Type-check the fetched data
+        const fetchedData = result.data as ClassData;
+        setClassData(fetchedData);
+        setIsUpdateDialogOpen(true);
+      } else {
+        toast.error("Failed to load class data");
+      }
+    } catch (error) {
+      console.error("Error fetching class data:", error);
+      toast.error("Failed to load class data");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
   // When clicking the card (excluding the dropdown), push to the class detail route.
   const handleCardClick = (e: React.MouseEvent) => {
     // Stop propagation if clicking dropdown or dialog
@@ -67,11 +132,28 @@ export const ClassCard = ({
     router.push(`/teacher/dashboard/classes/${code}`);
   };
 
-  const handleDelete = async () => {
-    if (confirm('Are you sure you want to delete this class?')) {
-      await deleteClass(id);
+  const handleDeleteClick = () => {
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    try {
+      setIsDeleting(true);
+      const result = await deleteClass(id);
+      
+      if (result.success) {
+        toast.success(`Class "${name}" has been deleted`);
+      } else {
+        toast.error(result.error || "Failed to delete class");
+      }
+    } catch (error) {
+      console.error("Delete class error:", error);
+      toast.error("Something went wrong while deleting the class");
+    } finally {
+      setIsDeleting(false);
+      setIsDeleteDialogOpen(false);
     }
-  }
+  };
   
   return (
     <Card className="bg-transparent w-[250px] mx-auto h-[250px] rounded-xl relative overflow-hidden">
@@ -87,11 +169,11 @@ export const ClassCard = ({
               <MoreHorizontal className="h-5 w-5 text-white/70 hover:text-white" />
             </DropdownMenuTrigger>
             <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => setIsUpdateDialogOpen(true)}>
+              <DropdownMenuItem onClick={handleOpenEditDialog} disabled={isLoading}>
                 <Pencil className="h-4 w-4 mr-2" />
-                Update
+                {isLoading ? "Loading..." : "Update"}
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleDelete}>
+              <DropdownMenuItem onClick={handleDeleteClick}>
                 <Trash2 className="h-4 w-4 mr-2" />
                 Delete
               </DropdownMenuItem>
@@ -131,21 +213,47 @@ export const ClassCard = ({
         </div>
       </div>
 
-      {/* Only render the edit form when it's open */}
-        {isUpdateDialogOpen && (
-          <EditClassForm
-            isOpen={isUpdateDialogOpen}
-            onClose={() => setIsUpdateDialogOpen(false)}
-            classData={{
-          id,
-          name,
-          emoji,
-          color,
-          grade,
-          classSessions: schedule ? [{ schedule }] : [], // Use schedule if available
-          }}
+      {/* Only render the edit form when it's open and we have loaded class data */}
+      {isUpdateDialogOpen && classData && (
+        <EditClassForm
+          isOpen={isUpdateDialogOpen}
+          onClose={() => setIsUpdateDialogOpen(false)}
+          classData={classData} // Pass the complete class data fetched from the server
         />
       )}
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the class "{name}" and all associated data. 
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                handleConfirmDelete();
+              }}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? (
+                <>
+                  <span className="loading loading-spinner loading-xs mr-2"></span>
+                  Deleting...
+                </>
+              ) : (
+                "Delete"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 };

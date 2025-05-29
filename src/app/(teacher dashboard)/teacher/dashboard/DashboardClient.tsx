@@ -36,7 +36,6 @@ declare module "next-auth" {
   }
 }
 
-const DaysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 const DashboardClient = ({ classes }: DashboardClientProps) => {
   const { data: session } = useSession({
@@ -52,15 +51,17 @@ const DashboardClient = ({ classes }: DashboardClientProps) => {
   // Limit the displayed classes to 3 maximum
   const displayedClasses = classesWithCounts.slice(0, 3);
 
-  // Format class sessions into a readable schedule string
-  const formatClassSchedule = (sessions?: ClassSession[]) => {
-    if (!sessions || sessions.length === 0) return null;
-    
-    return sessions.map(session => {
-      const day = DaysOfWeek[session.dayOfWeek];
-      return `${day} ${session.startTime}-${session.endTime}`;
-    }).join(', ');
-  };
+// Add the formatClassSchedule function for consistent display
+const DaysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+function formatClassSchedule(sessions?: any[]) {
+  if (!sessions || sessions.length === 0) return null;
+  
+  return sessions.map(session => {
+    const day = DaysOfWeek[session.dayOfWeek];
+    return `${day} ${session.startTime}-${session.endTime}`;
+  }).join(', ');
+}
 
   return (
     <div className="w-full">
@@ -77,7 +78,7 @@ const DashboardClient = ({ classes }: DashboardClientProps) => {
                 code={cls.code}
                 color={cls.color || "primary"}
                 grade={cls.grade}
-                numberOfStudents={cls.numberOfStudents}
+                numberOfStudents={cls._count?.enrollments || 0}
                 schedule={formatClassSchedule(cls.classSessions)}
                 overview={cls.overview}
               />

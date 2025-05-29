@@ -44,13 +44,44 @@ export function EditClassForm({ isOpen, onClose, classData }: EditClassFormProps
   
   // Initialize schedules from class sessions if available, or use default
   const defaultSchedule = [{ days: [1], startTime: "09:00", endTime: "10:00" }];
-  const [schedules, setSchedules] = useState<ClassScheduleItem[]>(
-    classData.classSessions?.map(session => ({
-      days: [session.dayOfWeek],
-      startTime: session.startTime,
-      endTime: session.endTime
-    })) || defaultSchedule
-  );
+  const [schedules, setSchedules] = useState<ClassScheduleItem[]>(() => {
+    if (!classData.classSessions || !Array.isArray(classData.classSessions) || classData.classSessions.length === 0) {
+      return defaultSchedule;
+    }
+    
+    // Group sessions by time slots
+    const timeSlotMap: Record<string, ClassScheduleItem> = {};
+    
+    classData.classSessions.forEach(session => {
+      // Make sure session has the required properties
+      if (!session.startTime || !session.endTime || typeof session.dayOfWeek !== 'number') {
+        console.warn('Invalid class session data:', session);
+        return;
+      }
+      
+      const timeKey = `${session.startTime}-${session.endTime}`;
+      
+      if (!timeSlotMap[timeKey]) {
+        timeSlotMap[timeKey] = {
+          days: [session.dayOfWeek],
+          startTime: session.startTime,
+          endTime: session.endTime
+        };
+      } else if (!timeSlotMap[timeKey].days.includes(session.dayOfWeek)) {
+        timeSlotMap[timeKey].days.push(session.dayOfWeek);
+      }
+    });
+    
+    // Convert the map to an array
+    const schedulesArray = Object.values(timeSlotMap);
+    
+    // Sort days within each schedule
+    schedulesArray.forEach(s => {
+      s.days = s.days.sort((a, b) => a - b);
+    });
+    
+    return schedulesArray.length > 0 ? schedulesArray : defaultSchedule;
+  });
 
   const handleScheduleChange = (newSchedules: ClassScheduleItem[]) => {
     setSchedules(newSchedules);
@@ -61,17 +92,26 @@ export function EditClassForm({ isOpen, onClose, classData }: EditClassFormProps
     setIsSubmitting(true);
     
     try {
+      // Check if all schedules have at least one day selected
+      const hasInvalidSchedule = schedules.some(schedule => schedule.days.length === 0);
+      if (hasInvalidSchedule) {
+        toast.error("Please select at least one day for each time slot");
+        setIsSubmitting(false);
+        return;
+      }
+
       const result = await updateClass(classData.id, {
         name,
         emoji,
         cadence,
         grade,
         color,
-        schedule: {
-          days: schedules.flatMap(s => s.days),
-          startTime: schedules[0]?.startTime || "09:00",
-          endTime: schedules[0]?.endTime || "10:00"
-        }
+        // Send complete schedule data instead of just the first item
+        schedules: schedules.map(schedule => ({
+          days: schedule.days,
+          startTime: schedule.startTime,
+          endTime: schedule.endTime
+        }))
       });
 
       if (!result.success) {
@@ -105,7 +145,7 @@ export function EditClassForm({ isOpen, onClose, classData }: EditClassFormProps
           <DialogTitle>Edit Class</DialogTitle>
         </DialogHeader>
         
-        <form onSubmit={handleSubmit} className="space-y-3">
+        <form onSubmit={handleSubmit} className="space-y-3 overflow-y-auto max-h-[80vh]">
           {/* Top section - Name, Emoji, Color */}
           <div className="grid grid-cols-3 gap-2">
             <div className="space-y-1">
@@ -161,7 +201,7 @@ export function EditClassForm({ isOpen, onClose, classData }: EditClassFormProps
                   <SelectValue placeholder="Select grade" />
                 </SelectTrigger>
                 <SelectContent>
-                  {["9th", "10th", "11th", "12th"].map((g) => (
+                  {["5th", "6th", "7th", "8th", "9th", "10th", "11th", "12th"].map((g) => (
                     <SelectItem key={g} value={g}>
                       {g} Grade
                     </SelectItem>

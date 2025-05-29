@@ -12,7 +12,7 @@ import { EmojiPickerButton } from "@/src/components/ui/emoji-picker-button"
 import ClassScheduleForm from "./ClassScheduleForm"
 import { ColorDropdown } from "@/src/components/ui/color-dropdown"
 import { DatePicker } from "@/src/components/ui/date-picker"
-import { formatDateForInput } from "@/src/lib/date-utils"
+import { formatDateForInput, safeDateParse } from "@/src/lib/date-utils"
 
 interface ClassScheduleItem {
   days: number[];
@@ -167,7 +167,7 @@ const AddClass = ({ isOpen, onClose, onSuccess }: AddClassProps) => {
                   value={formatDateForInput(startDate)}
                   onChange={(e) => {
                     if (e.target.value) {
-                      setStartDate(new Date(e.target.value));
+                      setStartDate(safeDateParse(e.target.value));
                     }
                   }}
                   className="h-8"
@@ -182,7 +182,7 @@ const AddClass = ({ isOpen, onClose, onSuccess }: AddClassProps) => {
                   value={formatDateForInput(endDate)}
                   onChange={(e) => {
                     if (e.target.value) {
-                      setEndDate(new Date(e.target.value));
+                      setEndDate(safeDateParse(e.target.value));
                     }
                   }}
                   className="h-8"
