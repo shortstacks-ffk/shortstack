@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/src/components/ui/select"
 import { toast } from "sonner"
+import { Download, Calendar, AlertCircle, Loader2 } from "lucide-react"
 
 interface BankStatementsProps {
   accounts: any[]
@@ -11,23 +12,66 @@ interface BankStatementsProps {
 export default function BankStatements({ accounts }: BankStatementsProps) {
   const [selectedAccountId, setSelectedAccountId] = useState<string>("")
   const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString())
+  const [isDownloading, setIsDownloading] = useState<string | null>(null)
+  const [availableStatements, setAvailableStatements] = useState<Record<string, boolean>>({})
+  const [isLoading, setIsLoading] = useState(true)
+  
+  // Ensure accounts are unique by ID and type
+  const uniqueAccounts = accounts.reduce((acc: any[], current) => {
+    // Check if we already have an account of this type
+    const exists = acc.find(item => item.accountType === current.accountType);
+    if (!exists) {
+      acc.push(current);
+    }
+    return acc;
+  }, []);
   
   // Set initial account if one exists
   useEffect(() => {
-    if (accounts.length > 0 && !selectedAccountId) {
-      setSelectedAccountId(accounts[0].id);
+    if (uniqueAccounts.length > 0 && !selectedAccountId) {
+      setSelectedAccountId(uniqueAccounts[0].id);
     }
-  }, [accounts, selectedAccountId]);
+  }, [uniqueAccounts, selectedAccountId]);
   
-  // Available years - typically we'd have this from the backend
-  const years = Array.from(
-    { length: 3 }, 
-    (_, i) => (new Date().getFullYear() - i).toString()
-  )
+  // Available years - current year and future (2025+)
+  const currentYear = new Date().getFullYear();
+  const years = [currentYear, currentYear+1, currentYear+2].map(year => year.toString());
   
-  const currentDate = new Date()
-  const currentMonth = currentDate.getMonth() // 0-11
-  const currentYear = currentDate.getFullYear()
+  // Fetch available statements when account or year changes
+  useEffect(() => {
+    const fetchAvailableStatements = async () => {
+      if (!selectedAccountId) return;
+      
+      setIsLoading(true);
+      
+      try {
+        const response = await fetch(`/api/student/banking/available-statements?accountId=${selectedAccountId}&year=${selectedYear}`);
+        
+        if (response.ok) {
+          const data = await response.json();
+          
+          // Create a map of month => available
+          const statementsMap: Record<string, boolean> = {};
+          data.statements.forEach((statement: any) => {
+            statementsMap[statement.month] = true;
+          });
+          
+          setAvailableStatements(statementsMap);
+        }
+      } catch (error) {
+        console.error("Error fetching available statements:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    if (selectedAccountId) {
+      fetchAvailableStatements();
+    }
+  }, [selectedAccountId, selectedYear]);
+  
+  const currentDate = new Date();
+  const currentMonth = currentDate.getMonth(); // 0-11
   
   // Months for statements
   const months = [
@@ -45,82 +89,176 @@ export default function BankStatements({ accounts }: BankStatementsProps) {
     { name: "December", abbr: "DEC.", index: 11 }
   ]
   
-  const handleDownloadStatement = (month: string, monthIndex: number) => {
-    const selectedYearNum = parseInt(selectedYear)
+  const handleDownloadStatement = async (month: string, monthIndex: number) => {
+    if (!selectedAccountId || isDownloading) return;
+    
+    const selectedYearNum = parseInt(selectedYear);
     
     // Check if the month is in the future or current month
     if (selectedYearNum > currentYear || 
-        (selectedYearNum === currentYear && monthIndex >= currentMonth)) {
-      // Future or current month - do nothing
-      return
-    } else {
-      // Past month - normally we'd try to fetch the statement here
-      toast.error(`No statement records found for ${month} ${selectedYear}`)
+        (selectedYearNum === currentYear && monthIndex > currentMonth)) {
+      toast.error(`Statement for ${month} ${selectedYear} is not yet available`);
+      return;
+    }
+    
+    // If we know this statement isn't available, show a toast
+    if (!availableStatements[month]) {
+      toast.error(`No statement available for ${month} ${selectedYear}`);
+      return;
+    }
+    
+    setIsDownloading(month);
+    
+    try {
+      // First try to get the statement ID
+      const response = await fetch(`/api/student/banking/statement-id?accountId=${selectedAccountId}&month=${month}&year=${selectedYear}`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        
+        if (data.statementId) {
+          // Use the universal download endpoint
+          const downloadUrl = `/api/banking/statements/download?id=${data.statementId}`;
+          
+          // Create a temporary link element and trigger download
+          const a = document.createElement('a');
+          a.href = downloadUrl;
+          a.download = `${month}_${selectedYear}_Statement.xlsx`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          
+          toast.success(`${month} ${selectedYear} Statement downloaded successfully`);
+        } else {
+          toast.error(`No statement available for ${month} ${selectedYear}`);
+        }
+      } else {
+        throw new Error("Failed to get statement information");
+      }
+    } catch (error) {
+      console.error("Error downloading statement:", error);
+      toast.error("Failed to download statement");
+    } finally {
+      setIsDownloading(null);
     }
   }
   
   // Helper to determine if a folder should be greyed out
-  const isDisabled = (monthIndex: number) => {
-    const selectedYearNum = parseInt(selectedYear)
-    return selectedYearNum > currentYear || 
-          (selectedYearNum === currentYear && monthIndex >= currentMonth)
+  const isDisabled = (monthIndex: number, monthName: string) => {
+    const selectedYearNum = parseInt(selectedYear);
+    
+    // Future dates are always disabled
+    const isFuture = selectedYearNum > currentYear || 
+      (selectedYearNum === currentYear && monthIndex > currentMonth);
+      
+    // Check if statement exists (not disabled if it exists)
+    const statementExists = availableStatements[monthName] === true;
+    
+    return isFuture || !statementExists;
+  }
+  
+  const getAccountName = (accountId: string) => {
+    const account = uniqueAccounts.find(acc => acc.id === accountId);
+    return account?.accountType === "CHECKING" ? "Checking" : "Savings";
   }
   
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">View Statements</h1>
-      
       <div className="flex flex-col sm:flex-row gap-4 mb-6">
-        <Select 
-          value={selectedYear} 
-          onValueChange={setSelectedYear}
-        >
-          <SelectTrigger className="w-full sm:w-[200px] border-orange-500 text-orange-500">
-            <SelectValue placeholder={selectedYear} />
-          </SelectTrigger>
-          <SelectContent>
-            {years.map(year => (
-              <SelectItem key={year} value={year}>{year}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="w-full sm:w-auto">
+          <Select 
+            value={selectedAccountId} 
+            onValueChange={setSelectedAccountId}
+          >
+            <SelectTrigger className="w-full sm:w-[180px] border-orange-500 text-orange-500">
+              <SelectValue placeholder="Select account" />
+            </SelectTrigger>
+            <SelectContent>
+              {uniqueAccounts.map(account => (
+                <SelectItem key={account.id} value={account.id}>
+                  {account.accountType === "CHECKING" ? "Checking" : "Savings"}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        
+        <div className="w-full sm:w-auto">
+          <Select 
+            value={selectedYear} 
+            onValueChange={setSelectedYear}
+          >
+            <SelectTrigger className="w-full sm:w-[180px] border-orange-500 text-orange-500">
+              <SelectValue placeholder={selectedYear} />
+            </SelectTrigger>
+            <SelectContent>
+              {years.map(year => (
+                <SelectItem key={year} value={year}>{year}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
       
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-8 justify-items-center">
-        {months.map((month) => {
-          const disabled = isDisabled(month.index);
-          
-          return (
-            <div 
-              key={month.abbr}
-              className={`relative cursor-pointer transition-transform hover:scale-105 ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
-              onClick={() => !disabled && handleDownloadStatement(month.name, month.index)}
-            >
-              {/* Custom styled folder to match the second image exactly */}
-              <div className="relative w-36 h-28 shadow-md rounded-md">
-                {/* Top folder tab */}
-                <div className="absolute -top-3 left-2 w-10 h-3 bg-green-700 rounded-t-md z-10"></div>
-                
-                {/* Main folder body with gradient */}
-                <div className={`absolute inset-0 bg-gradient-to-b from-green-600 to-green-400 rounded-md flex flex-col items-center justify-center`}>
-                  {/* Month abbreviation */}
-                  <div className="absolute top-3 left-4 text-white font-bold text-2xl">
-                    {month.abbr}
+      {isLoading ? (
+        <div className="flex justify-center items-center p-12">
+          <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {months.map((month) => {
+              const disabled = isDisabled(month.index, month.name);
+              const isLoading = isDownloading === month.name;
+              const statusColor = disabled ? 'text-gray-400' : 'text-green-700';
+              
+              return (
+                <div 
+                  key={month.abbr}
+                  className={`border rounded-lg overflow-hidden ${disabled ? 'opacity-50' : 'hover:shadow-md transition-all cursor-pointer'}`}
+                  onClick={() => !disabled && !isLoading && handleDownloadStatement(month.name, month.index)}
+                >
+                  <div className={`bg-green-50 border-b p-3 flex items-center justify-between`}>
+                    <div className="flex items-center">
+                      <Calendar className={`h-5 w-5 ${statusColor} mr-2`} />
+                      <div className="font-medium truncate">{month.name}</div>
+                    </div>
+                    <div className="text-xs text-gray-500">{selectedYear}</div>
                   </div>
                   
-                  {/* Download icon */}
-                  <div className="mt-6 text-white">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="size-10">
-                    <path fillRule="evenodd" d="M12 2.25a.75.75 0 0 1 .75.75v11.69l3.22-3.22a.75.75 0 1 1 1.06 1.06l-4.5 4.5a.75.75 0 0 1-1.06 0l-4.5-4.5a.75.75 0 1 1 1.06-1.06l3.22 3.22V3a.75.75 0 0 1 .75-.75Zm-9 13.5a.75.75 0 0 1 .75.75v2.25a1.5 1.5 0 0 0 1.5 1.5h13.5a1.5 1.5 0 0 0 1.5-1.5V16.5a.75.75 0 0 1 1.5 0v2.25a3 3 0 0 1-3 3H5.25a3 3 0 0 1-3-3V16.5a.75.75 0 0 1 .75-.75Z" clipRule="evenodd" />
-                  </svg>
-
+                  <div className="p-4">
+                    <div className="text-sm text-gray-600 mb-2">
+                      {getAccountName(selectedAccountId)} Statement
+                    </div>
+                    
+                    {disabled ? (
+                      <div className="flex items-center text-xs text-amber-600 mt-2">
+                        <AlertCircle className="h-3 w-3 mr-1" />
+                        {parseInt(selectedYear) > currentYear || 
+                          (parseInt(selectedYear) === currentYear && month.index > currentMonth) 
+                          ? 'Not yet available'
+                          : 'No transactions'}
+                      </div>
+                    ) : (
+                      <div className="flex justify-end mt-2">
+                        {isLoading ? (
+                          <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                        ) : (
+                          <Download className="h-4 w-4 text-blue-600" />
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+              );
+            })}
+          </div>
+          
+          <div className="text-center text-xs text-gray-500 mt-4">
+            Statements are generated on the 27th of each month
+          </div>
+        </>
+      )}
     </div>
-  )
+  );
 }
