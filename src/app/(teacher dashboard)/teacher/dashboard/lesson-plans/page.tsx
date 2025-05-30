@@ -273,15 +273,13 @@ export default function LessonPlansPage() {
         <AddLessonPlanDialog
           isOpen={isAddDialogOpen}
           onClose={() => setIsAddDialogOpen(false)}
-          onSuccess={() => {
+          onSuccess={async () => {
             // Refresh data after creating a lesson plan
             if (session?.user?.id) {
-              getLessonPlans(session.user.id).then((response) => {
-                if (response.success) setUserPlans(response.data || []);
-              });
+              const response = await getLessonPlans(session.user.id);
+              if (response.success) setUserPlans(response.data || []);
             }
-          }}
-        />
+          } } classCode={""}        />
       )}
 
       {/* Dialog for creating/editing generic lesson plans (templates) - only visible to super users */}

@@ -75,7 +75,7 @@ export default async function StoreItemPage({ params }: PageProps) {
   // Calculate purchase statistics with proper type safety
   const total = storeItem.quantity || 0;
   const purchased = storeItem.purchases?.reduce(
-    (acc, purchase) => acc + (purchase?.quantity || 0), 
+    (acc: any, purchase: { quantity: any; }) => acc + (purchase?.quantity || 0), 
     0
   ) || 0;
   
@@ -107,7 +107,7 @@ export default async function StoreItemPage({ params }: PageProps) {
           </div>
           <div className="flex items-center space-x-3">
             <Badge 
-              variant={storeItem.isAvailable ? "success" : "secondary"} 
+              variant={storeItem.isAvailable ? "default" : "secondary"} 
               className="text-sm"
             >
               {storeItem.isAvailable ? "Available" : "Not Available"}
@@ -198,7 +198,12 @@ export default async function StoreItemPage({ params }: PageProps) {
                       Assigned Classes
                     </h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                      {storeItem.classes.map((classItem) => (
+                      {storeItem.classes.map((classItem: {
+                        id: string;
+                        name: string;
+                        code: string;
+                        emoji: string;
+                      }) => (
                         <Link 
                           href={`/teacher/dashboard/classes/${classItem.code}`} 
                           key={classItem.id}

@@ -28,15 +28,15 @@ interface GenericLessonPlan {
 interface AddLessonPlanDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void;
-  initialClassCode?: string; // Optional now, as class will be selected in dialog
+  classCode: string; // Agregar esta línea
+  onSuccess: () => Promise<void>;
 }
 
 export default function AddLessonPlanDialog({
   isOpen,
   onClose,
-  onSuccess,
-  initialClassCode,
+  classCode, // Agregar aquí también
+  onSuccess
 }: AddLessonPlanDialogProps) {
   const [form, setForm] = useState({ name: '', description: '' });
   const [error, setError] = useState<string | null>(null);
@@ -49,7 +49,7 @@ export default function AddLessonPlanDialog({
   
   // New states for class selection
   const [classes, setClasses] = useState<ClassItem[]>([]);
-  const [selectedClassCode, setSelectedClassCode] = useState<string>(initialClassCode || '');
+  const [selectedClassCode, setSelectedClassCode] = useState<string>(classCode || '');
   const [isLoadingClasses, setIsLoadingClasses] = useState(false);
 
   // Fetch classes when dialog opens
@@ -58,7 +58,7 @@ export default function AddLessonPlanDialog({
       fetchClasses();
       fetchGenericLessonPlans();
     }
-  }, [isOpen, initialClassCode]);
+  }, [isOpen, classCode]);
 
   // Update templateName when a template is selected
   useEffect(() => {
@@ -82,9 +82,9 @@ export default function AddLessonPlanDialog({
       const data = await response.json();
       setClasses(data.classes || []);
       
-      // If initialClassCode is provided, select it by default
-      if (initialClassCode && !selectedClassCode) {
-        setSelectedClassCode(initialClassCode);
+      // If classCode is provided, select it by default
+      if (classCode && !selectedClassCode) {
+        setSelectedClassCode(classCode);
       } else if (data.classes?.length > 0 && !selectedClassCode) {
         // Otherwise select first class by default if there's no selection yet
         setSelectedClassCode(data.classes[0].code);
@@ -185,7 +185,7 @@ export default function AddLessonPlanDialog({
     setSelectedTemplateId('');
     setTemplateName('');
     // Don't reset selectedClassCode if initialClassCode is provided
-    if (!initialClassCode) {
+    if (!classCode) {
       setSelectedClassCode('');
     }
     setError(null);

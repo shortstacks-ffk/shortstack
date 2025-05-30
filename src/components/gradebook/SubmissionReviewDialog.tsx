@@ -131,14 +131,14 @@ export default function SubmissionReviewDialog({
               <h3 className="font-semibold mb-3">File Submission</h3>
               <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                 <div className="text-gray-600">
-                  {getFileIcon(submission.fileType)}
+                  {getFileIcon(submission.fileType ?? null)}
                 </div>
                 <div className="flex-1">
                   <p className="font-medium">{submission.fileName || 'Submitted File'}</p>
                   <div className="flex items-center gap-3 text-sm text-gray-500">
                     <span>{submission.fileType || 'Unknown type'}</span>
                     <span>•</span>
-                    <span>{formatFileSize(submission.fileSize)}</span>
+                    <span>{formatFileSize(submission.fileSize ?? null)}</span>
                   </div>
                 </div>
                 <Button variant="outline" size="sm" onClick={handleDownload}>

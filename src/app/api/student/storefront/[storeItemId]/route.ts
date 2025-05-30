@@ -5,7 +5,7 @@ import { db } from "@/src/lib/db";
 
 export async function GET(
   request: Request,
-  { params }: { params: { storeItemId: string } }
+  { params }: { params: Promise<{ storeItemId: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -14,7 +14,8 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     
-    const storeItemId = params.storeItemId;
+    // ✅ Await the params
+    const { storeItemId } = await params;
     
     if (!storeItemId) {
       return NextResponse.json({ error: "Item ID is required" }, { status: 400 });
@@ -23,20 +24,27 @@ export async function GET(
     // Get the student's ID
     const student = await db.student.findFirst({
       where: { userId: session.user.id },
-      select: { id: true, classId: true }
+      select: { id: true }
     });
     
     if (!student) {
       return NextResponse.json({ error: "Student profile not found" }, { status: 404 });
     }
-    
-    // Find the store item that belongs to the student's class
+
+    // ✅ FIXED: Use correct relationship structure from schema
     const storeItem = await db.storeItem.findFirst({
       where: {
         id: storeItemId,
+        isAvailable: true,
+        // Check if the student is enrolled in any class that has this store item
         class: {
           some: {
-            id: student.classId
+            enrollments: {
+              some: {
+                studentId: student.id,
+                enrolled: true
+              }
+            }
           }
         }
       },
@@ -52,7 +60,8 @@ export async function GET(
           select: {
             id: true,
             name: true,
-            emoji: true
+            emoji: true,
+            code: true
           }
         }
       }
@@ -60,7 +69,7 @@ export async function GET(
     
     if (!storeItem) {
       return NextResponse.json(
-        { error: "Item not found or not available in your class" }, 
+        { error: "Item not found or not available in your classes" }, 
         { status: 404 }
       );
     }

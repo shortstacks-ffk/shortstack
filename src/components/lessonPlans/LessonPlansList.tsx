@@ -12,6 +12,13 @@ interface LessonPlansListProps {
   cName: string;
 }
 
+interface AddLessonPlanDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess: () => Promise<void>;
+  classCode: string;
+}
+
 export default function LessonPlansList({ classCode, cName }: LessonPlansListProps) {
   const [lessonPlans, setLessonPlans] = useState<any[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -47,11 +54,10 @@ export default function LessonPlansList({ classCode, cName }: LessonPlansListPro
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
           {lessonPlans.map((plan) => (
             <LessonPlanCard 
-              key={plan.id} 
-              plan={plan} 
-              classCode={classCode}
+              key={plan.id}
+              plan={plan}
               onUpdate={fetchLessonPlans} // Pass the fetch function to update when changes happen
-            />
+              backgroundColor={''}            />
           ))}
           <AddLessonPlanCard onClick={() => setIsDialogOpen(true)} />
         </div>

@@ -244,7 +244,6 @@ export default function LessonPlanDetailView({ lessonId }: LessonPlanDetailViewP
                     setLessonPlan(res.data);
                   }
                 }}
-                readOnly={!canEdit}
               />
               
               {lessonPlan.files?.length === 0 && (
@@ -285,7 +284,6 @@ export default function LessonPlanDetailView({ lessonId }: LessonPlanDetailViewP
                       setLessonPlan(res.data);
                     }
                   }}
-                  readOnly={!canEdit}
                 />
                 
                 {lessonPlan.assignments?.length === 0 && (
