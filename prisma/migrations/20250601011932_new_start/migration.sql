@@ -1,5 +1,5 @@
 -- CreateEnum
-CREATE TYPE "Role" AS ENUM ('TEACHER', 'STUDENT');
+CREATE TYPE "Role" AS ENUM ('TEACHER', 'STUDENT', 'SUPER');
 
 -- CreateEnum
 CREATE TYPE "PurchaseStatus" AS ENUM ('PENDING', 'PAID', 'CANCELLED');
@@ -15,6 +15,9 @@ CREATE TYPE "AccountType" AS ENUM ('CHECKING', 'SAVINGS');
 
 -- CreateEnum
 CREATE TYPE "TransactionType" AS ENUM ('DEPOSIT', 'WITHDRAWAL', 'TRANSFER_IN', 'TRANSFER_OUT', 'BILL_PAYMENT');
+
+-- CreateEnum
+CREATE TYPE "TodoPriority" AS ENUM ('UPCOMING', 'TODAY', 'URGENT');
 
 -- CreateTable
 CREATE TABLE "User" (
@@ -39,6 +42,8 @@ CREATE TABLE "TeacherProfile" (
     "userId" TEXT NOT NULL,
     "firstName" TEXT NOT NULL,
     "lastName" TEXT NOT NULL,
+    "bio" TEXT,
+    "institution" TEXT,
 
     CONSTRAINT "TeacherProfile_pkey" PRIMARY KEY ("id")
 );
@@ -68,13 +73,14 @@ CREATE TABLE "Class" (
     "emoji" TEXT NOT NULL,
     "code" TEXT NOT NULL,
     "cadence" TEXT,
-    "day" TEXT,
-    "time" TEXT,
     "grade" TEXT,
     "overview" TEXT,
     "userId" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "color" TEXT,
+    "endDate" TIMESTAMP(3),
+    "startDate" TIMESTAMP(3),
 
     CONSTRAINT "Class_pkey" PRIMARY KEY ("id")
 );
@@ -131,8 +137,21 @@ CREATE TABLE "LessonPlan" (
     "classId" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "genericLessonPlanId" TEXT,
 
     CONSTRAINT "LessonPlan_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "GenericLessonPlan" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "description" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdBy" TEXT,
+
+    CONSTRAINT "GenericLessonPlan_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -275,6 +294,19 @@ CREATE TABLE "BankAccount" (
 );
 
 -- CreateTable
+CREATE TABLE "BankStatement" (
+    "id" TEXT NOT NULL,
+    "accountId" TEXT NOT NULL,
+    "studentId" TEXT NOT NULL,
+    "month" TEXT NOT NULL,
+    "year" TEXT NOT NULL,
+    "url" TEXT NOT NULL,
+    "generatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "BankStatement_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "Transaction" (
     "id" TEXT NOT NULL,
     "amount" DOUBLE PRECISION NOT NULL,
@@ -310,11 +342,65 @@ CREATE TABLE "CalendarEvent" (
 );
 
 -- CreateTable
+CREATE TABLE "Todo" (
+    "id" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "completed" BOOLEAN NOT NULL DEFAULT false,
+    "dueDate" TIMESTAMP(3) NOT NULL,
+    "priority" "TodoPriority" NOT NULL DEFAULT 'UPCOMING',
+    "userId" TEXT NOT NULL,
+    "calendarEventId" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Todo_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "PasswordReset" (
+    "id" TEXT NOT NULL,
+    "email" TEXT NOT NULL,
+    "code" TEXT NOT NULL,
+    "resetToken" TEXT,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "resetTokenExpiresAt" TIMESTAMP(3),
+    "used" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "PasswordReset_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "_StoreItemToClass" (
+    "A" TEXT NOT NULL,
+    "B" TEXT NOT NULL,
+
+    CONSTRAINT "_StoreItemToClass_AB_pkey" PRIMARY KEY ("A","B")
+);
+
+-- CreateTable
+CREATE TABLE "_GenericLessonPlanFiles" (
+    "A" TEXT NOT NULL,
+    "B" TEXT NOT NULL,
+
+    CONSTRAINT "_GenericLessonPlanFiles_AB_pkey" PRIMARY KEY ("A","B")
+);
+
+-- CreateTable
 CREATE TABLE "_LessonPlanFiles" (
     "A" TEXT NOT NULL,
     "B" TEXT NOT NULL,
 
     CONSTRAINT "_LessonPlanFiles_AB_pkey" PRIMARY KEY ("A","B")
+);
+
+-- CreateTable
+CREATE TABLE "_GenericLessonPlanAssignments" (
+    "A" TEXT NOT NULL,
+    "B" TEXT NOT NULL,
+
+    CONSTRAINT "_GenericLessonPlanAssignments_AB_pkey" PRIMARY KEY ("A","B")
 );
 
 -- CreateTable
@@ -373,6 +459,9 @@ CREATE UNIQUE INDEX "Enrollment_studentId_classId_key" ON "Enrollment"("studentI
 CREATE INDEX "LessonPlan_classId_idx" ON "LessonPlan"("classId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "GenericLessonPlan_name_key" ON "GenericLessonPlan"("name");
+
+-- CreateIndex
 CREATE INDEX "StudentAssignmentSubmission_assignmentId_idx" ON "StudentAssignmentSubmission"("assignmentId");
 
 -- CreateIndex
@@ -412,6 +501,18 @@ CREATE UNIQUE INDEX "BankAccount_accountNumber_key" ON "BankAccount"("accountNum
 CREATE INDEX "BankAccount_studentId_idx" ON "BankAccount"("studentId");
 
 -- CreateIndex
+CREATE INDEX "BankStatement_accountId_idx" ON "BankStatement"("accountId");
+
+-- CreateIndex
+CREATE INDEX "BankStatement_studentId_idx" ON "BankStatement"("studentId");
+
+-- CreateIndex
+CREATE INDEX "BankStatement_month_year_idx" ON "BankStatement"("month", "year");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "BankStatement_accountId_month_year_key" ON "BankStatement"("accountId", "month", "year");
+
+-- CreateIndex
 CREATE INDEX "Transaction_accountId_idx" ON "Transaction"("accountId");
 
 -- CreateIndex
@@ -436,7 +537,25 @@ CREATE INDEX "CalendarEvent_studentId_idx" ON "CalendarEvent"("studentId");
 CREATE INDEX "CalendarEvent_parentEventId_idx" ON "CalendarEvent"("parentEventId");
 
 -- CreateIndex
+CREATE INDEX "Todo_userId_idx" ON "Todo"("userId");
+
+-- CreateIndex
+CREATE INDEX "Todo_dueDate_idx" ON "Todo"("dueDate");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "PasswordReset_email_key" ON "PasswordReset"("email");
+
+-- CreateIndex
+CREATE INDEX "_StoreItemToClass_B_index" ON "_StoreItemToClass"("B");
+
+-- CreateIndex
+CREATE INDEX "_GenericLessonPlanFiles_B_index" ON "_GenericLessonPlanFiles"("B");
+
+-- CreateIndex
 CREATE INDEX "_LessonPlanFiles_B_index" ON "_LessonPlanFiles"("B");
+
+-- CreateIndex
+CREATE INDEX "_GenericLessonPlanAssignments_B_index" ON "_GenericLessonPlanAssignments"("B");
 
 -- CreateIndex
 CREATE INDEX "_LessonPlanAssignments_B_index" ON "_LessonPlanAssignments"("B");
@@ -460,13 +579,16 @@ ALTER TABLE "ClassSession" ADD CONSTRAINT "ClassSession_classId_fkey" FOREIGN KE
 ALTER TABLE "Student" ADD CONSTRAINT "Student_classId_fkey" FOREIGN KEY ("classId") REFERENCES "Class"("code") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Enrollment" ADD CONSTRAINT "Enrollment_studentId_fkey" FOREIGN KEY ("studentId") REFERENCES "Student"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "Enrollment" ADD CONSTRAINT "Enrollment_classId_fkey" FOREIGN KEY ("classId") REFERENCES "Class"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "Enrollment" ADD CONSTRAINT "Enrollment_studentId_fkey" FOREIGN KEY ("studentId") REFERENCES "Student"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "LessonPlan" ADD CONSTRAINT "LessonPlan_classId_fkey" FOREIGN KEY ("classId") REFERENCES "Class"("code") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "LessonPlan" ADD CONSTRAINT "LessonPlan_genericLessonPlanId_fkey" FOREIGN KEY ("genericLessonPlanId") REFERENCES "GenericLessonPlan"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "File" ADD CONSTRAINT "File_classId_fkey" FOREIGN KEY ("classId") REFERENCES "Class"("code") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -493,9 +615,6 @@ ALTER TABLE "StudentBill" ADD CONSTRAINT "StudentBill_studentId_fkey" FOREIGN KE
 ALTER TABLE "Payment" ADD CONSTRAINT "Payment_studentBillId_fkey" FOREIGN KEY ("studentBillId") REFERENCES "StudentBill"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "StoreItem" ADD CONSTRAINT "StoreItem_classId_fkey" FOREIGN KEY ("classId") REFERENCES "Class"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "StudentPurchase" ADD CONSTRAINT "StudentPurchase_itemId_fkey" FOREIGN KEY ("itemId") REFERENCES "StoreItem"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -505,34 +624,64 @@ ALTER TABLE "StudentPurchase" ADD CONSTRAINT "StudentPurchase_studentId_fkey" FO
 ALTER TABLE "BankAccount" ADD CONSTRAINT "BankAccount_studentId_fkey" FOREIGN KEY ("studentId") REFERENCES "Student"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "BankStatement" ADD CONSTRAINT "BankStatement_accountId_fkey" FOREIGN KEY ("accountId") REFERENCES "BankAccount"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "BankStatement" ADD CONSTRAINT "BankStatement_studentId_fkey" FOREIGN KEY ("studentId") REFERENCES "Student"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "Transaction" ADD CONSTRAINT "Transaction_accountId_fkey" FOREIGN KEY ("accountId") REFERENCES "BankAccount"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Transaction" ADD CONSTRAINT "Transaction_receivingAccountId_fkey" FOREIGN KEY ("receivingAccountId") REFERENCES "BankAccount"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "CalendarEvent" ADD CONSTRAINT "CalendarEvent_assignmentId_fkey" FOREIGN KEY ("assignmentId") REFERENCES "Assignment"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "CalendarEvent" ADD CONSTRAINT "CalendarEvent_billId_fkey" FOREIGN KEY ("billId") REFERENCES "Bill"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "CalendarEvent" ADD CONSTRAINT "CalendarEvent_classId_fkey" FOREIGN KEY ("classId") REFERENCES "Class"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "CalendarEvent" ADD CONSTRAINT "CalendarEvent_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "CalendarEvent" ADD CONSTRAINT "CalendarEvent_billId_fkey" FOREIGN KEY ("billId") REFERENCES "Bill"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "CalendarEvent" ADD CONSTRAINT "CalendarEvent_parentEventId_fkey" FOREIGN KEY ("parentEventId") REFERENCES "CalendarEvent"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "CalendarEvent" ADD CONSTRAINT "CalendarEvent_assignmentId_fkey" FOREIGN KEY ("assignmentId") REFERENCES "Assignment"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "CalendarEvent" ADD CONSTRAINT "CalendarEvent_studentId_fkey" FOREIGN KEY ("studentId") REFERENCES "Student"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "CalendarEvent" ADD CONSTRAINT "CalendarEvent_classId_fkey" FOREIGN KEY ("classId") REFERENCES "Class"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "Todo" ADD CONSTRAINT "Todo_calendarEventId_fkey" FOREIGN KEY ("calendarEventId") REFERENCES "CalendarEvent"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "CalendarEvent" ADD CONSTRAINT "CalendarEvent_studentId_fkey" FOREIGN KEY ("studentId") REFERENCES "Student"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "Todo" ADD CONSTRAINT "Todo_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "CalendarEvent" ADD CONSTRAINT "CalendarEvent_parentEventId_fkey" FOREIGN KEY ("parentEventId") REFERENCES "CalendarEvent"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "_StoreItemToClass" ADD CONSTRAINT "_StoreItemToClass_A_fkey" FOREIGN KEY ("A") REFERENCES "Class"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "_StoreItemToClass" ADD CONSTRAINT "_StoreItemToClass_B_fkey" FOREIGN KEY ("B") REFERENCES "StoreItem"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "_GenericLessonPlanFiles" ADD CONSTRAINT "_GenericLessonPlanFiles_A_fkey" FOREIGN KEY ("A") REFERENCES "File"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "_GenericLessonPlanFiles" ADD CONSTRAINT "_GenericLessonPlanFiles_B_fkey" FOREIGN KEY ("B") REFERENCES "GenericLessonPlan"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "_LessonPlanFiles" ADD CONSTRAINT "_LessonPlanFiles_A_fkey" FOREIGN KEY ("A") REFERENCES "File"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "_LessonPlanFiles" ADD CONSTRAINT "_LessonPlanFiles_B_fkey" FOREIGN KEY ("B") REFERENCES "LessonPlan"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "_GenericLessonPlanAssignments" ADD CONSTRAINT "_GenericLessonPlanAssignments_A_fkey" FOREIGN KEY ("A") REFERENCES "Assignment"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "_GenericLessonPlanAssignments" ADD CONSTRAINT "_GenericLessonPlanAssignments_B_fkey" FOREIGN KEY ("B") REFERENCES "GenericLessonPlan"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "_LessonPlanAssignments" ADD CONSTRAINT "_LessonPlanAssignments_A_fkey" FOREIGN KEY ("A") REFERENCES "Assignment"("id") ON DELETE CASCADE ON UPDATE CASCADE;
