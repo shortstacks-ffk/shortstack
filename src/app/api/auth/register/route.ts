@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { db } from "@/src/lib/db";
 
+// Update the POST function to include Account creation
 export async function POST(req: Request) {
   try {
     const { email, password, name, firstName, lastName } = await req.json();
@@ -28,7 +29,7 @@ export async function POST(req: Request) {
     // Hash the password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create user and teacher profile in one transaction
+    // Create user and associated records in one transaction
     const result = await db.$transaction(async (tx) => {
       // Create user
       const user = await tx.user.create({
@@ -49,6 +50,16 @@ export async function POST(req: Request) {
           firstName: user.firstName || '',
           lastName: user.lastName || '',
         },
+      });
+      
+      // Create a credentials Account entry for this user
+      await tx.account.create({
+        data: {
+          userId: user.id,
+          type: "credentials",
+          provider: "credentials",
+          providerAccountId: user.id, // Using the user ID as provider account ID
+        }
       });
 
       return user;

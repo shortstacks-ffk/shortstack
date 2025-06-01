@@ -15,11 +15,11 @@ export async function GET(request: Request) {
     }
     
     // Get count of statements by month/year
-    const statementCounts = await db.bankStatement.$groupBy({
-      by: ['month', 'year'],
+    const statementCounts = await db.bankStatement.groupBy({
+      by: ['accountId'],
       _count: {
-        id: true
-      }
+        _all: true,
+      },
     });
     
     return NextResponse.json({
