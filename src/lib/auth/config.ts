@@ -53,15 +53,54 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
-        
-        // First check for teacher login (existing functionality)
+
+        //Check for SUPER user credentials
+        if (
+          credentials.email === process.env.SUPER_USER_EMAIL &&
+          credentials.password === process.env.SUPER_USER_PASSWORD
+        ) {
+          // Look for existing super user or create one if it doesn't exist
+          let superUser = await db.user.findUnique({
+            where: { email: credentials.email },
+          });
+
+          if (!superUser) {
+            // Create the super user if it doesn't exist
+            superUser = await db.user.create({
+              data: {
+                email: credentials.email,
+                name: "Super Admin",
+                firstName: "Super",
+                lastName: "Admin",
+                password: await bcrypt.hash(credentials.password, 10),
+                role: "SUPER",
+              },
+            });
+          } else if (superUser.role !== "SUPER") {
+            // Upgrade to SUPER if exists but not SUPER yet
+            superUser = await db.user.update({
+              where: { id: superUser.id },
+              data: { role: "SUPER" },
+            });
+          }
+
+          return {
+            id: superUser.id,
+            email: superUser.email,
+            name: superUser.name,
+            role: "SUPER",
+            image: superUser.image,
+          };
+        }
+
+        // Check for teacher login credentials
         const user = await db.user.findUnique({
           where: { email: credentials.email },
         });
 
         if (user?.password) {
           const isValid = await bcrypt.compare(
-            credentials.password, 
+            credentials.password,
             user.password
           );
 
@@ -75,18 +114,18 @@ export const authOptions: NextAuthOptions = {
   };
           }
         }
-        
+
         // If teacher login fails, check for student login
         const student = await db.student.findUnique({
           where: { schoolEmail: credentials.email },
         });
-        
+
         if (student?.password) {
           const isStudentValid = await bcrypt.compare(
             credentials.password,
             student.password
           );
-          
+
           if (isStudentValid) {
             return {
               id: student.id,
@@ -97,7 +136,7 @@ export const authOptions: NextAuthOptions = {
             };
           }
         }
-        
+
         // If neither teacher nor student login succeeds, return null
         return null;
       },
@@ -105,7 +144,9 @@ export const authOptions: NextAuthOptions = {
   ],
   cookies: {
     sessionToken: {
-      name: `${process.env.NODE_ENV === "production" ? "__Secure-" : ""}next-auth.session-token`,
+      name: `${
+        process.env.NODE_ENV === "production" ? "__Secure-" : ""
+      }next-auth.session-token`,
       options: {
         httpOnly: true,
         sameSite: "lax",
@@ -120,15 +161,21 @@ export const authOptions: NextAuthOptions = {
       try {
         if (user.role === "TEACHER") {
           const existingProfile = await db.teacherProfile.findUnique({
-            where: { userId: user.id }
+            where: { userId: user.id },
           });
-          
+
           if (!existingProfile) {
             await db.teacherProfile.create({
               data: {
                 userId: user.id,
-                firstName: (user as CustomUser).firstName || user.name?.split(' ')[0] || '',
-                lastName: (user as CustomUser).lastName || user.name?.split(' ').slice(1).join(' ') || '',
+                firstName:
+                  (user as CustomUser).firstName ||
+                  user.name?.split(" ")[0] ||
+                  "",
+                lastName:
+                  (user as CustomUser).lastName ||
+                  user.name?.split(" ").slice(1).join(" ") ||
+                  "",
               },
             });
             console.log(`Created TeacherProfile for new user ${user.id}`);
@@ -144,18 +191,26 @@ export const authOptions: NextAuthOptions = {
         if (user.role === "TEACHER") {
           const userWithProfile = await db.user.findUnique({
             where: { id: user.id },
-            include: { teacherProfile: true }
+            include: { teacherProfile: true },
           });
-          
+
           if (userWithProfile && !userWithProfile.teacherProfile) {
             await db.teacherProfile.create({
               data: {
                 userId: user.id,
-                firstName: (user as CustomUser).firstName || user.name?.split(' ')[0] || '',
-                lastName: (user as CustomUser).lastName || user.name?.split(' ').slice(1).join(' ') || '',
+                firstName:
+                  (user as CustomUser).firstName ||
+                  user.name?.split(" ")[0] ||
+                  "",
+                lastName:
+                  (user as CustomUser).lastName ||
+                  user.name?.split(" ").slice(1).join(" ") ||
+                  "",
               },
             });
-            console.log(`Created TeacherProfile for existing user ${user.id} on sign in`);
+            console.log(
+              `Created TeacherProfile for existing user ${user.id} on sign in`
+            );
           }
         }
       } catch (error) {
@@ -216,7 +271,7 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string;
-        session.user.role = token.role as "TEACHER" | "STUDENT";
+        session.user.role = token.role as "TEACHER" | "STUDENT" | "SUPER";
       }
       return session;
     },

@@ -17,6 +17,18 @@ import { NavLogo } from "@/src/components/nav-logo";
 // Get the dashboard navigation data from shared source 
 import { dashboardData } from "@/src/lib/constants/nav-data";
 
+const getFilteredNavItems = (role: string, originalItems: any[]) => {
+  if (role === "SUPER") {
+    // Only show lesson plans for SUPER users
+    return originalItems.filter(item => 
+      item.title === "Lesson Plans" || 
+      item.url?.includes("lesson-plans")
+    );
+  }
+  // Return all items for TEACHER role
+  return originalItems;
+};
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [pageTitle, setPageTitle] = useState("Dashboard");
@@ -25,6 +37,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { data: session } = useSession({
     required: true,
   });
+  
+  // Get filtered navigation items based on user role
+  const filteredNavItems = getFilteredNavItems(
+    session?.user?.role || "TEACHER", 
+    dashboardData.navMain
+  );
   
   // Get teacher info for avatar
   const teacherName =
@@ -120,9 +138,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
       </div>
       
-      {/* Desktop Sidebar */}
+      {/* Desktop Sidebar - Pass filtered items */}
       <div className="hidden md:block">
-        <SidebarLeft />
+        <SidebarLeft filteredNavItems={filteredNavItems} />
       </div>
       
       <SidebarInset className="relative flex flex-col h-screen">
