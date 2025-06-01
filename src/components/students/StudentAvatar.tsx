@@ -4,17 +4,6 @@ import { useState } from "react";
 import Image from "next/image";
 import { useSession, signOut } from "next-auth/react";
 
-// Extend the session user type to include firstName and lastName
-declare module "next-auth" {
-  interface User {
-    firstName?: string;
-    lastName?: string;
-  }
-
-  interface Session {
-    user?: User;
-  }
-}
 import { 
   Avatar, 
   AvatarFallback, 
@@ -35,6 +24,21 @@ import {
   ChevronDown 
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+
+interface StudentAvatarProps {
+  studentId?: string;
+  user?: {
+    id: string;
+    role: "TEACHER" | "STUDENT" | "SUPER";
+    name?: string | null;
+    email?: string | null;
+    image?: string | null;
+    firstName?: string;
+    lastName?: string;
+  };
+  size?: "sm" | "md" | "lg";
+  showName?: boolean;
+}
 
 export function StudentAvatar() {
   const { data: session } = useSession();
