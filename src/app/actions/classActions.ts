@@ -4,6 +4,7 @@ import { db } from "@/src/lib/db";
 import { getAuthSession } from "@/src/lib/auth";
 import { revalidatePath } from "next/cache";
 import { Prisma } from '@prisma/client';
+import { createCalendarEventsFromClassSessions } from "@/src/lib/class-utils";
 
 // Types
 interface ClassSchedule {
@@ -128,108 +129,87 @@ async function createClassScheduleEvents(classData: any, schedules: any[]) {
 }
 
 // Create class
-export async function createClass(formData: FormData): Promise<ClassResponse> {
+export async function createClass(data: any) {
   try {
-    console.log("Starting class creation...");
-    
-    // Use NextAuth session
-    const session = await getAuthSession();
-    console.log("Session data:", session?.user?.id, session?.user?.role);
-    
-    if (!session?.user?.id || session.user.role !== "TEACHER") {
-      console.log("Auth failed:", !session?.user?.id ? "No user ID" : "Not a teacher");
-      return { success: false, error: "Unauthorized" };
-    }
-
-    const userId = session.user.id;
-    
-    // Get form data with validation
-    const name = formData.get('name') as string;
-    const emoji = formData.get('emoji') as string;
-    const cadence = formData.get('cadence') as string || "Weekly";
-    const grade = formData.get('grade') as string || "9th";
-    
-    // Validate color choice
-    const rawColor = formData.get('color') as string || "primary";
-    const validColors = ["primary", "secondary", "destructive", "success", "warning", "default"];
-    const color = validColors.includes(rawColor) ? rawColor : "primary";
-    
-    // Get class date range
-    let startDate: Date | undefined;
-    let endDate: Date | undefined;
-    
-    const startDateStr = formData.get('startDate') as string;
-    const endDateStr = formData.get('endDate') as string;
-    
-    if (startDateStr) {
-      startDate = new Date(startDateStr);
-    }
-    
-    if (endDateStr) {
-      endDate = new Date(endDateStr);
-    }
-    
-    // Get schedules from JSON
-    const schedulesJson = formData.get('schedules') as string;
-    const schedules = schedulesJson ? JSON.parse(schedulesJson) : [];
-    
-    // Ensure schedules have proper numeric days
-    if (schedules.length > 0) {
-      schedules.forEach((schedule: any) => {
-        if (schedule.days) {
-          schedule.days = schedule.days.map((day: any) => 
-            typeof day === 'string' ? parseInt(day, 10) : day
-          );
-        }
-      });
-    }
-    
-    console.log("Form data:", { name, emoji, cadence, grade, color, startDate, endDate, schedules });
-    
-    // Verify all required fields are present
-    if (!name || !emoji) {
-      return { success: false, error: "Missing required fields" };
-    }
-
-    // Generate unique code for this user
-    const code = await generateUniqueClassCode(userId);
-    console.log("Generated class code:", code);
-    
     const newClass = await db.class.create({
       data: {
-        name,
-        emoji,
-        code,
-        cadence,
-        color, // Use validated color
-        grade,
-        startDate, // Include startDate
-        endDate,   // Include endDate
-        userId
-      }
+        name: data.name,
+        emoji: data.emoji,
+        code: data.code,
+        cadence: data.cadence,
+        color: data.color,
+        grade: data.grade,
+        startDate: data.startDate,
+        endDate: data.endDate,
+        userId: data.userId
+      },
+      include: {
+        classSessions: true,
+        _count: { select: { enrollments: true } },
+      },
     });
 
-    console.log("Class created successfully:", newClass);
-
     // Create class sessions and calendar events
-    if (schedules && schedules.length > 0) {
-      await createClassScheduleEvents(newClass, schedules);
+    if (data.schedules && data.schedules.length > 0) {
+      await createClassScheduleEvents(newClass, data.schedules);
     }
 
     // Update revalidation paths
     revalidatePath('/teacher/dashboard/classes', 'page');
     revalidatePath('/teacher/dashboard', 'page');
 
-    return { success: true, data: newClass };
-  } catch (error: any) {
-    console.error("Create class error - DETAILED:", error);
-    console.error(error.stack);
-    
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      return { success: false, error: "Failed to generate a unique class code. Please try again." };
+    // After creating the class, create calendar events
+    if (newClass.classSessions && newClass.classSessions.length > 0 && newClass.startDate) {
+      const calendarEvents = createCalendarEventsFromClassSessions(
+        {
+          id: newClass.id,
+          name: newClass.name,
+          emoji: newClass.emoji,
+          code: newClass.code,
+          color: newClass.color || "primary",
+          cadence: newClass.cadence || "weekly",
+          grade: newClass.grade ?? undefined,
+          startDate: new Date(newClass.startDate),
+          endDate: newClass.endDate ? new Date(newClass.endDate) : undefined,
+          classSessions: newClass.classSessions,
+        },
+        data.userId
+      );
+
+      // Batch create calendar events
+      for (const event of calendarEvents) {
+        await db.calendarEvent.create({
+          data: {
+            title: event.title,
+            description: event.description,
+            startDate: event.startDate,
+            endDate: event.endDate,
+            variant: event.variant,
+            isRecurring: event.isRecurring,
+            createdBy: { connect: { id: data.userId } },
+            class: { connect: { id: newClass.id } }
+          },
+        });
+      }
     }
-    
-    return { success: false, error: `Failed to create class: ${error.message}` };
+
+    return {
+      success: true,
+      id: newClass.id,
+      name: newClass.name,
+      emoji: newClass.emoji,
+      code: newClass.code,
+      color: newClass.color ?? undefined,
+      cadence: newClass.cadence ?? undefined,
+      grade: newClass.grade ?? undefined,
+      startDate: newClass.startDate ?? undefined,
+      endDate: newClass.endDate ?? undefined,
+      classSessions: newClass.classSessions,
+      numberOfStudents: newClass._count?.enrollments || 0,
+    };
+  } catch (error: any) {
+    console.error("Create class error:", error);
+    return { success: false, error: error.message || "Failed to create class" };
   }
 }
 
@@ -334,7 +314,7 @@ export const getClassByID = async (id: string): Promise<ClassResponse> => {
   }
 }
 
-// Update class (only teacher owner)
+
 // Update class (only teacher owner)
 export async function updateClass(id: string, data: any): Promise<ClassResponse> {
   try {
@@ -437,11 +417,81 @@ export async function updateClass(id: string, data: any): Promise<ClassResponse>
       }
     }
 
+    // After updating the class, update calendar events
+    if (data.classSessions?.length && data.startDate) {
+      // Delete existing calendar events for this class
+      const existingEvents = await db.calendarEvent.findMany({
+        where: { classId: id },
+      });
+
+      // Delete calendar events related to this class
+      await db.calendarEvent.deleteMany({
+        where: {
+          OR: [
+            { classId: id },
+            { parentEventId: { in: existingEvents.map((e) => e.id) } },
+          ],
+        },
+      });
+
+      // Create new calendar events
+      const calendarEvents = createCalendarEventsFromClassSessions(
+        {
+          id: updatedClass.id,
+          name: updatedClass.name,
+          emoji: updatedClass.emoji,
+          code: updatedClass.code,
+          color: updatedClass.color || "primary",
+          cadence: updatedClass.cadence || "weekly",
+          grade: updatedClass.grade ?? undefined,
+          startDate: new Date(data.startDate),
+          endDate: data.endDate ? new Date(data.endDate) : undefined,
+          classSessions: data.classSessions,
+        },
+        session.user.id
+      );
+
+      // Batch create calendar events
+      for (const event of calendarEvents) {
+        await db.calendarEvent.create({
+          data: {
+            title: event.title,
+            description: event.description,
+            startDate: event.startDate,
+            endDate: event.endDate,
+            variant: event.variant,
+            isRecurring: event.isRecurring,
+            createdBy: { connect: { id: session.user.id } },
+            class: { connect: { id: updatedClass.id } }
+          },
+        });
+      }
+    }
+
     // Ensure revalidation is immediate and covers all necessary paths
     revalidatePath('/teacher/dashboard/classes', 'layout');
     revalidatePath('/teacher/dashboard', 'layout');
     
-    return { success: true, data: updatedClass };
+    return { 
+      success: true, 
+      data: {
+        id: updatedClass.id,
+        name: updatedClass.name,
+        emoji: updatedClass.emoji,
+        code: updatedClass.code,
+        color: updatedClass.color ?? undefined,
+        cadence: updatedClass.cadence ?? undefined,
+        grade: updatedClass.grade ?? undefined,
+        startDate: updatedClass.startDate ?? undefined,
+        endDate: updatedClass.endDate ?? undefined,
+        classSessions: (data.classSessions || []).map((session: any) => ({
+          id: session.id,
+          dayOfWeek: session.dayOfWeek,
+          startTime: session.startTime,
+          endTime: session.endTime
+        })) ?? []
+      }
+    };
   } catch (error: any) {
     console.error("Update class error:", error);
     return { success: false, error: `Failed to update class: ${error.message}` };

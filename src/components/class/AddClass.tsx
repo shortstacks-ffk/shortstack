@@ -67,7 +67,7 @@ const AddClass = ({ isOpen, onClose, onSuccess }: AddClassProps) => {
         setEndDate(newEndDate);
         onSuccess?.();
         setTimeout(() => {
-          toast.success(`Class created successfully! Class code: ${result.data.code}`);
+          toast.success(`Class created successfully! Class code: ${result.success && result.code ? result.code : ''}`);
         }, 100);
       }
     } catch (error) {

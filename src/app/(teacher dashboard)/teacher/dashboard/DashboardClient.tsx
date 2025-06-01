@@ -77,7 +77,7 @@ function formatClassSchedule(sessions?: any[]) {
                 code={cls.code}
                 color={cls.color || "primary"}
                 grade={cls.grade}
-                numberOfStudents={cls._count?.enrollments || 0}
+                numberOfStudents={(cls as any)._count?.enrollments || cls.numberOfStudents || 0}
                 schedule={formatClassSchedule(cls.classSessions)}
                 overview={cls.overview}
               />
