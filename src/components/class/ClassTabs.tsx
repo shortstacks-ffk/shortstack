@@ -1,15 +1,9 @@
 "use client";
 
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/src/components/ui/tabs";
-import { StudentList } from "../students/StudentList";
-// import { LessonPlans} from '@/src/components/class/LessonPlans';
-import LessonPlansList from "../lessonPlans/LessonPlansList";
-import ClassOverview from "./ClassOverview";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
+import LessonPlansList  from '@/src/components/lessonPlans/LessonPlansList';
+import ClassOverview from '@/src/components/class/ClassOverview';
+import { useSearchParams } from 'next/navigation';
 import Gradebook from "../gradebook/Gradebook";
 
 interface ClassTabsProps {
