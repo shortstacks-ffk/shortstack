@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react"; // Add useEffect
 import { Button } from "@/src/components/ui/button";
 import { Label } from "@/src/components/ui/label";
 import { Checkbox } from "@/src/components/ui/checkbox";
@@ -31,8 +31,17 @@ const DAYS = [
 ];
 
 export default function ClassScheduleForm({ value, onChange }: ClassScheduleFormProps) {
-  const [schedules, setSchedules] = useState<ClassScheduleItem[]>(value || []);
-
+  const [schedules, setSchedules] = useState<ClassScheduleItem[]>([]);
+  
+  // Sync with external value prop - add a proper initial state
+  useEffect(() => {
+    if (value && Array.isArray(value) && value.length > 0) {
+      setSchedules(value);
+    } else {
+      // Default to an empty array or a default schedule item
+      setSchedules([{ days: [1], startTime: "09:00", endTime: "10:00" }]);
+    }
+  }, [value]);
 
   const addScheduleItem = () => {
     const newSchedules = [
@@ -104,33 +113,33 @@ export default function ClassScheduleForm({ value, onChange }: ClassScheduleForm
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor={`startTime-${index}`}>Start Time</Label>
-              <TimePicker
-                isEndTime={false}
-                value={new Date(`2000-01-01T${schedule.startTime || '09:00'}:00`)}
-                onChange={(date) => {
-                  const timeString = format(date, 'HH:mm');
-                  updateScheduleItem(index, 'startTime', timeString);
-                }}
-                className="w-full"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor={`startTime-${index}`}>Start Time</Label>
+                <TimePicker
+                  isEndTime={false}
+                  value={new Date(`2000-01-01T${schedule.startTime || '09:00'}:00`)}
+                  onChange={(date) => {
+                    const timeString = format(date, 'HH:mm');
+                    updateScheduleItem(index, 'startTime', timeString);
+                  }}
+                  className="w-full"
+                />
+              </div>
+              <div>
+                <Label htmlFor={`endTime-${index}`}>End Time</Label>
+                <TimePicker
+                  isEndTime={true}
+                  scheduleStartTime={schedule.startTime}
+                  value={new Date(`2000-01-01T${schedule.endTime || '10:00'}:00`)}
+                  onChange={(date) => {
+                    const timeString = format(date, 'HH:mm');
+                    updateScheduleItem(index, 'endTime', timeString);
+                  }}
+                  className="w-full"
+                />
+              </div>
             </div>
-            <div>
-              <Label htmlFor={`endTime-${index}`}>End Time</Label>
-              <TimePicker
-                isEndTime={true}
-                scheduleStartTime={schedule.startTime} // Pass the current schedule's start time
-                value={new Date(`2000-01-01T${schedule.endTime || '10:00'}:00`)}
-                onChange={(date) => {
-                  const timeString = format(date, 'HH:mm');
-                  updateScheduleItem(index, 'endTime', timeString);
-                }}
-                className="w-full"
-              />
-            </div>
-          </div>
             
             <div>
               <Label className="mb-2 block">Days</Label>

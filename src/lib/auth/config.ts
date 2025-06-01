@@ -6,18 +6,33 @@ import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { db } from "@/src/lib/db";
 import bcrypt from "bcryptjs";
 
+// Ensure db is properly initialized before using it
+if (!db) {
+  throw new Error("Database client is not initialized properly");
+}
+
 interface CustomUser extends User {
   firstName?: string;
   lastName?: string;
 }
 
 export const authOptions: NextAuthOptions = {
+  // Only initialize the adapter when we're sure db is available
   adapter: PrismaAdapter(db),
-  debug: false, // Set this to false to disable debug logs
+  session: {
+    strategy: "jwt", // Use JWT instead of database sessions temporarily
+  },
+  debug: false,
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      authorization: {
+        params: {
+          prompt: "select_account", // Always show account selection
+          access_type: "offline",
+        },
+      },
       profile(profile) {
         return {
           id: profile.sub,
@@ -147,15 +162,57 @@ export const authOptions: NextAuthOptions = {
         console.error("Error in signIn event:", error);
       }
     },
+    signOut: async ({ token, session }) => {
+      try {
+        if (token?.id) {
+          // For JWT strategy, we need to clean up any related Account entries
+          if (token.email) {
+            // If there are any expired tokens or session-related data in Account
+            // that needs cleaning, you can handle it here
+            await db.account.updateMany({
+              where: { 
+                userId: token.id,
+                // Only update session-related fields when cleaning up
+                OR: [
+                  { expires_at: { lt: Math.floor(Date.now() / 1000) } }
+                ]
+              },
+              data: {
+                // Reset any dynamic session data if needed
+                session_state: null
+              }
+            });
+          }
+
+          // Clear any server-side session data
+          if (session) {
+            Object.keys(session).forEach(key => {
+              // @ts-ignore - We need to clear all session properties
+              session[key] = null;
+            });
+          }
+        }
+      } catch (error) {
+        console.error("Error during sign out cleanup:", error);
+      }
+    },
   },
   callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
+    async jwt({ token, user, account, profile, trigger }) {
+      // Clear any previous identity if we're starting a new sign in
+      if (account?.provider === 'google') {
+        // Reset token to avoid any previous session conflicts
+        token.id = user.id;
+        token.email = user.email;
+        token.role = user.role;
+      } else if (user) {
+        // Normal sign-in flow for other methods
         token.id = user.id;
         token.role = user.role;
       }
       return token;
     },
+    
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string;
@@ -163,43 +220,124 @@ export const authOptions: NextAuthOptions = {
       }
       return session;
     },
+    
     async signIn({ user, account, profile }) {
-      // Handle Google sign-in for teachers
+      // For OAuth providers, ensure account linking works properly
       if (account?.provider === "google") {
         try {
-          const existingUser = await db.user.findUnique({
-            where: { email: user.email as string },
-            include: { teacherProfile: true }
+          // First check if this Google account is already linked to a user
+          const linkedAccount = await db.account.findFirst({
+            where: { 
+              provider: 'google',
+              providerAccountId: account.providerAccountId
+            },
+            include: {
+              user: true
+            }
           });
           
-          // If user exists but doesn't have a teacher profile, create one
-          if (existingUser && !existingUser.teacherProfile) {
+          // If this Google account is already linked, return true to complete sign-in
+          if (linkedAccount) {
+            return true;
+          }
+          
+          // Check if we have a user with this email
+          const userWithEmail = await db.user.findUnique({
+            where: { 
+              email: user.email as string 
+            }
+          });
+          
+          // If no user with this email exists, let NextAuth create a new user
+          if (!userWithEmail) {
+            return true;
+          }
+          
+          // If user exists with this email but no linked Google account,
+          // manually create the account link
+          await db.account.create({
+            data: {
+              userId: userWithEmail.id,
+              type: account.type,
+              provider: account.provider,
+              providerAccountId: account.providerAccountId,
+              refresh_token: account.refresh_token,
+              access_token: account.access_token,
+              expires_at: account.expires_at,
+              token_type: account.token_type,
+              scope: account.scope,
+              id_token: account.id_token,
+            }
+          });
+          
+          // Also ensure teacher profile exists
+          const teacherProfile = await db.teacherProfile.findUnique({
+            where: { userId: userWithEmail.id }
+          });
+          
+          if (!teacherProfile) {
             await db.teacherProfile.create({
               data: {
-                userId: existingUser.id,
-                firstName: existingUser.firstName || (profile as any)?.given_name || "",
-                lastName: existingUser.lastName || (profile as any)?.family_name || "",
-              },
+                userId: userWithEmail.id,
+                firstName: userWithEmail.firstName || (profile as any)?.given_name || "",
+                lastName: userWithEmail.lastName || (profile as any)?.family_name || "",
+              }
             });
           }
+          
+          // Notify sign-in to use the existing user
+          return true;
         } catch (error) {
-          console.error("Error in signIn callback:", error);
-          // Don't block the sign-in process if this fails
+          console.error("Error in OAuth sign-in flow:", error);
+          return true; // Still allow sign-in even if our extra logic fails
         }
       }
       return true;
-    },
+    }
   },
+  
+  // Clear all sessions during sign out
+  // events: {
+  //   signOut: async ({ token, session }) => {
+  //     try {
+  //       if (token?.id) {
+  //         // For JWT strategy, we need to clean up any related Account entries
+  //         if (token.email) {
+  //           // If there are any expired tokens or session-related data in Account
+  //           // that needs cleaning, you can handle it here
+  //           await db.account.updateMany({
+  //             where: { 
+  //               userId: token.id,
+  //               // Only update session-related fields when cleaning up
+  //               OR: [
+  //                 { expires_at: { lt: Math.floor(Date.now() / 1000) } }
+  //               ]
+  //             },
+  //             data: {
+  //               // Reset any dynamic session data if needed
+  //               session_state: null
+  //             }
+  //           });
+  //         }
+
+  //         // Clear any server-side session data
+  //         if (session) {
+  //           Object.keys(session).forEach(key => {
+  //             // @ts-ignore - We need to clear all session properties
+  //             session[key] = null;
+  //           });
+  //         }
+  //       }
+  //     } catch (error) {
+  //       console.error("Error during sign out cleanup:", error);
+  //     }
+  //   },
+  // },
+  
+  // Add pages configuration to customize error and sign-in pages
   pages: {
-    // Using conditional paths based on role would require custom handling
-    // For now, keep the default paths
-    signIn: '/teacher', // This will be overridden in the sign-in component
-    error: '/login',
-    signOut: '/teacher',
-  },
-  session: {
-    strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60,
-  },
-  secret: process.env.NEXTAUTH_SECRET,
-};
+    signIn: '/teacher', 
+    error: '/auth/error',
+    signOut: '/teacher'
+  }
+}

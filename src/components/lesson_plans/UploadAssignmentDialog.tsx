@@ -64,9 +64,12 @@ export default function UploadAssignmentDialog({
         // Create a FormData instance
         const formData = new FormData();
         formData.append('file', file);
+        formData.append('fileName', file.name);
+        formData.append('lessonPlanId', lessonPlanId);
+        formData.append('classId', classId);
         
-        // Upload the file to your storage service
-        const uploadRes = await fetch('/api/upload', {
+        // Upload the file to the new API
+        const uploadRes = await fetch('/api/teacher/assignment/upload', {
           method: 'POST',
           body: formData,
         });
@@ -77,14 +80,13 @@ export default function UploadAssignmentDialog({
         
         const uploadData = await uploadRes.json();
         
-        // Make sure we're using the correct properties from the response
         if (!uploadData.success) {
           throw new Error(uploadData.error || 'File upload failed');
         }
         
-        url = uploadData.fileUrl || uploadData.url || ''; // Check both possible properties
-        fileType = file.type;
-        size = file.size;
+        url = uploadData.fileUrl;
+        fileType = uploadData.fileType;
+        size = uploadData.size;
       }
 
       console.log('Creating assignment with classId:', classId); // Add debugging
@@ -129,7 +131,10 @@ export default function UploadAssignmentDialog({
       }
     }}>
       <DialogTrigger asChild>
-        <Button className="bg-orange-500 text-white" size="sm">Upload</Button>
+        <Button className="bg-orange-500 text-white hover:bg-orange-600" size="sm">
+          <Upload className="mr-2 h-4 w-4" />
+          Upload
+        </Button>
       </DialogTrigger>
       <DialogContent className="max-w-lg">
         <DialogHeader>
@@ -172,7 +177,7 @@ export default function UploadAssignmentDialog({
           >
             <option value="Homework">Homework</option>
             <option value="Writing Assignment">Writing Assignment</option>
-            <option value="Essay">Essay</option>
+            <option value="Worksheet">Worksheet</option>
           </select>
           
           <Input 

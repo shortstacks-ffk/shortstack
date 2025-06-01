@@ -77,14 +77,14 @@ const AssignmentSubmitDialog = ({ children, assignment }: AssignmentSubmitDialog
       let fileUrl = '';
       
       if (currentTab === 'computer-upload' && selectedFile) {
-        // First upload the file to Google Drive
+        // First upload the file to our API
         setUploadProgress(true);
         
         const uploadFormData = new FormData();
         uploadFormData.append('file', selectedFile);
-        uploadFormData.append('fileName', selectedFile.name);
+        uploadFormData.append('assignmentId', assignment.id);
         
-        const uploadResponse = await fetch('/api/upload', {
+        const uploadResponse = await fetch('/api/student/assignment/upload', {
           method: 'POST',
           body: uploadFormData
         });
@@ -100,9 +100,9 @@ const AssignmentSubmitDialog = ({ children, assignment }: AssignmentSubmitDialog
         if (uploadResult.success) {
           fileUrl = uploadResult.fileUrl;
           formData.append('fileUrl', fileUrl);
-          formData.append('fileName', selectedFile.name);
-          formData.append('fileType', selectedFile.type);
-          formData.append('fileSize', selectedFile.size.toString());
+          formData.append('fileName', uploadResult.fileName);
+          formData.append('fileType', uploadResult.fileType);
+          formData.append('fileSize', uploadResult.size.toString());
         } else {
           throw new Error('File upload failed');
         }

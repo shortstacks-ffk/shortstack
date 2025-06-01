@@ -103,12 +103,12 @@ export async function POST(request: NextRequest) {
           password,
           isNewStudent,
           isPasswordReset,
-          appUrl
+          appUrl: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
         });
 
     // Send the email using the appropriate template
     const { data, error } = await resend.emails.send({
-      from: `ShortStack Education <${process.env.RESEND_FROM_EMAIL || 'noreply@shortstack.edu'}>`,
+      from: `ShortStacks Education <${process.env.RESEND_FROM_EMAIL || 'access@shortstacksffk.com'}>`,
       to: [to],
       subject: subject,
       react: emailTemplate,

@@ -8,6 +8,7 @@ import { useScheduler } from "@/src/providers/scheduler/schedular-provider";
 import { cn } from "@/src/lib/utils";
 import CustomModal from "@/src/components/ui/custom-modal";
 import AddEventModal from "@/src/components/scheduler/_modals/add-event-modal";
+import { toast } from "react-hot-toast";
 
 const formatDate = (d: Date | string) => {
   const date = typeof d === "string" ? new Date(d) : d;
@@ -106,11 +107,28 @@ export default function EventStyled({
 
   // Handle editing an event
   const handleEditEvent = (eventToEdit: Event) => {
+    // Ensure we're passing a clean object with properly converted dates
+    const cleanEventData = {
+      id: eventToEdit.id,
+      title: eventToEdit.title || "",
+      description: eventToEdit.description || "",
+      startDate: eventToEdit.startDate instanceof Date ? 
+        eventToEdit.startDate : new Date(eventToEdit.startDate),
+      endDate: eventToEdit.endDate instanceof Date ? 
+        eventToEdit.endDate : new Date(eventToEdit.endDate),
+      variant: eventToEdit.variant || "primary",
+      isRecurring: eventToEdit.isRecurring || false,
+      recurringDays: eventToEdit.recurringDays || [],
+      metadata: eventToEdit.metadata || {}
+    };
+
+    console.log("Opening edit modal with data:", cleanEventData);
+
     setOpen(
-      <CustomModal title="Edit Event">
+      <CustomModal title="Edit Event"> {/* This title will show in the modal header */}
         <AddEventModal />
       </CustomModal>,
-      async () => ({ default: { ...eventToEdit } }) // Ensure we pass a copy
+      async () => ({ default: cleanEventData })
     );
   };
 
@@ -118,14 +136,23 @@ export default function EventStyled({
   const handleDeleteEvent = (id: string) => {
     // Close any open modals first
     setOpen(null);
-
-    // Call the delete handler from the scheduler context
-    handlers.handleDeleteEvent(id);
-
+    
+    console.log("Event deletion requested for ID:", id);
+    
     // Call the onDelete prop if provided (for local state updates)
     if (onDelete) {
+      console.log("Calling onDelete callback");
       onDelete(id);
+    } else {
+      console.log("No onDelete callback provided, using handlers.handleDeleteEvent");
+      // Only trigger UI update if no external handler was provided
+      handlers.handleDeleteEvent(id);
     }
+    
+    // DO NOT call the API here - let the TeacherCalendarClient handle that
+    
+    // Success notification immediately for better UX
+    toast.success("Event deleted");
   };
 
   return (

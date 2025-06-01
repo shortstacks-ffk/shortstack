@@ -21,7 +21,7 @@ import {
   SchedulerContextType,
   startOfWeek,
 } from "@/src/types/scheduler/index";
-import ModalProvider, { useModal } from "./modal-context"; // Import useModal here
+import ModalProvider, { ModalContext } from "./modal-context"; // Import ModalContext
 import CustomModal from "@/src/components/ui/custom-modal"; // Import CustomModal component
 import AddEventModal from "@/src/components/scheduler/_modals/add-event-modal"; 
 // Define event and state types
@@ -100,6 +100,9 @@ export const SchedulerProvider = ({
   );
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(false);
+
+  // Access the modal context
+  const modalContext = useContext(ModalContext);
 
   useEffect(() => {
     if (initialState) {
@@ -387,34 +390,62 @@ const getEventsForDay = useCallback(
   }
 
   function handleUpdateEvent(event: Event, id: string) {
-    dispatch({ type: "UPDATE_EVENT", payload: { ...event, id } });
+    // Update UI immediately for responsiveness
+    dispatch({ 
+      type: "UPDATE_EVENT", 
+      payload: { 
+        ...event,
+        id // Ensure the ID is preserved
+      } 
+    });
+    
+    // Call any external update handler
     if (onUpdateEvent) {
       onUpdateEvent(event);
     }
   }
 
   function handleDeleteEvent(id: string) {
-    dispatch({ type: "REMOVE_EVENT", payload: { id } });
-    if (onDeleteEvent) {
-      onDeleteEvent(id);
+    try {
+      console.log("Deleting event from provider:", id);
+      
+      // Update UI immediately for responsiveness
+      dispatch({ type: "REMOVE_EVENT", payload: { id } });
+      
+      // Call any external delete handler
+      if (onDeleteEvent) {
+        onDeleteEvent(id);
+      }
+      
+      return true;
+    } catch (error) {
+      console.error("Error in provider's handleDeleteEvent:", error);
+      return false;
     }
   }
 
+  // Update the openEditModal function
   function openEditModal(event: Event) {
-    setOpen(
-      <CustomModal title="Edit Event">
-        <AddEventModal />
-      </CustomModal>,
-      async () => ({ default: event })
-    );
+    if (modalContext && modalContext.setOpen) {
+      modalContext.setOpen(
+        <CustomModal title="Edit Event">
+          <AddEventModal />
+        </CustomModal>,
+        async () => ({ default: event })
+      );
+    } else {
+      console.error("Modal context not available");
+    }
   }
 
+  // Add refreshEvents to the handlers object if not already there
   const handlers: Handlers = {
     handleEventStyling,
     handleAddEvent,
     handleUpdateEvent,
     handleDeleteEvent,
     openEditModal,
+    refreshEvents, // Make sure this is included
   };
 
   return (
@@ -441,8 +472,4 @@ export const useScheduler = () => {
   }
   return context;
 };
-
-function setOpen(arg0: React.JSX.Element, arg1: () => Promise<{ default: Event; }>) {
-  throw new Error("Function not implemented.");
-}
 

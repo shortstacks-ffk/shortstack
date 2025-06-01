@@ -33,7 +33,7 @@ export const StudentInvitation: React.FC<StudentInvitationProps> = ({
   email,
   password,
   isNewStudent,
-  appUrl = 'http://localhost:3000',
+  appUrl,
   isPasswordReset = false,
 }) => {
   // Determine the message type for preview and content

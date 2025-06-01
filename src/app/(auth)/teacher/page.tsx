@@ -33,7 +33,11 @@ export default function TeacherSignInPage() {
       });
 
       if (result?.error) {
+         if (result.error === "CredentialsSignin") {
+        setError("Invalid email or password. Please try again.");
+      } else {
         setError(result.error);
+      }
       } else {
         router.push("/teacher/dashboard");
       }
@@ -150,7 +154,7 @@ export default function TeacherSignInPage() {
 
           <div className="mt-6">
             <button
-              onClick={() => signIn("google", { callbackUrl: "/teacher/dashboard" })}
+              onClick={() => signIn("google", { callbackUrl: "/teacher/dashboard", prompt: "select_account" })}
               className="w-full flex items-center justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
             >
               <svg className="h-5 w-5 mr-2" viewBox="0 0 24 24">

@@ -36,7 +36,6 @@ declare module "next-auth" {
   }
 }
 
-const DaysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 const DashboardClient = ({ classes }: DashboardClientProps) => {
   const { data: session } = useSession({
@@ -52,21 +51,22 @@ const DashboardClient = ({ classes }: DashboardClientProps) => {
   // Limit the displayed classes to 3 maximum
   const displayedClasses = classesWithCounts.slice(0, 3);
 
-  // Format class sessions into a readable schedule string
-  const formatClassSchedule = (sessions?: ClassSession[]) => {
-    if (!sessions || sessions.length === 0) return null;
-    
-    return sessions.map(session => {
-      const day = DaysOfWeek[session.dayOfWeek];
-      return `${day} ${session.startTime}-${session.endTime}`;
-    }).join(', ');
-  };
+// Add the formatClassSchedule function for consistent display
+const DaysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+function formatClassSchedule(sessions?: any[]) {
+  if (!sessions || sessions.length === 0) return null;
+  
+  return sessions.map(session => {
+    const day = DaysOfWeek[session.dayOfWeek];
+    return `${day} ${session.startTime}-${session.endTime}`;
+  }).join(', ');
+}
 
   return (
     <div className="w-full">
       <div className="w-full">
         <section className="mb-6 md:mb-8">
-          <h2 className="text-xl md:text-2xl font-semibold mb-3 md:mb-4 px-1">Recent Classes</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
             {displayedClasses.map((cls) => (
               <ClassCard
@@ -77,7 +77,7 @@ const DashboardClient = ({ classes }: DashboardClientProps) => {
                 code={cls.code}
                 color={cls.color || "primary"}
                 grade={cls.grade}
-                numberOfStudents={cls.numberOfStudents}
+                numberOfStudents={(cls as any)._count?.enrollments || cls.numberOfStudents || 0}
                 schedule={formatClassSchedule(cls.classSessions)}
                 overview={cls.overview}
               />
