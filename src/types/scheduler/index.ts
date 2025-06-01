@@ -47,9 +47,6 @@ export type Action =
 
 // Define handlers interface
 export interface Handlers {
-  handleAddEvent: (event: Event) => void;
-  handleUpdateEvent: (event: Event, id: string) => void;
-  handleDeleteEvent: (id: string) => void;
   handleEventStyling: (
     event: Event,
     dayEvents: Event[],
@@ -58,8 +55,12 @@ export interface Handlers {
       periodIndex?: number;
       adjustForPeriod?: boolean;
     }
-  ) => Record<string, any>;
+  ) => any;
+  handleAddEvent: (event: Event) => void;
+  handleUpdateEvent: (event: Event, id: string) => void;
+  handleDeleteEvent: (id: string) => boolean;
   openEditModal: (event: Event) => void;
+  refreshEvents: () => Promise<void>; // Add this line
 }
 
 // Define getters interface

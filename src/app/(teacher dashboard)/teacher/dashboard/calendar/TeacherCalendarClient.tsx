@@ -178,7 +178,12 @@ export default function TeacherCalendarClient() {
       });
 
       if (!response.ok) throw new Error("Failed to update event");
-      fetchEvents();
+      
+      // Update the local state after successful API call
+      setEvents(prevEvents => 
+        prevEvents.map(e => e.id === event.id ? event : e)
+      );
+      
       toast.success("Event updated successfully");
     } catch (error) {
       console.error("Error updating event:", error);
@@ -186,18 +191,33 @@ export default function TeacherCalendarClient() {
     }
   };
 
+  // Modify the handleDeleteEvent function to avoid double deletion
   const handleDeleteEvent = async (eventId: string) => {
     try {
+      console.log("TeacherCalendarClient: Deleting event with ID:", eventId);
+      
+      // First, update local UI state for immediate feedback
+      setEvents(prevEvents => prevEvents.filter(event => event.id !== eventId));
+      
+      // Then call the API to delete from the database
       const response = await fetch(`/api/calendar/${eventId}`, {
         method: "DELETE",
       });
-
-      if (!response.ok) throw new Error("Failed to delete event");
-      setEvents(prevEvents => prevEvents.filter(event => event.id !== eventId));
+      
+      // Check response and handle errors
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to delete event");
+      }
+      
       toast.success("Event deleted successfully");
     } catch (error) {
       console.error("Error deleting event:", error);
+      
+      // Show error toast
       toast.error("Failed to delete event");
+      
+      // If API call fails, refresh events to restore the UI state
       fetchEvents();
     }
   };
@@ -261,8 +281,10 @@ export default function TeacherCalendarClient() {
           <Button
             variant="destructive"
             onClick={() => {
-              handleDeleteEvent(event.id);
+              // Close the modal first
               onClose();
+              // Then delete with the centralized function
+              handleDeleteEvent(event.id);
             }}
           >
             Delete Event
@@ -340,10 +362,6 @@ export default function TeacherCalendarClient() {
                 }}
                 CustomComponents={{
                   CustomEventModal: {
-                    CustomAddEventModal: {
-                      title: "Create Event",
-                      CustomForm: CreateEventFormWithHook,
-                    },
                     CustomViewEventModal: {
                       component: TeacherEventModal,
                     },
