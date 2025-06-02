@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/src/lib/auth/config";
 import { db } from "@/src/lib/db";
+import { getUserTimeZone } from "@/src/lib/time-utils";
 
 export async function GET(request: Request) {
   try {
@@ -9,6 +10,8 @@ export async function GET(request: Request) {
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const userTimeZone = request.headers.get('x-timezone') || 'UTC';
 
     const searchParams = new URL(request.url).searchParams;
     const start = searchParams.get('start') ? new Date(searchParams.get('start') as string) : undefined;

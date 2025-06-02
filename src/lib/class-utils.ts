@@ -1,10 +1,10 @@
 import { addDays, addWeeks, addMonths, setDate } from "date-fns";
+import { toZonedTime } from 'date-fns-tz';
 
-// Function to get recurrence days based on cadence
+// Function to get session dates (weekly by default)
 export function getSessionDates(
   startDate: Date,
   endDate: Date | null,
-  cadence: string,
   dayOfWeek: number,
   limit = 52 // Limit to prevent infinite recurring events
 ): Date[] {
@@ -25,28 +25,9 @@ export function getSessionDates(
   while ((!finalEndDate || currentDate < finalEndDate) && count < limit) {
     dates.push(new Date(currentDate));
     count++;
-
-    // Adjust the increment based on the cadence
-    switch (cadence.toLowerCase()) {
-      case "daily":
-        currentDate = addDays(currentDate, 1);
-        break;
-      case "weekly":
-        currentDate = addWeeks(currentDate, 1);
-        break;
-      case "biweekly":
-        currentDate = addWeeks(currentDate, 2);
-        break;
-      case "monthly":
-        currentDate = addMonths(currentDate, 1);
-        break;
-      case "quarterly":
-        currentDate = addMonths(currentDate, 3);
-        break;
-      default:
-        // Default to weekly if cadence is unknown
-        currentDate = addWeeks(currentDate, 1);
-    }
+    
+    // Default to weekly recurrence
+    currentDate = addWeeks(currentDate, 1);
   }
 
   return dates;
@@ -60,13 +41,13 @@ export function createCalendarEventsFromClassSessions(
     emoji: string;
     code: string;
     color?: string;
-    cadence?: string;
     grade?: string;
     startDate?: Date;
     endDate?: Date;
     classSessions?: { dayOfWeek: number; startTime: string; endTime: string; }[];
   },
-  teacherId: string
+  teacherId: string,
+  timeZone: string = 'UTC'
 ) {
   const events = [];
   
@@ -74,17 +55,14 @@ export function createCalendarEventsFromClassSessions(
     return [];
   }
   
-  const cadence = classData.cadence || "weekly"; // Default to weekly if not specified
-  
   // Process each class session
   for (const session of classData.classSessions) {
     const { dayOfWeek, startTime, endTime } = session;
     
-    // Get all dates for this session based on cadence
+    // Get all dates for this session (weekly by default)
     const sessionDates = getSessionDates(
       classData.startDate,
       classData.endDate || null,
-      cadence,
       dayOfWeek
     );
     
@@ -115,7 +93,8 @@ export function createCalendarEventsFromClassSessions(
           classId: classData.id,
           className: classData.name,
           classEmoji: classData.emoji,
-          classColor: classData.color
+          classColor: classData.color,
+          timeZone: timeZone
         }
       });
     }
@@ -130,7 +109,6 @@ export interface ClassWithStats {
   emoji: string;
   code: string;
   color?: string;
-  cadence?: string;
   grade?: string;
   startDate?: Date;
   endDate?: Date;

@@ -37,7 +37,6 @@ interface EditClassFormProps {
 export function EditClassForm({ isOpen, onClose, classData }: EditClassFormProps) {
   const [name, setName] = useState(classData.name)
   const [emoji, setEmoji] = useState(classData.emoji)
-  const [cadence, setCadence] = useState(classData.cadence || "Weekly")
   const [grade, setGrade] = useState(classData.grade || "9th")
   const [color, setColor] = useState(classData.color || "primary")
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -103,7 +102,6 @@ export function EditClassForm({ isOpen, onClose, classData }: EditClassFormProps
       const result = await updateClass(classData.id, {
         name,
         emoji,
-        cadence,
         grade,
         color,
         // Send complete schedule data instead of just the first item
@@ -177,23 +175,8 @@ export function EditClassForm({ isOpen, onClose, classData }: EditClassFormProps
             </div>
           </div>
           
-          {/* Middle section - Cadence, Grade */}
-          <div className="grid grid-cols-2 gap-2">
-            <div className="space-y-1">
-              <Label htmlFor="cadence">Cadence</Label>
-              <Select value={cadence} onValueChange={setCadence}>
-                <SelectTrigger className="h-9">
-                  <SelectValue placeholder="Select cadence" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Daily">Daily</SelectItem>
-                  <SelectItem value="Weekly">Weekly</SelectItem>
-                  <SelectItem value="Biweekly">Biweekly</SelectItem>
-                  <SelectItem value="Monthly">Monthly</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
+          {/* Middle section - Grade only (removed Cadence) */}
+          <div className="grid grid-cols-1 gap-2">
             <div className="space-y-1">
               <Label htmlFor="grade">Grade</Label>
               <Select value={grade} onValueChange={setGrade}>
@@ -202,9 +185,7 @@ export function EditClassForm({ isOpen, onClose, classData }: EditClassFormProps
                 </SelectTrigger>
                 <SelectContent>
                   {["5th", "6th", "7th", "8th", "9th", "10th", "11th", "12th"].map((g) => (
-                    <SelectItem key={g} value={g}>
-                      {g} Grade
-                    </SelectItem>
+                    <SelectItem key={g} value={g}>{g}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
