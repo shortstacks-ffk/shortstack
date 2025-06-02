@@ -9,6 +9,7 @@ import { StudentJoinClass } from "@/src/components/students/StudentJoinClass";
 import { StudentClassCard } from "@/src/components/class/StudentClassCard";
 import { getStudentClasses } from '@/src/app/actions/studentActions';
 import { Card, CardContent } from "@/src/components/ui/card";
+import { formatClassSchedule } from "@/src/lib/date-utils";
 
 // Define the color options for class cards
 const CLASS_COLORS = ["primary", "secondary", "success", "warning", "destructive", "default"];
@@ -35,7 +36,6 @@ interface Class {
   overview?: string | null; // Added this property from the API response
 }
 
-const DaysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export default function StudentClassesPage() {
   const [loading, setLoading] = useState(true);
@@ -44,15 +44,6 @@ export default function StudentClassesPage() {
   const { data: session, status } = useSession();
   const { toast } = useToast();
 
-  // Format class sessions into a readable schedule string
-  const formatClassSchedule = (sessions?: ClassSession[]) => {
-    if (!sessions || sessions.length === 0) return null;
-    
-    return sessions.map(session => {
-      const day = DaysOfWeek[session.dayOfWeek];
-      return `${day} ${session.startTime}-${session.endTime}`;
-    }).join(', ');
-  };
 
   const fetchClasses = async () => {
     try {
@@ -160,16 +151,6 @@ export default function StudentClassesPage() {
 
   return (
     <div className="container mx-auto p-4 max-w-6xl">
-      {/* <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">My Classes</h1>
-        <Button 
-          onClick={fetchClasses} 
-          variant="outline" 
-          size="sm"
-        >
-          Refresh
-        </Button>
-      </div> */}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
         {classes.length > 0 ? (

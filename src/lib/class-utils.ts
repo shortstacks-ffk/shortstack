@@ -26,6 +26,7 @@ export function getSessionDates(
     dates.push(new Date(currentDate));
     count++;
 
+    // Adjust the increment based on the cadence
     switch (cadence.toLowerCase()) {
       case "daily":
         currentDate = addDays(currentDate, 1);

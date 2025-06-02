@@ -3,7 +3,7 @@
 import * as React from "react"
 import { signOut } from "next-auth/react"
 import { toast } from "sonner"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 
 import { NavMain } from "@/src/components/nav-main"
 import { NavLogo } from "@/src/components/nav-logo"
@@ -24,6 +24,7 @@ interface SidebarLeftProps {
 
 export function SidebarLeft({ filteredNavItems }: SidebarLeftProps = {}) {
   const router = useRouter();
+  const pathname = usePathname(); // Get current path
 
   const handleLogout = async () => {
     try {
@@ -46,7 +47,7 @@ export function SidebarLeft({ filteredNavItems }: SidebarLeftProps = {}) {
       </SidebarHeader>
       <SidebarContent className="pl-4 pt-10 mb-4 flex flex-col">
         <div className="space-y-6">
-          <NavMain items={navItems} /> {/* Use filtered items */}
+          <NavMain items={navItems} currentPath={pathname} /> {/* Pass pathname to NavMain */}
         </div>
       </SidebarContent>
       <SidebarFooter>

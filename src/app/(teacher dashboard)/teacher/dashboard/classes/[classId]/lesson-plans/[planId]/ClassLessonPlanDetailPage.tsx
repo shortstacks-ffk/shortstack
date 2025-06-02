@@ -17,6 +17,7 @@ import FileTable from '@/src/components/lessonPlans/FileTable';
 import UploadAssignmentDialog from '@/src/components/lessonPlans/UploadAssignmentDialog';
 import AssignmentTable from '@/src/components/lessonPlans/AssignmentTable';
 import RichEditor from '@/src/components/RichEditor';
+import { Pen } from 'lucide-react';
 
 
 interface LessonPlanDetailProps {
@@ -24,7 +25,7 @@ interface LessonPlanDetailProps {
   planId: string;
 }
   
-export default function LessonPlanDetailPage({ classId, planId }: LessonPlanDetailProps) {
+export default function ClassLessonPlanDetailPage({ classId, planId }: LessonPlanDetailProps) {
   const [lessonPlan, setLessonPlan] = useState<any>(null);
   const [editMode, setEditMode] = useState(false);
   const [form, setForm] = useState({ name: '', description: '' });
@@ -116,7 +117,7 @@ export default function LessonPlanDetailPage({ classId, planId }: LessonPlanDeta
   }
 
   return (
-    <div className="w-full lg:w-5/6 xl:w-3/4 mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6 overflow-y-auto">
+    <div className="w-full h-[100vh] lg:w-5/6 xl:w-3/4 mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6 overflow-y-auto">
       {/* Breadcrumbs - hidden on mobile */}
       <div className="hidden sm:block">
         <Breadcrumbs
@@ -150,13 +151,13 @@ export default function LessonPlanDetailPage({ classId, planId }: LessonPlanDeta
         )}
         {editMode ? (
           <div className="flex items-center gap-2 self-end">
-            <Button onClick={handleSave} size="sm" className="sm:size-default">Save</Button>
+            <Button onClick={handleSave} size="sm" className="sm:size-default bg-orange-500">Save</Button>
             <Button variant="secondary" onClick={handleCancel} size="sm" className="sm:size-default">
               Cancel
             </Button>
           </div>
         ) : (
-          <Button onClick={() => setEditMode(true)} size="sm" className="sm:size-default self-end">Edit</Button>
+          <Button onClick={() => setEditMode(true)} size="sm" className="sm:size-default bg-orange-500 self-end"><Pen /></Button>
         )}
       </div>
 

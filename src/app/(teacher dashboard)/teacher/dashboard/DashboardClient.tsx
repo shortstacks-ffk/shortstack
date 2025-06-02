@@ -5,6 +5,7 @@ import { ClassCard } from "@/src/components/class/ClassCard";
 import DashboardAddClassCard from "@/src/components/class/dashboard-add-class-card";
 import { PerformanceChart } from "@/src/components/dashboard/performance-chart";
 import { useSession } from "next-auth/react";
+import { formatClassSchedule } from "@/src/lib/date-utils";
 
 interface ClassSession {
   id: string;
@@ -36,7 +37,6 @@ declare module "next-auth" {
   }
 }
 
-
 const DashboardClient = ({ classes }: DashboardClientProps) => {
   const { data: session } = useSession({
     required: true,
@@ -50,18 +50,6 @@ const DashboardClient = ({ classes }: DashboardClientProps) => {
 
   // Limit the displayed classes to 3 maximum
   const displayedClasses = classesWithCounts.slice(0, 3);
-
-// Add the formatClassSchedule function for consistent display
-const DaysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-function formatClassSchedule(sessions?: any[]) {
-  if (!sessions || sessions.length === 0) return null;
-  
-  return sessions.map(session => {
-    const day = DaysOfWeek[session.dayOfWeek];
-    return `${day} ${session.startTime}-${session.endTime}`;
-  }).join(', ');
-}
 
   return (
     <div className="w-full">

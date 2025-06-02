@@ -23,6 +23,7 @@ import { MoreHorizontal, FileEdit, Trash2, Send, Calendar, FileIcon } from 'luci
 import EditFileDialog from './EditFileDialog';
 import AssignFileDialog from './AssignFileDialog';
 import Link from 'next/link';
+import { getSimpleFileType } from '@/src/lib/utils';
 
 interface FileRecord {
   id: string;
@@ -53,36 +54,6 @@ const formatDate = (dateString?: string) => {
   return date.toLocaleDateString();
 };
 
-// Extract simplified file type from the file type or name
-const getSimpleFileType = (fileType?: string, fileName?: string): string => {
-  if (fileType) {
-    // Remove any prefix like "application/" or "text/"
-    const parts = fileType.split('/');
-    const ext = parts[parts.length - 1];
-    
-    // Further simplify common extensions
-    if (ext.includes('pdf')) return 'PDF';
-    if (ext.includes('word') || ext.includes('doc')) return 'DOC';
-    if (ext.includes('excel') || ext.includes('sheet') || ext.includes('csv')) return 'XLS';
-    if (ext.includes('powerpoint') || ext.includes('presentation') || ext.includes('ppt')) return 'PPT';
-    if (ext.includes('image') || ext.includes('jpeg') || ext.includes('png')) return 'IMG';
-    if (ext.includes('video')) return 'VID';
-    if (ext.includes('audio')) return 'AUD';
-    if (ext.includes('zip') || ext.includes('rar') || ext.includes('tar')) return 'ZIP';
-    return ext.toUpperCase().substring(0, 3);
-  }
-  
-  // Try to extract from filename if fileType isn't available
-  if (fileName) {
-    const nameParts = fileName.split('.');
-    if (nameParts.length > 1) {
-      const ext = nameParts[nameParts.length - 1].toLowerCase();
-      return ext.substring(0, 3).toUpperCase();
-    }
-  }
-  
-  return 'FILE';
-};
 
 export default function FileTable({ 
   files, 

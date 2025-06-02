@@ -1,6 +1,7 @@
 import { getClasses } from "@/src/app/actions/classActions";
 import DashboardAddClassCard from "@/src/components/class/dashboard-add-class-card";
 import { ClassCard } from "@/src/components/class/ClassCard";
+import { formatClassSchedule } from "@/src/lib/date-utils";
 
 export const dynamic = 'force-dynamic';
 
@@ -40,14 +41,3 @@ export default async function ClassesPage() {
   );
 }
 
-// Add the formatClassSchedule function for consistent display
-const DaysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-function formatClassSchedule(sessions?: any[]) {
-  if (!sessions || sessions.length === 0) return null;
-  
-  return sessions.map(session => {
-    const day = DaysOfWeek[session.dayOfWeek];
-    return `${day} ${session.startTime}-${session.endTime}`;
-  }).join(', ');
-}
