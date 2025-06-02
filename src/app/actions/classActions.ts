@@ -69,10 +69,18 @@ async function createClassScheduleEvents(classData: any, schedules: any[]) {
     
     // Create calendar events for each schedule
     for (const schedule of schedules) {
-      // Ensure days is an array of numbers
-      const days: number[] = Array.isArray(schedule.days)
-        ? schedule.days.map((day: string | number) => typeof day === 'string' ? parseInt(day, 10) : day)
-        : [];
+      // Handle days based on cadence
+      let days: number[] = [];
+      
+      // If cadence is Daily, select all days of the week (0-6)
+      if (classData.cadence?.toLowerCase() === "daily") {
+        days = [0, 1, 2, 3, 4, 5, 6]; // All days
+      } else {
+        // For other cadences, use the days selected in the schedule
+        days = Array.isArray(schedule.days)
+          ? schedule.days.map((day: string | number) => typeof day === 'string' ? parseInt(day, 10) : day)
+          : [];
+      }
       
       if (days.length === 0) {
         console.log("No days specified for this schedule");
@@ -103,9 +111,13 @@ async function createClassScheduleEvents(classData: any, schedules: any[]) {
           endDate: endDate,
           variant: classData.color || "primary",
           isRecurring: true,
-          recurringDays: days, // Ensure these are numbers (0-6)
+          recurringDays: days,
           createdById: session.user.id,
           classId: classData.id,
+          // Store cadence in the metadata to ensure it's available for the calendar
+          metadata: {
+            cadence: classData.cadence || "Weekly"
+          }
         }
       });
       
@@ -113,15 +125,15 @@ async function createClassScheduleEvents(classData: any, schedules: any[]) {
       for (const day of days) {
         await db.classSession.create({
           data: {
-            dayOfWeek: day, // Store as number (0-6)
-            startTime: schedule.startTime, // Store as string (HH:MM)
-            endTime: schedule.endTime, // Store as string (HH:MM)
+            dayOfWeek: day,
+            startTime: schedule.startTime,
+            endTime: schedule.endTime,
             classId: classData.id
           }
         });
       }
       
-      console.log(`Created recurring calendar event for class ${classData.name} with days: ${days.join(', ')}`);
+      console.log(`Created recurring calendar event for class ${classData.name} with cadence: ${classData.cadence}, days: ${days.join(', ')}`);
     }
   } catch (error) {
     console.error("Error creating class schedule events:", error);
@@ -129,19 +141,57 @@ async function createClassScheduleEvents(classData: any, schedules: any[]) {
 }
 
 // Create class
-export async function createClass(data: any) {
+export async function createClass(formData: FormData) {
   try {
+    const session = await getAuthSession();
+    if (!session?.user?.id || session.user.role !== "TEACHER") {
+      return { success: false, error: "Unauthorized" };
+    }
+
+    // Extract values from FormData
+    const name = formData.get('name') as string;
+    const emoji = formData.get('emoji') as string;
+    const cadence = formData.get('cadence') as string;
+    const grade = formData.get('grade') as string;
+    const color = formData.get('color') as string;
+    const startDateStr = formData.get('startDate') as string;
+    const endDateStr = formData.get('endDate') as string;
+    
+    // Parse schedules from JSON string
+    let schedules = [];
+    try {
+      const schedulesStr = formData.get('schedules') as string;
+      if (schedulesStr) {
+        schedules = JSON.parse(schedulesStr);
+      }
+    } catch (e) {
+      console.error("Failed to parse schedules:", e);
+      schedules = [];
+    }
+
+    // Generate unique class code
+    const code = await generateUniqueClassCode(session.user.id);
+    
+    // Parse dates if present
+    const startDate = startDateStr ? new Date(startDateStr) : undefined;
+    const endDate = endDateStr ? new Date(endDateStr) : undefined;
+
+    // Validate required fields
+    if (!name) {
+      return { success: false, error: "Class name is required" };
+    }
+
     const newClass = await db.class.create({
       data: {
-        name: data.name,
-        emoji: data.emoji,
-        code: data.code,
-        cadence: data.cadence,
-        color: data.color,
-        grade: data.grade,
-        startDate: data.startDate,
-        endDate: data.endDate,
-        userId: data.userId
+        name,
+        emoji: emoji || "📚",
+        code,
+        cadence: cadence || "Weekly",
+        color: color || "primary",
+        grade: grade || undefined,
+        startDate,
+        endDate,
+        userId: session.user.id
       },
       include: {
         classSessions: true,
@@ -150,8 +200,8 @@ export async function createClass(data: any) {
     });
 
     // Create class sessions and calendar events
-    if (data.schedules && data.schedules.length > 0) {
-      await createClassScheduleEvents(newClass, data.schedules);
+    if (schedules && schedules.length > 0) {
+      await createClassScheduleEvents(newClass, schedules);
     }
 
     // Update revalidation paths
@@ -173,7 +223,7 @@ export async function createClass(data: any) {
           endDate: newClass.endDate ? new Date(newClass.endDate) : undefined,
           classSessions: newClass.classSessions,
         },
-        data.userId
+        session.user.id
       );
 
       // Batch create calendar events
@@ -186,7 +236,7 @@ export async function createClass(data: any) {
             endDate: event.endDate,
             variant: event.variant,
             isRecurring: event.isRecurring,
-            createdBy: { connect: { id: data.userId } },
+            createdBy: { connect: { id: session.user.id } },
             class: { connect: { id: newClass.id } }
           },
         });
@@ -367,10 +417,18 @@ export async function updateClass(id: string, data: any): Promise<ClassResponse>
     // Process each schedule
     if (data.schedules && data.schedules.length > 0) {
       for (const schedule of data.schedules) {
-        // Ensure days are numeric (0-6)
-        const dayNumbers = schedule.days.map((day: any) => 
-          typeof day === "string" ? parseInt(day, 10) : day
-        );
+        // Handle days based on cadence
+        let dayNumbers: number[] = [];
+        
+        // If cadence is Daily, select all days of the week (0-6)
+        if (data.cadence?.toLowerCase() === "daily") {
+          dayNumbers = [0, 1, 2, 3, 4, 5, 6]; // All days
+        } else {
+          // For other cadences, use the selected days
+          dayNumbers = schedule.days.map((day: any) => 
+            typeof day === "string" ? parseInt(day, 10) : day
+          );
+        }
         
         if (dayNumbers.length === 0) continue;
 
@@ -412,6 +470,10 @@ export async function updateClass(id: string, data: any): Promise<ClassResponse>
             recurringDays: dayNumbers,
             createdById: session.user.id,
             classId: id,
+            // Store cadence in the metadata
+            metadata: {
+              cadence: data.cadence || "Weekly"
+            }
           }
         });
       }
