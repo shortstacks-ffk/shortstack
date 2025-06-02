@@ -85,3 +85,26 @@ export function createCalendarDisplayDate(dateStr: string | Date): Date {
   date.setHours(12, 0, 0, 0);
   return date;
 }
+
+// Add the formatClassSchedule function for consistent display
+const DaysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+// Add a helper function to format time in 12-hour format
+function formatTime(time24: string): string {
+  const [hours, minutes] = time24.split(':').map(Number);
+  const period = hours >= 12 ? 'PM' : 'AM';
+  const hours12 = hours % 12 || 12; // Convert 0 to 12 for 12 AM
+  return `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`;
+}
+
+// Update the formatClassSchedule function
+export function formatClassSchedule(sessions?: any[]) {
+  if (!sessions || sessions.length === 0) return null;
+  
+  return sessions.map(session => {
+    const day = DaysOfWeek[session.dayOfWeek];
+    const startTime = formatTime(session.startTime);
+    const endTime = formatTime(session.endTime);
+    return `${day} ${startTime}-${endTime}`;
+  }).join(', ');
+}
