@@ -5,6 +5,7 @@ import { getAuthSession } from "@/src/lib/auth";
 import { revalidatePath } from "next/cache";
 import { Prisma } from '@prisma/client';
 import { createCalendarEventsFromClassSessions } from "@/src/lib/class-utils";
+import { formatLocalTimeToUTC, formatUTCToLocalTime } from "@/src/lib/time-utils";
 
 // Types
 interface ClassSchedule {
@@ -16,11 +17,10 @@ interface ClassSchedule {
 interface ClassData {
   name: string;
   emoji: string;
-  cadence?: string;
   grade?: string;
   color?: string;
-  startDate?: Date; // Add startDate field
-  endDate?: Date;   // Add endDate field
+  startDate?: Date;
+  endDate?: Date;
   schedule?: ClassSchedule;
 }
 
@@ -59,7 +59,7 @@ async function generateUniqueClassCode(userId: string): Promise<string> {
 }
 
 // Create recurring calendar events for class sessions
-async function createClassScheduleEvents(classData: any, schedules: any[]) {
+async function createClassScheduleEvents(classData: any, schedules: any[], timeZone: string = 'UTC') {
   try {
     const session = await getAuthSession();
     if (!session?.user?.id) {
@@ -69,18 +69,10 @@ async function createClassScheduleEvents(classData: any, schedules: any[]) {
     
     // Create calendar events for each schedule
     for (const schedule of schedules) {
-      // Handle days based on cadence
-      let days: number[] = [];
-      
-      // If cadence is Daily, select all days of the week (0-6)
-      if (classData.cadence?.toLowerCase() === "daily") {
-        days = [0, 1, 2, 3, 4, 5, 6]; // All days
-      } else {
-        // For other cadences, use the days selected in the schedule
-        days = Array.isArray(schedule.days)
-          ? schedule.days.map((day: string | number) => typeof day === 'string' ? parseInt(day, 10) : day)
-          : [];
-      }
+      // Use the days selected in the schedule
+      const days = Array.isArray(schedule.days)
+        ? schedule.days.map((day: string | number) => typeof day === 'string' ? parseInt(day, 10) : day)
+        : [];
       
       if (days.length === 0) {
         console.log("No days specified for this schedule");
@@ -96,13 +88,14 @@ async function createClassScheduleEvents(classData: any, schedules: any[]) {
       const endHour = parseInt(schedule.endTime.split(':')[0]);
       const endMinute = parseInt(schedule.endTime.split(':')[1]);
       
+      // Create dates in user's time zone
       const startDate = new Date();
       startDate.setHours(startHour, startMinute, 0, 0);
       
       const endDate = new Date();
       endDate.setHours(endHour, endMinute, 0, 0);
       
-      // Create one calendar event with all recurring days
+      // Store the time zone with the event
       const calendarEvent = await db.calendarEvent.create({
         data: {
           title: eventTitle,
@@ -114,9 +107,9 @@ async function createClassScheduleEvents(classData: any, schedules: any[]) {
           recurringDays: days,
           createdById: session.user.id,
           classId: classData.id,
-          // Store cadence in the metadata to ensure it's available for the calendar
           metadata: {
-            cadence: classData.cadence || "Weekly"
+            timeZone: timeZone,
+            type: "class"
           }
         }
       });
@@ -133,7 +126,7 @@ async function createClassScheduleEvents(classData: any, schedules: any[]) {
         });
       }
       
-      console.log(`Created recurring calendar event for class ${classData.name} with cadence: ${classData.cadence}, days: ${days.join(', ')}`);
+      console.log(`Created recurring calendar event for class ${classData.name} with days: ${days.join(', ')}`);
     }
   } catch (error) {
     console.error("Error creating class schedule events:", error);
@@ -151,11 +144,11 @@ export async function createClass(formData: FormData) {
     // Extract values from FormData
     const name = formData.get('name') as string;
     const emoji = formData.get('emoji') as string;
-    const cadence = formData.get('cadence') as string;
     const grade = formData.get('grade') as string;
     const color = formData.get('color') as string;
     const startDateStr = formData.get('startDate') as string;
     const endDateStr = formData.get('endDate') as string;
+    const timeZone = formData.get('timeZone') as string || 'UTC';
     
     // Parse schedules from JSON string
     let schedules = [];
@@ -186,7 +179,6 @@ export async function createClass(formData: FormData) {
         name,
         emoji: emoji || "📚",
         code,
-        cadence: cadence || "Weekly",
         color: color || "primary",
         grade: grade || undefined,
         startDate,
@@ -201,7 +193,7 @@ export async function createClass(formData: FormData) {
 
     // Create class sessions and calendar events
     if (schedules && schedules.length > 0) {
-      await createClassScheduleEvents(newClass, schedules);
+      await createClassScheduleEvents(newClass, schedules, timeZone);
     }
 
     // Update revalidation paths
@@ -217,13 +209,13 @@ export async function createClass(formData: FormData) {
           emoji: newClass.emoji,
           code: newClass.code,
           color: newClass.color || "primary",
-          cadence: newClass.cadence || "weekly",
           grade: newClass.grade ?? undefined,
           startDate: new Date(newClass.startDate),
           endDate: newClass.endDate ? new Date(newClass.endDate) : undefined,
           classSessions: newClass.classSessions,
         },
-        session.user.id
+        session.user.id,
+        timeZone
       );
 
       // Batch create calendar events
@@ -237,7 +229,11 @@ export async function createClass(formData: FormData) {
             variant: event.variant,
             isRecurring: event.isRecurring,
             createdBy: { connect: { id: session.user.id } },
-            class: { connect: { id: newClass.id } }
+            class: { connect: { id: newClass.id } },
+            metadata: {
+              ...event.metadata,
+              timeZone: timeZone
+            }
           },
         });
       }
@@ -250,7 +246,6 @@ export async function createClass(formData: FormData) {
       emoji: newClass.emoji,
       code: newClass.code,
       color: newClass.color ?? undefined,
-      cadence: newClass.cadence ?? undefined,
       grade: newClass.grade ?? undefined,
       startDate: newClass.startDate ?? undefined,
       endDate: newClass.endDate ?? undefined,
@@ -393,7 +388,6 @@ export async function updateClass(id: string, data: any): Promise<ClassResponse>
       data: {
         name: data.name,
         emoji: data.emoji,
-        cadence: data.cadence,
         grade: data.grade,
         color: validColor,
         startDate: data.startDate,
@@ -417,18 +411,9 @@ export async function updateClass(id: string, data: any): Promise<ClassResponse>
     // Process each schedule
     if (data.schedules && data.schedules.length > 0) {
       for (const schedule of data.schedules) {
-        // Handle days based on cadence
-        let dayNumbers: number[] = [];
-        
-        // If cadence is Daily, select all days of the week (0-6)
-        if (data.cadence?.toLowerCase() === "daily") {
-          dayNumbers = [0, 1, 2, 3, 4, 5, 6]; // All days
-        } else {
-          // For other cadences, use the selected days
-          dayNumbers = schedule.days.map((day: any) => 
-            typeof day === "string" ? parseInt(day, 10) : day
-          );
-        }
+        const dayNumbers = schedule.days.map((day: any) => 
+          typeof day === "string" ? parseInt(day, 10) : day
+        );
         
         if (dayNumbers.length === 0) continue;
 
@@ -469,11 +454,7 @@ export async function updateClass(id: string, data: any): Promise<ClassResponse>
             isRecurring: true,
             recurringDays: dayNumbers,
             createdById: session.user.id,
-            classId: id,
-            // Store cadence in the metadata
-            metadata: {
-              cadence: data.cadence || "Weekly"
-            }
+            classId: id
           }
         });
       }
@@ -504,7 +485,6 @@ export async function updateClass(id: string, data: any): Promise<ClassResponse>
           emoji: updatedClass.emoji,
           code: updatedClass.code,
           color: updatedClass.color || "primary",
-          cadence: updatedClass.cadence || "weekly",
           grade: updatedClass.grade ?? undefined,
           startDate: new Date(data.startDate),
           endDate: data.endDate ? new Date(data.endDate) : undefined,
@@ -542,7 +522,6 @@ export async function updateClass(id: string, data: any): Promise<ClassResponse>
         emoji: updatedClass.emoji,
         code: updatedClass.code,
         color: updatedClass.color ?? undefined,
-        cadence: updatedClass.cadence ?? undefined,
         grade: updatedClass.grade ?? undefined,
         startDate: updatedClass.startDate ?? undefined,
         endDate: updatedClass.endDate ?? undefined,

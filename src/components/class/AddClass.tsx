@@ -13,6 +13,7 @@ import ClassScheduleForm from "./ClassScheduleForm"
 import { ColorDropdown } from "@/src/components/ui/color-dropdown"
 import { DatePicker } from "@/src/components/ui/date-picker"
 import { formatDateForInput, safeDateParse } from "@/src/lib/date-utils"
+import { getUserTimeZone } from "@/src/lib/time-utils"
 
 interface ClassScheduleItem {
   days: number[];
@@ -50,6 +51,7 @@ const AddClass = ({ isOpen, onClose, onSuccess }: AddClassProps) => {
       formData.set('schedules', JSON.stringify(schedules));
       formData.set('startDate', formatDateForInput(startDate));
       formData.set('endDate', formatDateForInput(endDate));
+      formData.set('timeZone', getUserTimeZone()); // Add user's timezone
       
       const result = await createClass(formData);
 
@@ -71,8 +73,8 @@ const AddClass = ({ isOpen, onClose, onSuccess }: AddClassProps) => {
         }, 100);
       }
     } catch (error) {
-      console.error("Create class client error:", error);
-      toast.error("Failed to create class");
+      console.error("Error creating class:", error);
+      toast.error("Something went wrong");
     } finally {
       setIsSubmitting(false);
     }
@@ -110,21 +112,6 @@ const AddClass = ({ isOpen, onClose, onSuccess }: AddClassProps) => {
                 onChange={setSelectedEmoji}
                 className="w-full text-xl h-8"
               />
-            </div>
-
-            <div className="space-y-1">
-              <Label htmlFor="cadence" className="text-xs">Cadence</Label>
-              <Select name="cadence" defaultValue="Weekly">
-                <SelectTrigger className="h-8">
-                  <SelectValue placeholder="Select" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Daily">Daily</SelectItem>
-                  <SelectItem value="Weekly">Weekly</SelectItem>
-                  <SelectItem value="Biweekly">Biweekly</SelectItem>
-                  <SelectItem value="Monthly">Monthly</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
 
             <div className="space-y-1">

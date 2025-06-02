@@ -60,7 +60,6 @@ model Class {
   name           String
   emoji          String
   code           String          @unique
-  cadence        String?
   grade          String?
   overview       String?
   userId         String
@@ -368,10 +367,10 @@ model CalendarEvent {
   assignmentId  String?
   classId       String?
   studentId     String?
-  metadata      Json? 
   parentEventId String?
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
+  metadata      Json?
   assignment    Assignment?     @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
   bill          Bill?           @relation(fields: [billId], references: [id], onDelete: Cascade)
   class         Class?          @relation(fields: [classId], references: [id], onDelete: Cascade)

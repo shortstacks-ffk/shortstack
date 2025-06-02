@@ -11,6 +11,7 @@ import CreateEventFormWithHook from "@/src/components/calendar/CreateEventFormWi
 import { TodoSidebar } from "@/src/components/todo-sidebar";
 import { CheckSquare, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { HEADER_HEIGHT } from "@/src/lib/constants/header_height";
+import { getUserTimeZone } from "@/src/lib/time-utils";
 
 export default function TeacherCalendarClient() {
   const router = useRouter();
@@ -68,13 +69,21 @@ export default function TeacherCalendarClient() {
   const fetchEvents = async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/calendar");
+      const userTimeZone = getUserTimeZone();
+      const response = await fetch("/api/calendar", {
+        headers: {
+          'Cache-Control': 'no-cache',
+          'x-timezone': userTimeZone
+        }
+      });
+      
       if (!response.ok) {
         throw new Error("Failed to fetch events");
       }
+      
       const data = await response.json();
       
-      // Format events for Mina Scheduler
+      // Process events with time zone adjustment
       const formatted = data.map((event: any) => {
         // For bills and assignments, we need special date handling
         if (event.metadata?.type === "bill" || event.metadata?.type === "assignment") {
@@ -132,7 +141,8 @@ export default function TeacherCalendarClient() {
       });
 
       setEvents(formatted);
-    } catch {
+    } catch (error) {
+      console.error("Error fetching calendar:", error);
       toast.error("Failed to load calendar");
     } finally {
       setLoading(false);
