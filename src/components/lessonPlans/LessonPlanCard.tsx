@@ -24,6 +24,7 @@ interface LessonPlanCardProps {
       name?: string;
       emoji?: string;
       grade?: string;
+      code?: string; // Added code field for class
     };
   };
   backgroundColor: string;
@@ -51,23 +52,37 @@ export default function LessonPlanCard({
 
   // Determine the link URL based on whether this is a template or regular plan
   const getLinkUrl = () => {
-    if (viewContext === 'class' && plan.classId) {
-      // When viewed from class context, use class-specific route
-      return `/teacher/dashboard/classes/${plan.classId}/lesson-plans/${plan.id}`;
-    } else {
-      // Whether it's a template or regular plan, use the same detail view route
-      // The LessonPlanDetailView will display it correctly based on the template status
+    // For templates, always use the template view route
+    if (isTemplate) {
       return `/teacher/dashboard/lesson-plans/${plan.id}`;
+    } 
+    
+    // For regular lesson plans, prioritize class code if available
+    // First check for class.code (preferred way)
+    if (plan.class?.code) {
+      return `/teacher/dashboard/classes/${plan.class.code}/lesson-plans/${plan.id}`;
     }
+    
+    // Fall back to classId if that's all we have
+    if (plan.classId) {
+      return `/teacher/dashboard/classes/${plan.classId}/lesson-plans/${plan.id}`;
+    }
+    
+    // Last resort fallback for any edge cases
+    return `/teacher/dashboard/lesson-plans/${plan.id}`;
   };
 
   const handleCardClick = (e: React.MouseEvent) => {
-    // Prevent navigation if clicking on dropdown
-    if ((e.target as HTMLElement).closest('.dropdown-menu')) {
+    // Prevent navigation if clicking on dropdown menu or its contents
+    const target = e.target as HTMLElement;
+    if (
+      target.closest('.dropdown-menu') || 
+      target.closest('[role="menu"]')
+    ) {
       e.preventDefault();
+      e.stopPropagation();
       return;
     }
-    
     // Otherwise navigation will happen naturally through the Link
   };
 

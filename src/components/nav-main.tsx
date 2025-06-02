@@ -11,7 +11,9 @@ import {
 } from "@/src/components/ui/sidebar"
 
 export function NavMain({
-  items, className
+  items, 
+  className,
+  currentPath
 }: {
   items: {
     title: string
@@ -20,13 +22,24 @@ export function NavMain({
     isActive?: boolean
   }[]
   className?: string
+  currentPath?: string
 }) {
   const pathname = usePathname()
+  const activePath = currentPath || pathname
+  
+  // Check if a nav item should be active - consider it active if the path starts with the item URL
+  const isItemActive = (itemUrl: string) => {
+    if (itemUrl === "/teacher/dashboard") {
+      return activePath === "/teacher/dashboard"
+    }
+    return activePath.startsWith(itemUrl)
+  }
+  
   return (
     <SidebarMenu>
       {items.map((item) => (
         <SidebarMenuItem key={item.title}>
-          <SidebarMenuButton asChild isActive={pathname === item.url}>
+          <SidebarMenuButton asChild isActive={isItemActive(item.url)}>
             <Link href={item.url}>
               <item.icon />
               <span>{item.title}</span>

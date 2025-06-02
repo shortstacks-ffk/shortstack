@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 // import DashboardAddStoreItemCard from "@/src/components/storefront/dashboardAddStoreItemCard";
 import { getAllStoreItems } from "@/src/app/actions/storeFrontActions";
 import { StoreItemCard } from "@/src/components/storefront/StoreItemCard";

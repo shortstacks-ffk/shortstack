@@ -90,7 +90,15 @@ export default function LandingLayout({
       {children}
       
       {/* Footer */}
-      <footer className="bg-green-600 text-white py-12">
+
+      <div className="relative">
+
+            <svg className="w-full h-28 text-green-600" viewBox="0 0 1200 140" preserveAspectRatio="none">
+              <path d="M0,0 C200,100 400,100 600,40 C800,0 1000,0 1200,0 L1200,140 L0,140 Z" fill="currentColor" />
+            </svg>
+
+              
+              <footer className="bg-green-600 text-white py-6">
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex flex-col md:flex-row justify-between mb-8 gap-8">
             <div>
@@ -125,15 +133,28 @@ export default function LandingLayout({
               <h3 className="font-bold mb-4">Social Media</h3>
               <ul className="space-y-2 text-sm">
                 <li><Link href="#" className="hover:underline">Twitter</Link></li>
+                <li><Link href="#" className="hover:underline">LinkedIn</Link></li>
+                <li><Link href="#" className="hover:underline">Facebook</Link></li>
+                <li><Link href="#" className="hover:underline">Instagram</Link></li>
+                <li><Link href="#" className="hover:underline">YouTube</Link></li>
+                <li><Link href="#" className="hover:underline">TikTok</Link></li>
               </ul>
             </div>
           </div>
           
-          <div className="flex justify-center pt-8 border-t border-green-500">
-            <p className="text-sm">&copy; {new Date().getFullYear()} ShortStacks Education. All rights reserved.</p>
+          <div className="flex justify-center pt-2 border-t border-green-500">
+            <p className="text-sm">&copy; {new Date().getFullYear()} ShortStacks Finance For Kids. All rights reserved.</p>
           </div>
         </div>
       </footer>
+
+
     </div>
+
+
+            </div>
+
+
+      
   );
 }

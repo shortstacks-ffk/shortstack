@@ -368,6 +368,7 @@ model CalendarEvent {
   assignmentId  String?
   classId       String?
   studentId     String?
+  metadata      Json? 
   parentEventId String?
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
