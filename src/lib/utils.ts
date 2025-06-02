@@ -60,3 +60,133 @@ export function generateAccountNumber(): string {
   return randomNumber.toString();
 }
 
+
+
+// Update the getSimpleFileType function
+export const getSimpleFileType = (fileType?: string, fileName?: string): string => {
+  // Check for common file extensions in the filename first
+  if (fileName) {
+    const lowerName = fileName.toLowerCase();
+    
+    // PowerPoint files
+    if (lowerName.endsWith('.ppt') || lowerName.endsWith('.pptx') || lowerName.endsWith('.pptm')) {
+      return 'PPT';
+    }
+    // Word documents
+    if (lowerName.endsWith('.doc') || lowerName.endsWith('.docx') || lowerName.endsWith('.rtf')) {
+      return 'DOC';
+    }
+    // Excel files
+    if (lowerName.endsWith('.xls') || lowerName.endsWith('.xlsx') || lowerName.endsWith('.csv')) {
+      return 'XLS';
+    }
+    // PDF files
+    if (lowerName.endsWith('.pdf')) {
+      return 'PDF';
+    }
+    // Image files
+    if (lowerName.endsWith('.jpg') || lowerName.endsWith('.jpeg') || 
+        lowerName.endsWith('.png') || lowerName.endsWith('.gif') ||
+        lowerName.endsWith('.svg') || lowerName.endsWith('.webp')) {
+      return 'IMG';
+    }
+    // Video files
+    if (lowerName.endsWith('.mp4') || lowerName.endsWith('.mov') || 
+        lowerName.endsWith('.avi') || lowerName.endsWith('.webm')) {
+      return 'VID';
+    }
+    // Audio files
+    if (lowerName.endsWith('.mp3') || lowerName.endsWith('.wav') || 
+        lowerName.endsWith('.ogg') || lowerName.endsWith('.m4a')) {
+      return 'AUD';
+    }
+    // Archive files
+    if (lowerName.endsWith('.zip') || lowerName.endsWith('.rar') || lowerName.endsWith('.7z')) {
+      return 'ZIP';
+    }
+    
+    // If we can identify a file extension
+    const nameParts = lowerName.split('.');
+    if (nameParts.length > 1) {
+      const ext = nameParts[nameParts.length - 1];
+      return ext.toUpperCase();
+    }
+  }
+  
+  // Fall back to content type detection
+  if (fileType) {
+    const lowerType = fileType.toLowerCase();
+    
+    // PowerPoint files
+    if (lowerType.includes('powerpoint') || 
+        lowerType.includes('presentation') || 
+        lowerType.includes('ppt')) {
+      return 'PPT';
+    }
+    
+    // Word documents
+    if (lowerType.includes('word') || 
+        lowerType.includes('doc') || 
+        lowerType.includes('rtf')) {
+      return 'DOC';
+    }
+    
+    // Excel files
+    if (lowerType.includes('excel') || 
+        lowerType.includes('spreadsheet') || 
+        lowerType.includes('csv') ||
+        lowerType.includes('sheet')) {
+      return 'XLS';
+    }
+    
+    // PDF files
+    if (lowerType.includes('pdf')) {
+      return 'PDF';
+    }
+    
+    // Image files
+    if (lowerType.includes('image') || 
+        lowerType.includes('jpeg') || 
+        lowerType.includes('png') ||
+        lowerType.includes('gif') ||
+        lowerType.includes('svg')) {
+      return 'IMG';
+    }
+    
+    // Video files
+    if (lowerType.includes('video')) {
+      return 'VID';
+    }
+    
+    // Audio files
+    if (lowerType.includes('audio')) {
+      return 'AUD';
+    }
+    
+    // Archive files
+    if (lowerType.includes('zip') || 
+        lowerType.includes('rar') || 
+        lowerType.includes('archive') ||
+        lowerType.includes('compressed')) {
+      return 'ZIP';
+    }
+    
+    // Text files
+    if (lowerType.includes('text/plain') || lowerType.includes('txt')) {
+      return 'TXT';
+    }
+    
+    // HTML files
+    if (lowerType.includes('html')) {
+      return 'HTML';
+    }
+    
+    // Generic types
+    const parts = lowerType.split('/');
+    if (parts.length > 1) {
+      return parts[1].toUpperCase().substring(0, 3);
+    }
+  }
+  
+  return 'FILE';
+};

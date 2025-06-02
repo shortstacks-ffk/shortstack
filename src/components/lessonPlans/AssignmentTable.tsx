@@ -24,6 +24,7 @@ import { deleteAssignment } from '@/src/app/actions/assignmentActions';
 import EditAssignmentDialog from './EditAssignmentDialog';
 import AssignAssignmentDialog from './AssignAssignmentDialog';
 import { AssignmentRecord } from '@/src/types/assignments';
+import { getSimpleFileType } from '@/src/lib/utils';
 
 const formatFileSize = (bytes?: number): string => {
   if (!bytes) return 'N/A';
@@ -41,32 +42,6 @@ const formatDate = (dateString?: string) => {
   return date.toLocaleDateString();
 };
 
-// Extract file extension from file type or URL
-const getSimpleFileType = (fileType?: string, url?: string): string => {
-  if (fileType) {
-    // Remove any prefix like "application/" or "text/"
-    const parts = fileType.split('/');
-    const ext = parts[parts.length - 1];
-    
-    // Further simplify common extensions
-    if (ext.includes('pdf')) return 'PDF';
-    if (ext.includes('word') || ext.includes('doc')) return 'DOC';
-    if (ext.includes('excel') || ext.includes('sheet')) return 'XLS';
-    if (ext.includes('powerpoint') || ext.includes('presentation')) return 'PPT';
-    if (ext.includes('image') || ext.includes('jpeg') || ext.includes('png')) return 'IMG';
-    return ext.toUpperCase().substring(0, 3);
-  }
-  
-  // Try to extract from URL if fileType isn't available
-  if (url) {
-    const urlParts = url.split('.');
-    if (urlParts.length > 1) {
-      return urlParts[urlParts.length - 1].toUpperCase().substring(0, 3);
-    }
-  }
-  
-  return 'FILE';
-};
 
 export default function AssignmentTable({ 
   assignments, 
