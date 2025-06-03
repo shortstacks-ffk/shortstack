@@ -7,7 +7,6 @@ import { SchedulerProvider } from "@/src/providers/scheduler/schedular-provider"
 import SchedulerViewFilteration from "@/src/components/scheduler/_components/view/schedular-view-filteration";
 import { Button } from "@/src/components/ui/button";
 import { toast } from "sonner";
-import CreateEventFormWithHook from "@/src/components/calendar/CreateEventFormWithHook";
 import { TodoSidebar } from "@/src/components/todo-sidebar";
 import { CheckSquare, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { HEADER_HEIGHT } from "@/src/lib/constants/header_height";
@@ -472,7 +471,7 @@ export default function TeacherCalendarClient() {
     onClose: () => void;
   }) => {
     return (
-      <div className="p-4 space-y-4">
+      <div className="p-4 space-y-4 mb-4">
         <h2 className="text-lg font-semibold">{event.title || "Untitled Event"}</h2>
 
         {event.description && (

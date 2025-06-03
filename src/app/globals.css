@@ -1105,11 +1105,11 @@ body {
   overflow-x: hidden !important;
 }
 
-.week-view-hour-cell {
+/* .week-view-hour-cell {
   width: calc(100% / 7) !important;
   max-width: calc(100% / 7) !important;
   box-sizing: border-box !important;
-}
+} */
 
 /* Ensure day column headers are properly sized */
 .mina-scheduler-column-header {
