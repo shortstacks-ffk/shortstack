@@ -10,6 +10,10 @@ import { Label } from "@/src/components/ui/label";
 import { Textarea } from "@/src/components/ui/textarea";
 import { toast } from "sonner";
 import { formatCurrency } from "@/src/lib/utils";
+import { CalendarIcon } from "lucide-react";
+import { Calendar } from "@/src/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/src/components/ui/popover";
+import { format } from "date-fns";
 
 interface Student {
   id: string;
@@ -35,12 +39,16 @@ export default function AddFundsDialog({
   const [amount, setAmount] = useState("");
   const [accountType, setAccountType] = useState("checking");
   const [description, setDescription] = useState("");
+  const [issueDate, setIssueDate] = useState<Date>(new Date());
+  const [recurrence, setRecurrence] = useState("once");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const resetForm = () => {
     setAmount("");
     setAccountType("checking");
     setDescription("");
+    setIssueDate(new Date());
+    setRecurrence("once");
   };
 
   const handleClose = () => {
@@ -66,7 +74,9 @@ export default function AddFundsDialog({
           studentIds: selectedStudents.map(s => s.id),
           accountType,
           amount: parseFloat(amount),
-          description: description || `Funds added by teacher`
+          description: description || `Funds added by teacher`,
+          issueDate: issueDate.toISOString(),
+          recurrence: recurrence,
         })
       });
 
@@ -127,25 +137,63 @@ export default function AddFundsDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="amount">Amount</Label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 transform -translate-y-1/2">$</span>
+            <Label htmlFor="issue-date">Issue on</Label>
+            <div className="flex gap-2">
               <Input
-                id="amount"
-                type="number"
-                min="0.01"
-                step="0.01"
-                placeholder="0.00"
-                className="pl-8"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                id="issue-date"
+                type="date"
+                className="flex-1"
+                min={new Date().toISOString().split('T')[0]} // Prevents selecting dates in the past
+                value={issueDate ? issueDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0]}
+                onChange={(e) => {
+                  const newDate = e.target.value ? new Date(e.target.value) : new Date();
+                  // Set the time to current time to ensure it's valid
+                  newDate.setHours(new Date().getHours(), new Date().getMinutes());
+                  setIssueDate(newDate);
+                }}
               />
+              
+            </div>
+          </div>
+
+          <div className="flex flex-col space-y-2">
+            <Label htmlFor="recurrence">Set</Label>
+            <div className="flex items-center gap-2">
+              <Select value={recurrence} onValueChange={setRecurrence}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Select recurrence" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="once">one time</SelectItem>
+                  <SelectItem value="weekly">weekly</SelectItem>
+                  <SelectItem value="biweekly">bi-weekly</SelectItem>
+                  <SelectItem value="monthly">monthly</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              <span className="text-sm">fee of</span>
+              
+              <div className="relative flex-1">
+                <span className="absolute left-3 top-1/2 transform -translate-y-1/2">$</span>
+                <Input
+                  id="amount"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  placeholder="0.00"
+                  className="pl-8"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                />
+              </div>
             </div>
           </div>
 
           <div>
             <p className="text-sm text-gray-500 mt-4">
-              This will add {formatCurrency(parseFloat(amount) || 0)} to the {accountType} account of each selected student.
+              This will add {formatCurrency(parseFloat(amount) || 0)} to the {accountType} account of each selected student
+              {recurrence !== 'once' ? ` on a ${recurrence} basis starting ` : ' on '}
+              {format(issueDate, 'PPP')}.
             </p>
           </div>
         </div>
