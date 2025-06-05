@@ -9,7 +9,7 @@ import { Readable } from "stream";
 export const config = {
   api: {
     bodyParser: false,
-    responseLimit: '100mb',
+    responseLimit: '250mb',
   },
 };
 
@@ -68,8 +68,8 @@ export async function POST(request: Request) {
     }
 
     // Increased file size limit to 100MB for larger files
-    if (file.size > 100 * 1024 * 1024) {
-      return NextResponse.json({ error: "File too large (max 100MB)" }, { status: 400 });
+    if (file.size > 250 * 1024 * 1024) {
+      return NextResponse.json({ error: "File too large (max 250MB)" }, { status: 400 });
     }
 
     // Verify the teacher has access to this class and lesson plan

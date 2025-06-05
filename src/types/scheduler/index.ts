@@ -70,6 +70,7 @@ export interface Getters {
     year: number
   ) => { day: number; events: Event[] }[];
   getEventsForDay: (day: number, currentDate: Date) => Event[];
+  getEventsForWeekDay: (date: Date) => Event[]; // Add this line
   getDaysInWeek: (week: number, year: number) => Date[];
   getWeekNumber: (date: Date) => number;
   getDayName: (day: number) => string;

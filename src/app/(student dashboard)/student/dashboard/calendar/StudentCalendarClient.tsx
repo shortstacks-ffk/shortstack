@@ -79,78 +79,75 @@ export default function StudentCalendarClient() {
 
   // Function to fetch events with better error handling
   const fetchEvents = async () => {
-    setLoading(true);
     try {
-      const response = await fetch("/api/calendar", {
-        headers: { 'Cache-Control': 'no-cache' },
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`API error (${response.status}): ${errorText}`);
-        
-        // Count attempts to help with retry logic
-        setFetchAttempts(prev => prev + 1);
-        
-        if (response.status === 404 && errorText.includes("Student profile not found")) {
-          toast.error("Your student profile could not be found. Please contact support.");
-          // Empty events array to avoid rendering errors
-          setEvents([]);
-          return;
-        }
-        
-        throw new Error(`Failed to fetch events: ${response.status} ${response.statusText}`);
-      }
-      
+      setLoading(true);
+      const response = await fetch("/api/calendar");
+      if (!response.ok) throw new Error("Failed to fetch events");
       const data = await response.json();
-      
-      // Format events for the scheduler
-      const formattedEvents = data.map((event: any) => {
-        // Special handling for all-day events like assignments and bills
+
+      const formatted = data.map((event: any) => {
+        // For bills and assignments, we need special date handling
         if (event.metadata?.type === "bill" || event.metadata?.type === "assignment") {
-          // Create start date at midnight local time
-          const startDate = new Date(event.startDate);
-          startDate.setHours(0, 0, 0, 0);
+          const date = new Date(event.startDate);
           
-          // Create end date at 11:59:59 PM local time
-          const endDate = new Date(event.startDate);
-          endDate.setHours(23, 59, 59, 999);
+          // For bills, set to 12:00 PM (noon) for better visibility
+          const startDate = new Date(
+            date.getFullYear(),
+            date.getMonth(),
+            date.getDate(),
+            event.metadata?.type === "bill" ? 12 : 0,
+            0, 0
+          );
+          
+          // End date for bills: 12:59 PM, assignments: 11:59:59 PM
+          const endDate = new Date(
+            date.getFullYear(),
+            date.getMonth(),
+            date.getDate(),
+            event.metadata?.type === "bill" ? 12 : 23,
+            event.metadata?.type === "bill" ? 59 : 59,
+            event.metadata?.type === "bill" ? 0 : 59
+          );
+
+          return {
+            id: event.id,
+            title: event.title,
+            description: event.description || "",
+            startDate: startDate,
+            endDate: endDate,
+            variant: event.variant || "primary",
+            isRecurring: event.isRecurring === true,
+            recurringDays: event.recurringDays || [],
+            metadata: {
+              ...event.metadata,
+              isAllDay: event.metadata?.type === "assignment",
+              originalDueDate: event.metadata.dueDate,
+              isDueAtNoon: event.metadata?.type === "bill"
+            },
+          } as Event;
+        } else {
+          // For regular events, use the normal date processing
+          const startDate = new Date(event.startDate);
+          const endDate = new Date(event.endDate);
           
           return {
             id: event.id,
             title: event.title,
             description: event.description || "",
-            startDate,
-            endDate,
+            startDate: startDate,
+            endDate: endDate,
             variant: event.variant || "primary",
-            isRecurring: false,
-            metadata: {
-              ...event.metadata,
-              isAllDay: true
-            }
-          };
+            isRecurring: event.isRecurring === true,
+            recurringDays: event.recurringDays || [],
+            metadata: event.metadata,
+          } as Event;
         }
-        
-        // For regular events
-        return {
-          id: event.id,
-          title: event.title,
-          description: event.description || "",
-          startDate: new Date(event.startDate),
-          endDate: new Date(event.endDate),
-          variant: event.variant || "primary",
-          isRecurring: Boolean(event.isRecurring),
-          recurringDays: event.recurringDays || [],
-          metadata: event.metadata || {}
-        };
       });
-      
-      console.log(`Loaded ${formattedEvents.length} events`);
-      setEvents(formattedEvents);
+
+      setEvents(formatted);
     } catch (error) {
-      console.error("Error fetching calendar events:", error);
-      toast.error("Failed to load calendar events");
-      setEvents([]);
+      console.error("Error fetching calendar:", error);
+      toast.error("Failed to load calendar");
     } finally {
       setLoading(false);
     }

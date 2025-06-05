@@ -89,8 +89,8 @@ const pageTransitionVariants = {
   }),
 };
 
-
 const shouldShowRecurringEvent = (event: Event, date: Date) => {
+  // For events with recurring days array
   if (
     event.isRecurring &&
     Array.isArray(event.recurringDays) &&
@@ -98,7 +98,14 @@ const shouldShowRecurringEvent = (event: Event, date: Date) => {
   ) {
     return event.recurringDays.includes(date.getDay());
   }
-  return isSameDay(event.startDate, date);
+  
+  // For non-recurring events, just check if it's on the same date
+  const eventDate = new Date(event.startDate);
+  return (
+    eventDate.getFullYear() === date.getFullYear() &&
+    eventDate.getMonth() === date.getMonth() &&
+    eventDate.getDate() === date.getDate()
+  );
 };
 
 export default function WeeklyView({
@@ -179,9 +186,9 @@ useEffect(() => {
     console.log("All available events:", allEvents);
 
     // Debug log for the current week's events
-    const eventsThisWeek = daysOfWeek.flatMap((day) =>
+    const eventsThisWeek = daysOfWeek.flatMap((day) => 
       getters.getEventsForDay(
-        day.getDate(),
+        day.getDate(), 
         new Date(day.getFullYear(), day.getMonth(), 1)
       )
     );
@@ -400,6 +407,59 @@ useEffect(() => {
     return groups;
   };
 
+  useEffect(() => {
+  // Create a more aggressive style override for week view events
+  const style = document.createElement('style');
+  style.id = 'week-view-event-fix';
+  style.innerHTML = `
+    /* Force events to be visible regardless of z-index stacking contexts */
+    .mina-scheduler-week-container .event-container {
+      background-color: #EBF5FF !important;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2) !important;
+      display: block !important;
+      visibility: visible !important;
+      opacity: 1 !important;
+      overflow: visible !important;
+      z-index: 1000 !important;
+      pointer-events: auto !important;
+      position: absolute !important;
+      min-height: 20px !important;
+      transform: translateZ(0) !important;
+    }
+
+    /* Fix container positioning and overflow */
+    .mina-scheduler-week-container .col-span-1 {
+      position: relative !important;
+      overflow: visible !important;
+    }
+
+    /* Make text in event containers visible */
+    .mina-scheduler-week-container .event-container * {
+      visibility: visible !important;
+      opacity: 1 !important;
+      color: #1a1a1a !important;
+    }
+
+    /* Add borders for visibility */
+    .mina-scheduler-week-container .event-container {
+      border-radius: 4px !important;
+    }
+    
+    /* Add strong contrast for debugging */
+    .mina-scheduler-week-container .AnimatePresence > * {
+      outline: 2px dashed red !important;
+    }
+  `;
+  document.head.appendChild(style);
+  
+  return () => {
+    const existingStyle = document.getElementById('week-view-event-fix');
+    if (existingStyle) {
+      existingStyle.remove();
+    }
+  };
+}, []);
+
   return (
     <div className="mina-scheduler-week-container flex flex-col">
       <div className="flex-1 overflow-auto">
@@ -534,28 +594,56 @@ useEffect(() => {
 
               {daysOfWeek.map((day, dayIndex) => {
                 const isCurrentDay = isSameDay(day, new Date());
-                const dayEvents = getters.getEventsForDay(day.getDate(), day);
-                const filteredEvents = dayEvents.filter((ev) =>
-                  shouldShowRecurringEvent(ev, day)
-                );
-                const timeGroups = groupEventsByTimePeriod(filteredEvents);
-
+                
+                // 1. Create a more explicit date object for the current day
+                const specificDay = new Date(day.getFullYear(), day.getMonth(), day.getDate());
+                
+                // 2. Debug log the date we're looking for
+                console.log(`Looking for events on: ${specificDay.toDateString()}`);
+                
+                // 3. Get events for this specific day - using the first day of the month
+                const monthDate = new Date(day.getFullYear(), day.getMonth(), 1);
+                const dayEvents = getters.getEventsForDay(day.getDate(), monthDate);
+                
+                // 4. Debug log what we found
+                console.log(`Found ${dayEvents?.length || 0} events for ${day.toDateString()}`);
+                
+                // 5. Add direct debugging of each event's dates
+                if (dayEvents?.length) {
+                  dayEvents.forEach(evt => {
+                    const eventStart = new Date(evt.startDate);
+                    console.log(`Event: ${evt.title} - Start: ${eventStart.toDateString()}`);
+                  });
+                }
+                
+                // Calculate time groups for events on this day
+                const timeGroups = groupEventsByTimePeriod(dayEvents);
+                
+                // Log time groups for debugging
+                console.log(`Time groups for ${day.toDateString()}:`, timeGroups.length);
+                
                 return (
                   <div
                     key={`day-${dayIndex}`}
-                    className={`col-span-1 relative z-20 transition duration-300 cursor-pointer border-r 
-                  text-center text-xs text-muted-foreground overflow-hidden 
-                  ${isCurrentDay ? "current-week-day-column" : ""}`}
-                    onClick={() =>
-                      handleAddEventWeek(dayIndex, detailedHour as string)
-                    }
+                    className={`col-span-1 relative transition duration-300 cursor-pointer border-r 
+                  text-center text-xs text-muted-foreground overflow-visible h-[1344px] 
+                  ${isCurrentDay ? "current-week-day-column" : ""}`} // Changed overflow-hidden to overflow-visible and added explicit height
+                    style={{
+                      position: "relative",
+                      zIndex: 1,
+                      minHeight: "1344px", // 24 hours * 56px
+                      height: "1344px",
+                      display: "block",
+                      overflow: "visible",
+                    }}
+                    onClick={() => handleAddEventWeek(dayIndex, detailedHour as string)}
                   >
-                    {/* 1) render the 24 hour slots first */}
+                    {/* Hour slots */}
                     {Array.from({ length: 24 }, (_, hourIndex) => (
                       <div
                         key={`day-${dayIndex}-hour-${hourIndex}`}
                         className={`h-[56px] relative week-view-hour-cell
-                      ${isCurrentDay ? "current-week-day-hour" : ""}`}
+                        ${isCurrentDay ? "current-week-day-hour" : ""}`}
                       >
                         <div className="absolute inset-0 z-10 flex items-center justify-center text-xs opacity-0 hover:opacity-100">
                           Add Event
@@ -563,15 +651,17 @@ useEffect(() => {
                       </div>
                     ))}
 
-                    {/* 2) then absolutely-position your events on top */}
+                    {/* Events */}
                     <AnimatePresence initial={false}>
-                      {filteredEvents.map((event) => {
+                      {dayEvents && dayEvents.length > 0 && dayEvents.map((event) => {
+                        console.log(`Rendering event: ${event.title} (${event.id})`);
+                        
+                        // Find the time group this event belongs to
                         let eventsInSamePeriod = 1;
                         let periodIndex = 0;
+                        
                         for (let i = 0; i < timeGroups.length; i++) {
-                          const idx = timeGroups[i].findIndex(
-                            (e) => e.id === event.id
-                          );
+                          const idx = timeGroups[i].findIndex(e => e.id === event.id);
                           if (idx !== -1) {
                             eventsInSamePeriod = timeGroups[i].length;
                             periodIndex = idx;
@@ -579,41 +669,67 @@ useEffect(() => {
                           }
                         }
 
-                        const style = handlers.handleEventStyling(
-                          event,
-                          filteredEvents,
-                          {
+                        // Get styling for this event with more explicit debug
+                        console.log(`Styling event ${event.title}:`, {
+                          eventsInSamePeriod,
+                          periodIndex
+                        });
+                        
+                        try {
+                          const style = handlers.handleEventStyling(event, dayEvents, {
                             eventsInSamePeriod,
                             periodIndex,
                             adjustForPeriod: true,
-                          }
-                        );
+                          });
+                          
+                          // Override the top position with a direct calculation
+                          const startHour = new Date(event.startDate).getHours();
+                          const startMinute = new Date(event.startDate).getMinutes();
+                          const topPosition = (startHour * 56) + (startMinute / 60 * 56);
 
-                        return (
-                          <motion.div
-                            key={event.id}
-                            style={{
-                              height: style.height,
-                              top: style.top,
-                              left: style.left,
-                              maxWidth: style.maxWidth,
-                              minWidth: style.minWidth,
-                              position: "absolute",
-                              zIndex: style.zIndex + 20, // above the z-20 container
-                            }}
-                            className="event-container"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <EventStyled
-                              event={{
-                                ...event,
-                                CustomEventComponent,
-                                minmized: true,
+                          console.log(`Event ${event.title} corrected position: ${topPosition}px (was ${style.top})`);
+
+                          return (
+                            <motion.div
+                              key={event.id}
+                              style={{
+                                height: style.height,
+                                top: `${topPosition}px`,  // Use our direct calculation
+                                left: style.left,
+                                maxWidth: style.maxWidth,
+                                minWidth: style.minWidth,
+                                position: "absolute", 
+                                zIndex: 10,
+                                // backgroundColor: "rgba(59, 130, 246, 0.2)",
+                                boxShadow: "0 2px 4px rgba(0, 0, 0, 0.2)",
+                                borderRadius: "2px",
+                                overflow: "visible",
+                                display: "block",
+                                width: "100%",
+                                // transform: "translateZ(0)", // Force GPU rendering
                               }}
-                              CustomEventModal={CustomEventModal}
-                            />
-                          </motion.div>
-                        );
+                              className="event-container"
+                              onClick={(e) => e.stopPropagation()}
+                              // Add explicit animation properties
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              exit={{ opacity: 0 }}
+                              transition={{ duration: 0.2 }}
+                            >
+                              <EventStyled
+                                event={{
+                                  ...event,
+                                  CustomEventComponent,
+                                  minmized: true,
+                                }}
+                                CustomEventModal={CustomEventModal}
+                              />
+                            </motion.div>
+                          );
+                        } catch (error) {
+                          console.error("Error rendering event:", error);
+                          return null;
+                        }
                       })}
                     </AnimatePresence>
                   </div>

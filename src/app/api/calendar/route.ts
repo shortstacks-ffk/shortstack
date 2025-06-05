@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/src/lib/auth/config";
 import { db } from "@/src/lib/db";
 import { getUserTimeZone } from "@/src/lib/time-utils";
+import { getFrequencyDisplayText, getStatusColor } from "@/src/lib/bill-utils";
 
 export async function GET(request: Request) {
   try {
@@ -11,136 +12,37 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const userTimeZone = request.headers.get('x-timezone') || 'UTC';
+    const { searchParams } = new URL(request.url);
+    const start = searchParams.get('start') ? new Date(searchParams.get('start')!) : undefined;
+    const end = searchParams.get('end') ? new Date(searchParams.get('end')!) : undefined;
 
-    const searchParams = new URL(request.url).searchParams;
-    const start = searchParams.get('start') ? new Date(searchParams.get('start') as string) : undefined;
-    const end = searchParams.get('end') ? new Date(searchParams.get('end') as string) : undefined;
-    
-    let whereClause: any = {};
-    
-    // For teachers, preserve existing query behavior
-    if (session.user.role === 'TEACHER') {
-      // Use the existing query logic for teachers
-      whereClause = {
-        OR: [
-          { createdById: session.user.id },
-          { class: { userId: session.user.id } }
-        ]
-      };
-    } 
-    // For students, implement new query logic
-    else if (session.user.role === 'STUDENT') {
-      try {
-        // Try multiple ways to find the student profile (similar to getStudentClasses)
-        let student = await db.student.findFirst({
-          where: { 
-            userId: session.user.id 
-          },
-          select: { id: true }
-        });
-        
-        // If not found by userId, try by email
-        if (!student && session.user.email) {
-          student = await db.student.findFirst({
-            where: { 
-              schoolEmail: session.user.email 
-            },
-            select: { id: true }
-          });
-        }
-        
-        // If still not found, try directly by ID as a last resort
-        if (!student) {
-          student = await db.student.findUnique({
-            where: { id: session.user.id },
-            select: { id: true }
-          });
-        }
+    let whereClause: any = {
+      createdById: session.user.id
+    };
 
-        if (!student) {
-          console.error(`Student profile not found for user ${session.user.id} with email ${session.user.email}`);
-          return NextResponse.json({ error: "Student profile not found" }, { status: 404 });
-        }
-        
-        // Get events for the student
+    if (session.user.role === 'STUDENT') {
+      const student = await db.student.findFirst({
+        where: { userId: session.user.id },
+        select: { id: true }
+      });
+
+      if (student) {
         whereClause = {
           OR: [
-            // Student's personal events
-            { studentId: student.id },
-            
-            // Class events for enrolled classes
-            { 
-              classId: {
-                in: await db.enrollment.findMany({
-                  where: {
-                    studentId: student.id,
-                    enrolled: true
-                  },
-                  select: { classId: true }
-                }).then(enrollments => enrollments.map(e => e.classId))
-              }
-            },
-            
-            // Bills assigned to the student
-            {
-              billId: {
-                in: await db.studentBill.findMany({
-                  where: {
-                    studentId: student.id
-                  },
-                  select: { billId: true }
-                }).then(bills => bills.map(b => b.billId))
-              }
-            },
-            
-            // Assignments for the student's classes
-            {
-              assignmentId: {
-                in: await db.assignment.findMany({
-                  where: {
-                    classId: {
-                      in: await db.enrollment.findMany({
-                        where: {
-                          studentId: student.id,
-                          enrolled: true
-                        },
-                        select: { classId: true }
-                      }).then(enrollments => enrollments.map(e => e.classId))
-                    }
-                  },
-                  select: { id: true }
-                }).then(assignments => assignments.map(a => a.id))
-              }
-            },
-            
-            // Todos created by the student
-            {
-              todos: {
-                some: {
-                  userId: session.user.id
-                }
-              }
-            }
+            { createdById: session.user.id },
+            { studentId: student.id }
           ]
         };
-      } catch (error) {
-        console.error("Error building student calendar query:", error);
-        return NextResponse.json({ error: "Failed to build student calendar query" }, { status: 500 });
       }
     }
-    
-    // Add date filters if provided - preserve existing functionality
+
     if (start) {
       whereClause.startDate = { gte: start };
     }
-    
     if (end) {
       whereClause.endDate = { lte: end };
     }
-    
-    console.log("Calendar query for role:", session.user.role);
-    
+
     const events = await db.calendarEvent.findMany({
       where: whereClause,
       include: {
@@ -154,60 +56,51 @@ export async function GET(request: Request) {
       }
     });
 
-    // Format events for consumption by the calendar - preserve existing formatter
-    const formattedEvents = events.map((event) => {
-      // Basic event data
-      const formattedEvent: any = {
-        id: event.id,
-        title: event.title,
-        description: event.description,
-        startDate: event.startDate.toISOString(),
-        endDate: event.endDate.toISOString(),
-        variant: event.variant || "primary",
-        isRecurring: event.isRecurring,
-        recurringDays: event.recurringDays || [],
-        metadata: {
-          type: "event"
-        }
-      };
-      
-      // Add specific metadata based on event type
-      if (event.billId && event.bill) {
-        formattedEvent.metadata = {
-          type: "bill",
-          billId: event.billId,
-          dueDate: event.bill?.dueDate?.toISOString(),
-          status: event.bill?.status
-        };
-      } else if (event.assignmentId && event.assignment) {
-        formattedEvent.metadata = {
-          type: "assignment",
-          assignmentId: event.assignmentId,
-          classId: event.assignment?.classId,
-          dueDate: event.assignment?.dueDate?.toISOString()
-        };
-      } else if (event.todos && event.todos.length > 0) {
-        formattedEvent.metadata = {
-          type: "todo",
-          todoId: event.todos[0].id,
-          priority: event.todos[0].priority,
-          completed: event.todos[0].completed
-        };
-      } else if (event.classId && event.class) {
-        formattedEvent.metadata = {
-          type: "class",
-          classId: event.classId,
-          className: event.class?.name,
-          emoji: event.class?.emoji
+    // Format events with proper timezone handling
+    const formattedEvents = events.map(event => {
+      // For bills, ensure they show at 12:00 PM - 12:59 PM
+      if (event.metadata && typeof event.metadata === 'object' && 
+          'type' in event.metadata && event.metadata.type === 'bill') {
+        
+        const eventDate = new Date(event.startDate);
+        
+        // Set bill to 12:00 PM - 12:59 PM for visibility in week view
+        const startDate = new Date(
+          eventDate.getFullYear(),
+          eventDate.getMonth(),
+          eventDate.getDate(),
+          12, 0, 0, 0
+        );
+        
+        const endDate = new Date(
+          eventDate.getFullYear(),
+          eventDate.getMonth(),
+          eventDate.getDate(),
+          12, 59, 0, 0
+        );
+
+        return {
+          ...event,
+          startDate: startDate.toISOString(),
+          endDate: endDate.toISOString(),
+          metadata: {
+            ...event.metadata,
+            isDueAtNoon: true
+          }
         };
       }
       
-      return formattedEvent;
+      // For other events, use their original times
+      return {
+        ...event,
+        startDate: event.startDate.toISOString(),
+        endDate: event.endDate.toISOString()
+      };
     });
 
     return NextResponse.json(formattedEvents);
   } catch (error) {
-    console.error("Calendar GET error:", error);
+    console.error("Error fetching calendar events:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

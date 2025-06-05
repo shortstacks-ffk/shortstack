@@ -67,9 +67,9 @@ export default function EventStyled({
     setOpen(
       <CustomModal title={event.title || "Details"}>
         <div className="space-y-2">
-          <div className="font-semibold whitespace-nowrap truncate">
+          {/* <div className="font-semibold whitespace-nowrap truncate">
             {event.title}
-          </div>
+          </div> */}
           {event.description && (
             <div className="text-sm opacity-90">{event.description}</div>
           )}
@@ -80,6 +80,16 @@ export default function EventStyled({
               {formatDate(event.startDate)} – {formatDate(event.endDate)}
             </div>
           )}
+
+          {/* {
+            ["bill"].includes(type) && (
+              <div className="text-xs opacity-80">
+                Frequency:{event.metadata?.frequency || "One-time"}
+                
+              </div>
+            )
+          } */}
+
           {/* only allow editing on "event" and "todo" */}
           {["event", "todo"].includes(type) && (
             <div className="flex items-center space-x-2 mt-4">
@@ -181,14 +191,14 @@ export default function EventStyled({
           <div className="text-xs mb-1 opacity-90 truncate">{event.description}</div>
         )}
 
-        {!event.minmized &&
+        {/* {!event.minmized &&
            (
             <div className="flex flex-col text-xs opacity-90 mt-1">
               <div>
                 {formatDate(event.endDate)}
               </div>
             </div>
-          )}
+          )} */}
 
         {!event.minmized &&
           !["bill", "assignment"].includes(event.metadata?.type || "") && (

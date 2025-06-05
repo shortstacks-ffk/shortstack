@@ -37,8 +37,8 @@ export async function POST(request: Request) {
     }
 
     // Validate file size (50MB limit)
-    if (file.size > 50 * 1024 * 1024) {
-      return NextResponse.json({ error: "File too large (max 50MB)" }, { status: 400 });
+    if (file.size > 250 * 1024 * 1024) {
+      return NextResponse.json({ error: "File too large (max 250MB)" }, { status: 400 });
     }
 
     console.log("Teacher assignment upload - starting process");

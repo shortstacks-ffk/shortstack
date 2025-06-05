@@ -152,11 +152,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         
         {/* Main content area */}
         <div 
-          className={`bg-gray-50 flex-1 overflow-hidden`} // Change overflow-y-auto to overflow-hidden for calendar pages
+          className={`flex-1 bg-gray-50`} // Make sure this has bg-gray-50
           style={{ height: `calc(100vh - ${HEADER_HEIGHT}px)` }}
         >
-          {/* Apply different styles based on page type */}
-          <div className={`mx-auto w-full overflow-hidden ${isCalendarPage ? 'p-0 max-w-none' : 'max-w-7xl px-2 sm:px-4 md:px-6 py-2 md:py-4'}`}>
+          {/* Apply consistent background styling */}
+          <div className={`mx-auto min-h-screen min-w-screen ${isCalendarPage ? 'p-0 max-w-none bg-gray-50' : 'max-w-7xl px-2 sm:px-4 md:px-4s py-2 md:py-4 bg-gray-50'}`}>
             {children}
           </div>
         </div>

@@ -118,6 +118,7 @@ model Student {
   assignmentSubmissions StudentAssignmentSubmission[]
   studentBills          StudentBill[]
   purchases             StudentPurchase[]
+  excludedFromBills     Bill[]                        @relation("ExcludedFromBill")
 
   @@index([classId])
   @@index([schoolEmail])
@@ -220,21 +221,22 @@ model StudentAssignmentSubmission {
 }
 
 model Bill {
-  id             String          @id @default(cuid())
-  title          String
-  emoji          String          @default("💰")
-  amount         Float
-  dueDate        DateTime
-  description    String?
-  frequency      BillFrequency   @default(ONCE)
-  status         BillStatus      @default(ACTIVE)
-  creatorId      String
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  creator        User            @relation(fields: [creatorId], references: [id], onDelete: Cascade)
-  calendarEvents CalendarEvent[]
-  studentBills   StudentBill[]
-  class          Class[]         @relation("BillToClass")
+  id               String          @id @default(cuid())
+  title            String
+  emoji            String          @default("💰")
+  amount           Float
+  dueDate          DateTime
+  description      String?
+  frequency        BillFrequency   @default(ONCE)
+  status           BillStatus      @default(ACTIVE)
+  creatorId        String
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  creator          User            @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  calendarEvents   CalendarEvent[]
+  studentBills     StudentBill[]
+  class            Class[]         @relation("BillToClass")
+  excludedStudents Student[]       @relation("ExcludedFromBill")
 
   @@index([creatorId])
 }
@@ -362,6 +364,13 @@ model CalendarEvent {
   variant       String          @default("primary")
   isRecurring   Boolean         @default(false)
   recurringDays Int[]
+  // Add these new fields for better bill recurrence handling
+  recurrenceType String?        // "WEEKLY", "MONTHLY", "QUARTERLY", "YEARLY", "NONE"
+  recurrenceInterval Int?       // 1 for weekly, 2 for biweekly, 3 for quarterly, etc.
+  monthlyDate   Int?           // For monthly/quarterly: which date of month (1-31)
+  yearlyMonth   Int?           // For yearly: which month (0-11)
+  yearlyDate    Int?           // For yearly: which date
+  recurrenceEnd DateTime?      // Optional end date for recurrence
   createdById   String
   billId        String?
   assignmentId  String?
@@ -430,9 +439,11 @@ enum PurchaseStatus {
 }
 
 enum BillStatus {
-  PENDING
   ACTIVE
+  DUE
+  LATE
   PAID
+  PARTIAL
   CANCELLED
 }
 

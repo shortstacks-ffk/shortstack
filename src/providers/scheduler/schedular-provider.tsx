@@ -216,6 +216,95 @@ export const SchedulerProvider = ({
   // Helper function to filter events for a specific day
   // This function is used to get events for a specific day in the month
 
+// Update the shouldEventAppearOnDate function
+const shouldEventAppearOnDate = (event: Event, targetDate: Date): boolean => {
+  const eventStartDate = new Date(event.startDate);
+  
+  // For non-recurring events, just check if dates match
+  if (!event.isRecurring) {
+    return (
+      eventStartDate.getFullYear() === targetDate.getFullYear() &&
+      eventStartDate.getMonth() === targetDate.getMonth() &&
+      eventStartDate.getDate() === targetDate.getDate()
+    );
+  }
+
+  // For recurring events, check based on recurrence type
+  const recurrenceType = (event.metadata as any)?.recurrenceType || (event as any).recurrenceType;
+  const interval = (event.metadata as any)?.recurrenceInterval || (event as any).recurrenceInterval || 1;
+  
+  switch (recurrenceType) {
+    case "WEEKLY": {
+      const dayOfWeek = targetDate.getDay();
+      const eventDayOfWeek = eventStartDate.getDay();
+      
+      if (dayOfWeek !== eventDayOfWeek) {
+        return false;
+      }
+      
+      // Check if target date is at the correct interval
+      const daysDiff = Math.floor((targetDate.getTime() - eventStartDate.getTime()) / (1000 * 60 * 60 * 24));
+      
+      // Allow the event to show on or after the start date
+      if (daysDiff < 0) {
+        return false;
+      }
+      
+      // For weekly events, check if it falls on the correct interval
+      const weeksDiff = Math.floor(daysDiff / 7);
+      return weeksDiff % interval === 0;
+    }
+    
+    case "MONTHLY": {
+      const targetDay = targetDate.getDate();
+      const eventDay = eventStartDate.getDate();
+      
+      // Check if it's the same day of the month
+      if (targetDay !== eventDay) {
+        // Handle month-end cases (e.g., Jan 31 -> Feb 28)
+        const lastDayOfTargetMonth = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0).getDate();
+        if (eventDay > lastDayOfTargetMonth && targetDay === lastDayOfTargetMonth) {
+          // It's the last day of the month and the event was scheduled for a day that doesn't exist
+        } else {
+          return false;
+        }
+      }
+      
+      // Check if target date is at the correct interval
+      const monthsDiff = (targetDate.getFullYear() - eventStartDate.getFullYear()) * 12 + 
+                        (targetDate.getMonth() - eventStartDate.getMonth());
+      return monthsDiff >= 0 && monthsDiff % interval === 0;
+    }
+    
+    case "YEARLY": {
+      const targetMonth = targetDate.getMonth();
+      const targetDay = targetDate.getDate();
+      const eventMonth = eventStartDate.getMonth();
+      const eventDay = eventStartDate.getDate();
+      
+      if (targetMonth !== eventMonth || targetDay !== eventDay) {
+        // Handle leap year edge case for Feb 29
+        if (eventMonth === 1 && eventDay === 29 && targetMonth === 1 && targetDay === 28) {
+          // Feb 29 event on non-leap year shows on Feb 28
+          const isLeapYear = (year: number) => year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+          if (!isLeapYear(targetDate.getFullYear())) {
+            return true;
+          }
+        }
+        return false;
+      }
+      
+      // Check if target date is at the correct interval
+      const yearsDiff = targetDate.getFullYear() - eventStartDate.getFullYear();
+      return yearsDiff >= 0 && yearsDiff % interval === 0;
+    }
+    
+    default:
+      return false;
+  }
+};
+
+// Update the getEventsForDay function
 const getEventsForDay = useCallback(
   (day: number, monthDate: Date) => {
     if (!events?.length) return [];
@@ -226,96 +315,175 @@ const getEventsForDay = useCallback(
     const targetMonth = targetDate.getMonth();
     const targetDay = targetDate.getDate();
     const weekday = targetDate.getDay();
-    
-    // Debug the target date we're filtering for
-    console.log(`Filtering events for date: ${targetYear}-${targetMonth+1}-${targetDay} (weekday: ${weekday})`);
 
     return events.filter((event) => {
-      // For recurring events with recurring days, check if the weekday matches
-      if (
-        event.isRecurring === true &&
-        Array.isArray(event.recurringDays) &&
-        event.recurringDays.length > 0
-      ) {
-        const matches = event.recurringDays.includes(weekday);
-        if (matches) {
-          console.log(`Recurring event match: ${event.title} appears on weekday ${weekday}`);
-        }
-        return matches;
-      }
-      
-      // Special handling for bills and assignments
-      if (
-        event.metadata?.type === "bill" ||
-        event.metadata?.type === "assignment"
-      ) {
-        let eventDate: Date;
+      try {
+        // For bills and assignments with special metadata handling
+        if (event.metadata?.type === "bill" || event.metadata?.type === "assignment") {
+          // Check if this event should appear on the target date
+          if (event.metadata?.dueDate) {
+            let eventDate: Date;
 
-        if (typeof event.metadata?.dueDate === "string") {
-          // "2025-05-09T00:00:00.000Z" → ["2025","05","09"] → local midnight
-          const [year, month, day] = (event.metadata.dueDate as string)
-            .slice(0, 10)
-            .split("-")
-            .map((n) => parseInt(n, 10));
-          eventDate = new Date(year, month - 1, day, 0, 0, 0, 0);
-        } else {
-          // fallback if someone stored a Date in metadata
-          const d = event.metadata.dueDate as unknown as Date;
-          eventDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+            if (typeof event.metadata.dueDate === "string") {
+              const dueDateString = event.metadata.dueDate as string;
+              const [year, month, day] = (dueDateString
+                .slice(0, 10)
+                .split("-")
+                .map((n: string) => parseInt(n, 10)));
+              eventDate = new Date(year, month - 1, day, 0, 0, 0, 0);
+            } else {
+              const d = new Date(event.metadata.dueDate);
+              eventDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+            }
+
+            // For recurring bills, use the recurrence logic
+            if (event.isRecurring && event.metadata?.type === "bill") {
+              return shouldEventAppearOnDate(event, targetDate);
+            } else {
+              // For non-recurring or assignments, check exact date match
+              return (
+                eventDate.getFullYear() === targetYear &&
+                eventDate.getMonth() === targetMonth &&
+                eventDate.getDate() === targetDay
+              );
+            }
+          }
         }
 
-        const matches =
+        // For recurring events with recurring days (legacy weekly events)
+        if (
+          event.isRecurring === true &&
+          Array.isArray(event.recurringDays) &&
+          event.recurringDays.length > 0
+        ) {
+          return event.recurringDays.includes(weekday);
+        }
+
+        // For other recurring events, use the enhanced logic
+        if (event.isRecurring) {
+          return shouldEventAppearOnDate(event, targetDate);
+        }
+
+        // For regular non-recurring events
+        const eventDate = event.startDate instanceof Date
+          ? event.startDate
+          : new Date(event.startDate);
+          
+        if (!eventDate || isNaN(eventDate.getTime())) {
+          console.warn("Invalid event date:", event);
+          return false;
+        }
+
+        return (
           eventDate.getFullYear() === targetYear &&
           eventDate.getMonth() === targetMonth &&
-          eventDate.getDate() === targetDay;
-
-        if (matches) {
-          console.log(
-            `Bill/Assignment match: ${event.title} on ${targetYear}-${
-              targetMonth + 1
-            }-${targetDay}`
-          );
-        }
-        return matches;
+          eventDate.getDate() === targetDay
+        );
+      } catch (error) {
+        console.error("Error filtering event:", event, error);
+        return false;
       }
-      
-      // For all other regular events
-      const eventDate = event.startDate instanceof Date
-        ? event.startDate
-        : new Date(event.startDate);
-        
-      const eventYear = eventDate.getFullYear();
-      const eventMonth = eventDate.getMonth();
-      const eventDay = eventDate.getDate();
-      
-      const matches = (
-        eventYear === targetYear &&
-        eventMonth === targetMonth &&
-        eventDay === targetDay
-      );
-      
-      if (matches) {
-        console.log(`Regular event match: ${event.title} on ${eventYear}-${eventMonth+1}-${eventDay}`);
-      }
-      
-      return matches;
     });
   },
   [events]
 );
 
-  const getDayName = (day: number) => {
-    const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    return days[day];
-  };
+// Add a specific function for week view events
+const getEventsForWeekDay = useCallback(
+  (date: Date) => {
+    if (!events?.length) return [];
+    
+    const targetYear = date.getFullYear();
+    const targetMonth = date.getMonth();
+    const targetDay = date.getDate();
+    const weekday = date.getDay();
 
-  const getters: Getters = {
-    getDaysInMonth,
-    getEventsForDay,
-    getDaysInWeek,
-    getWeekNumber,
-    getDayName,
-  };
+    return events.filter((event) => {
+      try {
+        // For bills and assignments with special metadata handling
+        if (event.metadata?.type === "bill" || event.metadata?.type === "assignment") {
+          if (event.metadata?.dueDate) {
+            let eventDate: Date;
+
+            if (typeof event.metadata.dueDate === "string") {
+              const dueDateString = event.metadata.dueDate as string;
+              const [year, month, day] = (dueDateString
+                .slice(0, 10)
+                .split("-")
+                .map((n: string) => parseInt(n, 10)));
+              eventDate = new Date(year, month - 1, day, 0, 0, 0, 0);
+            } else {
+              const d = new Date(event.metadata.dueDate);
+              eventDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+            }
+
+            // For recurring bills, use the recurrence logic
+            if (event.isRecurring && event.metadata?.type === "bill") {
+              return shouldEventAppearOnDate(event, date);
+            } else {
+              // For non-recurring or assignments, check exact date match
+              return (
+                eventDate.getFullYear() === targetYear &&
+                eventDate.getMonth() === targetMonth &&
+                eventDate.getDate() === targetDay
+              );
+            }
+          }
+        }
+
+        // For recurring events with recurring days (legacy weekly events)
+        if (
+          event.isRecurring === true &&
+          Array.isArray(event.recurringDays) &&
+          event.recurringDays.length > 0
+        ) {
+          return event.recurringDays.includes(weekday);
+        }
+
+        // For other recurring events, use the enhanced logic
+        if (event.isRecurring) {
+          return shouldEventAppearOnDate(event, date);
+        }
+
+        // For regular non-recurring events
+        const eventDate = event.startDate instanceof Date
+          ? event.startDate
+          : new Date(event.startDate);
+          
+        if (!eventDate || isNaN(eventDate.getTime())) {
+          console.warn("Invalid event date:", event);
+          return false;
+        }
+
+        return (
+          eventDate.getFullYear() === targetYear &&
+          eventDate.getMonth() === targetMonth &&
+          eventDate.getDate() === targetDay
+        );
+      } catch (error) {
+        console.error("Error filtering event:", event, error);
+        return false;
+      }
+    });
+  },
+  [events]
+);
+
+// Add the missing getDayName function before the getters object
+const getDayName = (dayIndex: number): string => {
+  const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  return days[dayIndex] || "";
+};
+
+// Update the getters object to include the week view function
+const getters: Getters = {
+  getDaysInMonth,
+  getEventsForDay,
+  getEventsForWeekDay, // Add this
+  getDaysInWeek,
+  getWeekNumber,
+  getDayName, // This was missing
+};
 
   // Function to handle event styling
   // This function calculates the height and position of the event
