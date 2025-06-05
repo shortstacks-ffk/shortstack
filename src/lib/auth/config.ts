@@ -273,6 +273,19 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.id as string;
         session.user.role = token.role as "TEACHER" | "STUDENT" | "SUPER";
       }
+
+      // Update last login timestamp for students on session creation
+      if (session?.user?.role === "STUDENT" && session.user.email) {
+        try {
+          await db.student.updateMany({
+            where: { schoolEmail: session.user.email },
+            data: { lastLogin: new Date() }
+          });
+        } catch (error) {
+          console.error("Failed to update student last login:", error);
+        }
+      }
+
       return session;
     },
     
