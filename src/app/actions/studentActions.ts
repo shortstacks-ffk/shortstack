@@ -4,7 +4,6 @@ import { db } from "@/src/lib/db";
 import { revalidatePath } from "next/cache";
 import { getAuthSession } from "@/src/lib/auth";
 import * as bcrypt from 'bcryptjs';
-import { generateAccountNumber } from "@/src/lib/utils";
 import { setupBankAccountsForStudent } from "@/src/lib/banking";
 
 // Utility function to generate random passwords
@@ -163,7 +162,7 @@ export async function createStudent(formData: FormData, classCode: string) {
       const hashedPassword = await bcrypt.hash(finalPassword, 10);
       
       try {
-        // IMPORTANT: Using classCode here, not classData.id
+        // IMPORTANT CHANGE: Store teacher's actual ID in teacherId
         student = await db.student.create({
           data: {
             firstName,
@@ -171,11 +170,16 @@ export async function createStudent(formData: FormData, classCode: string) {
             schoolEmail,
             password: hashedPassword,
             progress: 0,
-            classId: classCode, // Using classCode directly as per your schema
-            teacherId: session.user.name ?? "" // Associate with the teacher, fallback to an empty string
+            classId: classCode,
+            teacherId: session.user.id, // Store the teacher's ID in teacherId
+            teacherName: session.user.name || "" // Store the teacher's name separately
           }
         });
         console.log("Student created with ID:", student.id);
+        
+        // Create bank accounts immediately after student creation
+        await setupBankAccountsForStudent(student.id);
+        
       } catch (createError) {
         console.error("Error creating student:", createError);
         return { 
@@ -185,13 +189,13 @@ export async function createStudent(formData: FormData, classCode: string) {
       }
     }
 
-    // Now create the enrollment - this needs classData.id
+    // Create the enrollment
     try {
       const enrollment = await db.enrollment.create({
         data: {
           studentId: student.id,
-          classId: classData.id, // This uses ID as per your schema
-          enrolled: false  // Not fully enrolled until the student logs in and joins
+          classId: classData.id,
+          enrolled: false
         }
       });
 
@@ -283,19 +287,17 @@ export async function addExistingStudentToClass(studentId: string, classCode: st
       return { success: false, error: "You don't have permission to access this class" };
     }
 
-    // Check that the student exists
+    // Check that the student exists - but don't restrict by teacherId
+    // This allows finding any student the teacher should have access to
     const student = await db.student.findUnique({ 
-      where: { 
-        id: studentId,
-        teacherId: session.user.id // Ensure the student belongs to this teacher
-      }
+      where: { id: studentId }
     });
     
     if (!student) {
       return { success: false, error: "Student not found" };
     }
 
-    // Prevent duplicate enrollment - important check
+    // Prevent duplicate enrollment
     const existingEnrollment = await db.enrollment.findUnique({
       where: { 
         studentId_classId: { 
@@ -317,8 +319,18 @@ export async function addExistingStudentToClass(studentId: string, classCode: st
         enrolled: false
       }
     });
+    
+    // Update the student's teacher if it's not set correctly
+    if (student.teacherId !== session.user.id) {
+      await db.student.update({
+        where: { id: student.id },
+        data: { 
+          teacherId: session.user.id 
+        }
+      });
+    }
 
-    // Send notification email using our API
+    // Send email notification to the student about being added to the class
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/email`, {
         method: 'POST',
@@ -330,36 +342,39 @@ export async function addExistingStudentToClass(studentId: string, classCode: st
           firstName: student.firstName,
           lastName: student.lastName,
           className: classData.name,
-          classCode,
+          classCode: classCode,
           email: student.schoolEmail,
-          isNewStudent: false
+          // No password needed since this is an existing student
+          isNewStudent: false, // This is not a new student
+          isPasswordReset: false // This is not a password reset
         }),
       });
       
       const result = await response.json();
       
       if (!result.success) {
-        console.error("Email API error:", result.error);
-        revalidatePath(`/dashboard/classes/${classCode}`);
+        console.error("Email notification failed:", result.error);
+        // Continue with enrollment even if email fails
+        // But return a warning to the UI
+        revalidatePath(`/teacher/dashboard/classes/${classCode}`);
         return { 
           success: true, 
           data: enrollment,
-          warning: "Student was added but the notification email couldn't be sent. Please notify them manually."
+          warning: "Student was added to the class but the notification email couldn't be sent."
         };
       }
     } catch (emailError) {
       console.error("Failed to send class addition email:", emailError);
-      // Continue even if email fails
-      // Return warning in response
-      revalidatePath(`/dashboard/classes/${classCode}`);
+      // Continue even if email fails, but return a warning
+      revalidatePath(`/teacher/dashboard/classes/${classCode}`);
       return { 
         success: true, 
         data: enrollment,
-        warning: "Student was added but the notification email couldn't be sent. Please notify them manually."
+        warning: "Student was added to the class but the notification email couldn't be sent."
       };
     }
 
-    revalidatePath(`/dashboard/classes/${classCode}`);
+    revalidatePath(`/teacher/dashboard/classes/${classCode}`);
     return { success: true, data: enrollment };
 
   } catch (error: any) {
@@ -396,11 +411,32 @@ export async function getAvailableStudents(classCode: string) {
       select: { studentId: true }
     }).then(enrollments => enrollments.map(e => e.studentId));
 
-    // Return students not in the list of enrolled IDs
+    console.log(`Found ${enrolledStudentIds.length} already enrolled students`);
+
+    // Search for all students created by this teacher
+    // Use more flexible criteria to find students
     const students = await db.student.findMany({
       where: {
-        id: { notIn: enrolledStudentIds },
-        teacherId: session.user.id // Only find students created by this teacher
+        AND: [
+          { id: { notIn: enrolledStudentIds.length > 0 ? enrolledStudentIds : ['no-students'] } },
+          {
+            OR: [
+              // Students where teacherId is the teacher's user ID
+              { teacherId: session.user.id },
+              // Students where teacherId is the teacher's name (from old records)
+              { teacherId: session.user.name || '' }, 
+              // Students that have this teacher's classes as their primary class
+              {
+                classId: {
+                  in: await db.class.findMany({
+                    where: { userId: session.user.id },
+                    select: { code: true }
+                  }).then(classes => classes.map(c => c.code))
+                }
+              }
+            ]
+          }
+        ]
       },
       select: {
         id: true,
@@ -411,6 +447,8 @@ export async function getAvailableStudents(classCode: string) {
       orderBy: { firstName: 'asc' }
     });
 
+    console.log(`Found ${students.length} available students`);
+    
     return { success: true, data: students };
 
   } catch (error) {
@@ -619,43 +657,70 @@ export async function deleteStudent(
       return { success: false, error: "Student not enrolled in this class" };
     }
 
-    console.log(`Deleting student ${studentId} with options:`, options);
+    // Get the student record to check if this is their primary class
+    const student = await db.student.findUnique({
+      where: { id: studentId },
+      include: {
+        enrollments: {
+          include: {
+            class: true
+          }
+        }
+      }
+    });
+
+    if (!student) {
+      return { success: false, error: "Student not found" };
+    }
+
+    console.log(`Processing student ${studentId} with options:`, options);
     
-    // Handle full deletion first if requested
+    // Handle full deletion if requested
     if (!options.removeFromClassOnly) {
       console.log("Attempting complete student deletion");
       
       try {
-        // First delete all enrollments for this student (to avoid FK constraints)
-        const deleteEnrollments = await db.enrollment.deleteMany({
+        // Delete all enrollments first
+        await db.enrollment.deleteMany({
           where: { studentId: studentId }
         });
         
-        console.log(`Deleted ${deleteEnrollments.count} enrollments`);
+        // Delete bank accounts and related records
+        await db.bankAccount.deleteMany({
+          where: { studentId: studentId }
+        });
         
-        // Now delete the student record
+        // Delete bank statements
+        await db.bankStatement.deleteMany({
+          where: { studentId: studentId }
+        });
+        
+        // Remove from any bills
+        await db.studentBill.deleteMany({
+          where: { studentId: studentId }
+        });
+        
+        // Finally delete the student record
         await db.student.delete({
           where: { id: studentId }
         });
         
         console.log("Student completely deleted");
         
-        revalidatePath(`/dashboard/classes/${classCode}`);
+        revalidatePath(`/teacher/dashboard/classes/${classCode}`);
         return { 
           success: true, 
           message: "Student has been completely deleted from the system"
         };
       } catch (error) {
         console.error("Failed to fully delete student:", error);
-        
-        // If full deletion fails, fall back to removing from just this class
+        // Fall back to removing from class only
         try {
-          // Try to at least remove from this specific class
           await db.enrollment.delete({
             where: { id: enrollment.id }
           });
           
-          revalidatePath(`/dashboard/classes/${classCode}`);
+          revalidatePath(`/teacher/dashboard/classes/${classCode}`);
           return { 
             success: true, 
             message: "Student could not be fully deleted, but was removed from this class",
@@ -667,17 +732,43 @@ export async function deleteStudent(
         }
       }
     } else {
-      // Just remove from this class
+      // Remove from this class only
       console.log("Removing student from class only");
       
       try {
+        // First delete the enrollment
         await db.enrollment.delete({
           where: { id: enrollment.id }
         });
         
-        console.log("Student removed from class");
+        // Check if this was the student's primary class (classId in the student record)
+        if (student.classId === classCode) {
+          // Find another class to use as primary, if any
+          const otherEnrollments = student.enrollments.filter(e => e.class.code !== classCode);
+          
+          if (otherEnrollments.length > 0) {
+            // Set another class as the primary class
+            await db.student.update({
+              where: { id: studentId },
+              data: {
+                classId: otherEnrollments[0].class.code
+              }
+            });
+          } else {
+            // No other classes, but keep the student record
+            // Make sure teacherId is still associated with this teacher
+            await db.student.update({
+              where: { id: studentId },
+              data: {
+                teacherId: session.user.id
+              }
+            });
+          }
+        }
         
-        revalidatePath(`/dashboard/classes/${classCode}`);
+        console.log("Student successfully removed from class");
+        
+        revalidatePath(`/teacher/dashboard/classes/${classCode}`);
         return { 
           success: true, 
           message: "Student has been removed from this class"
@@ -702,7 +793,7 @@ export async function createStudentBankAccounts(studentId: string) {
     const result = await setupBankAccountsForStudent(studentId);
     
     if (result.success) {
-      revalidatePath("/dashboard/bank");
+      revalidatePath("/teacher/dashboard/bank");
       return { success: true, data: result.data };
     } else {
       return { success: false, error: "An unknown error occurred while creating bank accounts" };
@@ -798,9 +889,114 @@ export async function getStudentClasses() {
     return { success: true, data: classes };
   } catch (error) {
     console.error("Get student classes error:", error);
+    return { success: false, error: "Failed to fetch student classes" };
+  }
+}
+
+// Add multiple existing students to a class
+export async function addMultipleExistingStudentsToClass(studentIds: string[], classCode: string) {
+  try {
+    const session = await getAuthSession();
+    if (!session?.user?.id || session.user.role !== "TEACHER") {
+      return { success: false, error: "Unauthorized" };
+    }
+
+    // Find the class by code
+    const classData = await db.class.findUnique({ 
+      where: { code: classCode },
+      select: { 
+        id: true, 
+        userId: true,
+        name: true,
+        emoji: true
+      }
+    });
+    
+    if (!classData) {
+      return { success: false, error: "Class not found" };
+    }
+    
+    // Verify the teacher owns this class
+    if (classData.userId !== session.user.id) {
+      return { success: false, error: "You don't have permission to access this class" };
+    }
+
+    // Get all the student records
+    const students = await db.student.findMany({
+      where: { id: { in: studentIds } }
+    });
+    
+    if (students.length === 0) {
+      return { success: false, error: "No valid students found" };
+    }
+    
+    // Check which students are already enrolled
+    const existingEnrollments = await db.enrollment.findMany({
+      where: {
+        studentId: { in: studentIds },
+        classId: classData.id
+      }
+    });
+    
+    const alreadyEnrolledIds = existingEnrollments.map(e => e.studentId);
+    const newStudentIds = studentIds.filter(id => !alreadyEnrolledIds.includes(id));
+    
+    if (newStudentIds.length === 0) {
+      return { success: false, error: "All selected students are already enrolled in this class" };
+    }
+
+    // Create enrollments for the new students
+    await db.enrollment.createMany({
+      data: newStudentIds.map(studentId => ({
+        studentId,
+        classId: classData.id,
+        enrolled: false
+      }))
+    });
+    
+    // Update teacherId for students if needed
+    await db.student.updateMany({
+      where: { 
+        id: { in: newStudentIds },
+        NOT: { teacherId: session.user.id }
+      },
+      data: { teacherId: session.user.id }
+    });
+
+    // Send email notifications in the background using Promise.all
+    // This won't block the response even if some emails fail
+    Promise.all(
+      students
+        .filter(student => newStudentIds.includes(student.id))
+        .map(student => 
+          fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/email`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              to: student.schoolEmail,
+              firstName: student.firstName,
+              lastName: student.lastName,
+              className: classData.name,
+              classCode: classCode,
+              email: student.schoolEmail,
+              isNewStudent: false,
+              isPasswordReset: false
+            }),
+          }).catch(err => console.error(`Email error for ${student.schoolEmail}:`, err))
+        )
+    );
+
+    revalidatePath(`/teacher/dashboard/classes/${classCode}`);
     return { 
-      success: false, 
-      error: error instanceof Error ? error.message : "Failed to fetch student classes" 
+      success: true, 
+      data: { 
+        added: newStudentIds.length,
+        total: studentIds.length
+      }
     };
+
+  } catch (error: any) {
+    console.error("Add multiple students error:", error);
+    return { success: false, error: "Failed to add students to class" };
   }
 }
