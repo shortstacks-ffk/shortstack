@@ -40,10 +40,10 @@ async function BillsContent() {
 
   const getColumnColor = (index: number) => {
     switch (index % 3) {
-      case 0: return "bg-blue-100";
-      case 1: return "bg-green-100";
-      case 2: return "bg-yellow-100";
-      default: return "bg-blue-100";
+      case 0: return "bg-blue-200";
+      case 1: return "bg-green-200";
+      case 2: return "bg-yellow-200";
+      default: return "bg-blue-200";
     }
   };
 

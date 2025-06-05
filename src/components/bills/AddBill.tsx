@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { createBill } from "@/src/app/actions/billActions";
 import { useRouter } from "next/navigation";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/src/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/src/components/ui/dialog";
 import { Input } from "@/src/components/ui/input";
 import { Label } from "@/src/components/ui/label";
 import { Button } from "@/src/components/ui/button";
@@ -37,17 +37,32 @@ const AddBill = ({ isOpen = false, onClose, onSuccess }: AddBillProps) => {
     }
   };
 
+  // Timezone-safe date formatting helper
+  const formatDateForInput = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+  
+  // Get today's date in YYYY-MM-DD format in local timezone
+  const getTodayDateString = () => {
+    const today = new Date();
+    return formatDateForInput(today);
+  };
+
   const clientAction = async (formData: FormData) => {
     try {
       setIsSubmitting(true);
       
-      // Get the date value and create a proper Date object in local timezone
+      // Better timezone handling for the due date
       const dueDateString = formData.get("dueDate") as string;
       if (dueDateString) {
-        // Create a new Date object at midnight local time
-        const localDate = new Date(dueDateString + 'T00:00:00');
+        // Create a date using the components to avoid timezone shifts
+        const [year, month, day] = dueDateString.split('-').map(Number);
+        const localDate = new Date(year, month - 1, day, 12, 0, 0); // Setting to noon for better visibility
         
-        // Update the formData with the proper date
+        // Update the formData with the proper ISO string
         formData.set("dueDate", localDate.toISOString());
       }
       
@@ -75,27 +90,21 @@ const AddBill = ({ isOpen = false, onClose, onSuccess }: AddBillProps) => {
     }
   };
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const todayString = today.toISOString().split('T')[0];
+  const todayString = getTodayDateString();
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleDialogChange}>
-      <DialogContent className="max-w-md">
+    <Dialog 
+      open={isOpen} 
+      onOpenChange={handleDialogChange}
+    >
+      <DialogContent className="max-w-md bg-background">
         <DialogHeader>
-          <DialogTitle>Create New Bill</DialogTitle>
+          <DialogTitle>Create A New Bill</DialogTitle>
         </DialogHeader>
         
         <form ref={formRef} action={clientAction} className="space-y-4">
+          {/* Updated layout with emoji picker on the right correctly aligned */}
           <div className="flex items-center gap-3">
-            <EmojiPickerButton 
-              value={selectedEmoji}
-              onChange={(emoji) => {
-                setSelectedEmoji(emoji);
-              }}
-              className="text-2xl h-14 w-14"
-            />
-            
             <Input
               name="title"
               placeholder="Bill title"
@@ -103,6 +112,16 @@ const AddBill = ({ isOpen = false, onClose, onSuccess }: AddBillProps) => {
               required
               disabled={isSubmitting}
             />
+            
+            <div className="shrink-0">
+              <EmojiPickerButton 
+                value={selectedEmoji}
+                onChange={(emoji) => {
+                  setSelectedEmoji(emoji);
+                }}
+                className="text-2xl h-14 w-14"
+              />
+            </div>
             
             <input type="hidden" name="emoji" value={selectedEmoji} />
           </div>
@@ -127,7 +146,7 @@ const AddBill = ({ isOpen = false, onClose, onSuccess }: AddBillProps) => {
                 id="dueDate"
                 name="dueDate"
                 type="date"
-                min={todayString} // Prevent past dates
+                min={todayString}
                 required
                 disabled={isSubmitting}
               />
@@ -168,10 +187,10 @@ const AddBill = ({ isOpen = false, onClose, onSuccess }: AddBillProps) => {
             <p className="mt-1">You can assign it to classes or students later from the bill details page.</p>
           </div>
 
-          <div className="flex justify-end gap-2 pt-2">
+          <DialogFooter className="pt-2 border-t">
             <Button 
               type="button" 
-              variant="secondary" 
+              variant="outline"
               onClick={onClose}
               disabled={isSubmitting}
             >
@@ -188,7 +207,7 @@ const AddBill = ({ isOpen = false, onClose, onSuccess }: AddBillProps) => {
                 </>
               ) : "Create Bill"}
             </Button>
-          </div>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
