@@ -156,7 +156,7 @@ export const ClassCard = ({
   };
   
   return (
-    <Card className="bg-transparent w-[250px] mx-auto h-[250px] rounded-xl relative overflow-hidden">
+    <Card className="bg-transparent w-[250px] h-[250px] rounded-xl relative overflow-hidden">
       {/* Use an inner container that has the dynamic background */}
       <div
         onClick={handleCardClick} 

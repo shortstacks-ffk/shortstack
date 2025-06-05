@@ -273,10 +273,15 @@ export async function getClasses(): Promise<ClassResponse> {
         orderBy: { createdAt: 'desc' },
         include: {
           classSessions: true, // Include class sessions to access schedule info
-          _count: { select: { enrollments: { where: { enrolled: true } } } } // Count enrolled students
+          _count: { 
+            select: { 
+              enrollments: true // Remove the where clause to count all students
+            } 
+          } 
         }
       });
     } else if (session.user.role === "STUDENT") {
+      // Student view stays the same since they should only see classes they're enrolled in
       classes = await db.class.findMany({
         where: {
           enrollments: {

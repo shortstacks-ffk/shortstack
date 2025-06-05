@@ -96,30 +96,62 @@ model ClassSession {
   @@index([classId])
 }
 
+// model Student {
+//   id                    String                        @id @default(cuid())
+//   firstName             String
+//   lastName              String
+//   schoolEmail           String                        @unique
+//   password              String
+//   classId               String
+//   progress              Int                           @default(0)
+//   lastLogin             DateTime?
+//   profileImage          String?
+//   userId                String?                       @unique
+//   teacherId             String
+//   createdAt             DateTime                      @default(now())
+//   updatedAt             DateTime                      @updatedAt
+//   bankAccounts          BankAccount[]
+//   bankStatements        BankStatement[]
+//   calendarEvents        CalendarEvent[]
+//   enrollments           Enrollment[]
+//   class                 Class                         @relation(fields: [classId], references: [code], onDelete: Cascade)
+//   assignmentSubmissions StudentAssignmentSubmission[]
+//   studentBills          StudentBill[]
+//   purchases             StudentPurchase[]
+//   excludedFromBills     Bill[]                        @relation("ExcludedFromBill")
+
+//   @@index([classId])
+//   @@index([schoolEmail])
+// }
+
 model Student {
-  id                    String                        @id @default(cuid())
-  firstName             String
-  lastName              String
-  schoolEmail           String                        @unique
-  password              String
-  classId               String
-  progress              Int                           @default(0)
-  lastLogin             DateTime?
-  profileImage          String?
-  userId                String?                       @unique
-  teacherId             String
-  createdAt             DateTime                      @default(now())
-  updatedAt             DateTime                      @updatedAt
+  id            String    @id @default(cuid())
+  firstName     String
+  lastName      String
+  schoolEmail   String    @unique
+  password      String
+  progress      Int       @default(0)
+  lastLogin     DateTime?
+  profileImage  String?
+  userId        String?   @unique
+  teacherId     String    // This should be the user.id of the teacher
+  teacherName   String?   // Store the teacher's name separately
+  classId       String?   // Make this optional with ? - key change
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relations
   bankAccounts          BankAccount[]
   bankStatements        BankStatement[]
   calendarEvents        CalendarEvent[]
   enrollments           Enrollment[]
-  class                 Class                         @relation(fields: [classId], references: [code], onDelete: Cascade)
+  class                 Class?          @relation(fields: [classId], references: [code], onDelete: SetNull) // Change to SetNull
   assignmentSubmissions StudentAssignmentSubmission[]
   studentBills          StudentBill[]
   purchases             StudentPurchase[]
-  excludedFromBills     Bill[]                        @relation("ExcludedFromBill")
+  excludedFromBills     Bill[]          @relation("ExcludedFromBill")
 
+  @@index([teacherId])
   @@index([classId])
   @@index([schoolEmail])
 }
@@ -356,38 +388,37 @@ model Transaction {
 }
 
 model CalendarEvent {
-  id            String          @id @default(cuid())
-  title         String
-  description   String?
-  startDate     DateTime
-  endDate       DateTime
-  variant       String          @default("primary")
-  isRecurring   Boolean         @default(false)
-  recurringDays Int[]
-  // Add these new fields for better bill recurrence handling
-  recurrenceType String?        // "WEEKLY", "MONTHLY", "QUARTERLY", "YEARLY", "NONE"
-  recurrenceInterval Int?       // 1 for weekly, 2 for biweekly, 3 for quarterly, etc.
-  monthlyDate   Int?           // For monthly/quarterly: which date of month (1-31)
-  yearlyMonth   Int?           // For yearly: which month (0-11)
-  yearlyDate    Int?           // For yearly: which date
-  recurrenceEnd DateTime?      // Optional end date for recurrence
-  createdById   String
-  billId        String?
-  assignmentId  String?
-  classId       String?
-  studentId     String?
-  parentEventId String?
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
-  metadata      Json?
-  assignment    Assignment?     @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
-  bill          Bill?           @relation(fields: [billId], references: [id], onDelete: Cascade)
-  class         Class?          @relation(fields: [classId], references: [id], onDelete: Cascade)
-  createdBy     User            @relation(fields: [createdById], references: [id], onDelete: Cascade)
-  parentEvent   CalendarEvent?  @relation("EventChildren", fields: [parentEventId], references: [id], onDelete: Cascade)
-  childEvents   CalendarEvent[] @relation("EventChildren")
-  student       Student?        @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  todos         Todo[]
+  id                 String          @id @default(cuid())
+  title              String
+  description        String?
+  startDate          DateTime
+  endDate            DateTime
+  variant            String          @default("primary")
+  isRecurring        Boolean         @default(false)
+  recurringDays      Int[]
+  createdById        String
+  billId             String?
+  assignmentId       String?
+  classId            String?
+  studentId          String?
+  parentEventId      String?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  metadata           Json?
+  monthlyDate        Int?
+  recurrenceEnd      DateTime?
+  recurrenceInterval Int?
+  recurrenceType     String?
+  yearlyDate         Int?
+  yearlyMonth        Int?
+  assignment         Assignment?     @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  bill               Bill?           @relation(fields: [billId], references: [id], onDelete: Cascade)
+  class              Class?          @relation(fields: [classId], references: [id], onDelete: Cascade)
+  createdBy          User            @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  parentEvent        CalendarEvent?  @relation("EventChildren", fields: [parentEventId], references: [id], onDelete: Cascade)
+  childEvents        CalendarEvent[] @relation("EventChildren")
+  student            Student?        @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  todos              Todo[]
 
   @@index([createdById])
   @@index([billId])

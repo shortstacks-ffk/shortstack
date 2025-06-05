@@ -9,6 +9,7 @@
     "lint": "next lint",
     "postinstall": "prisma generate",
     "deploy-db": "prisma generate && prisma migrate deploy"
+
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -86,6 +87,7 @@
     "@types/react-day-picker": "^5.2.1",
     "@types/react-dom": "^19",
     "bcryptjs": "^2.4.3",
+    "cross-env": "^7.0.3",
     "eslint": "^9",
     "eslint-config-next": "15.1.3",
     "postcss": "^8",
