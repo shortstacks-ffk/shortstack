@@ -44,7 +44,7 @@ export async function GET(req: Request) {
     const teacherHasAccess = await db.class.findFirst({
       where: {
         userId: session.user.id,
-        code: account.student.classId
+        code: account.student.classId ?? undefined // Use classId if available
       }
     });
     

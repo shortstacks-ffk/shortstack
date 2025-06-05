@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, use, Suspense } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Download, RefreshCw, FileText, Calendar, ChevronRight, Loader2 } from "lucide-react";
 import {
@@ -26,6 +26,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { formatCurrency } from "@/src/lib/utils";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import RecurringTransactionsDialog from "../RecurringTransactionsDialog";
 
 interface Transaction {
   id: string;
@@ -52,17 +53,8 @@ interface StudentDetail {
   accounts: StudentAccount[];
 }
 
-export default function StudentAccountPage({ 
-  params 
-}: { 
-  params: Promise<{ studentId: string }> 
-}) {
+function StudentAccountContent({ studentId }: { studentId: string }) {
   const router = useRouter();
-  
-  // Use React.use() to unwrap the params Promise
-  const resolvedParams = use(params); 
-  const { studentId } = resolvedParams; 
-  
   const [student, setStudent] = useState<StudentDetail | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -73,52 +65,61 @@ export default function StudentAccountPage({
   const [isDownloadingStatement, setIsDownloadingStatement] = useState<number | null>(null);
   const [availableStatements, setAvailableStatements] = useState<Record<string, boolean>>({});
   const [isStatementsLoading, setIsStatementsLoading] = useState(false);
+  const [isRecurringTransactionsOpen, setIsRecurringTransactionsOpen] = useState(false);
 
 
-  useEffect(() => {
-    const fetchStudentData = async () => {
-      setIsLoading(true);
-      try {
-        const response = await fetch(`/api/teacher/banking/students/${studentId}`);
-        if (response.ok) {
-          const data = await response.json();
-          setStudent(data);
-          
-          // Set the first account as default
-          if (data.accounts.length > 0) {
-            setSelectedAccountId(data.accounts[0].id);
-          }
+  // Define fetch functions
+  const fetchStudentData = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch(`/api/teacher/banking/students/${studentId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setStudent(data);
+        
+        // Set the first account as default
+        if (data.accounts.length > 0) {
+          setSelectedAccountId(data.accounts[0].id);
         }
-      } catch (error) {
-        console.error("Error fetching student data:", error);
-      } finally {
-        setIsLoading(false);
       }
-    };
+    } catch (error) {
+      console.error("Error fetching student data:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchTransactions = async () => {
+    if (!selectedAccountId) return;
     
+    setIsTransactionsLoading(true);
+    try {
+      const response = await fetch(`/api/teacher/banking/transactions?accountId=${selectedAccountId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setTransactions(data);
+      }
+    } catch (error) {
+      console.error("Error fetching transactions:", error);
+    } finally {
+      setIsTransactionsLoading(false);
+    }
+  };
+  
+  // Use the functions in useEffect hooks
+  useEffect(() => {
     fetchStudentData();
   }, [studentId]);
 
   useEffect(() => {
-    const fetchTransactions = async () => {
-      if (!selectedAccountId) return;
-      
-      setIsTransactionsLoading(true);
-      try {
-        const response = await fetch(`/api/teacher/banking/transactions?accountId=${selectedAccountId}`);
-        if (response.ok) {
-          const data = await response.json();
-          setTransactions(data);
-        }
-      } catch (error) {
-        console.error("Error fetching transactions:", error);
-      } finally {
-        setIsTransactionsLoading(false);
-      }
-    };
-    
     fetchTransactions();
   }, [selectedAccountId]);
+  
+  // Fix the reload function to call these functions
+  const reloadData = () => {
+    fetchStudentData();
+    fetchTransactions();
+  };
 
   // Determine the display type based on transaction type and direction
   const getDisplayTransactionType = (transaction: Transaction) => {
@@ -419,6 +420,15 @@ useEffect(() => {
                   >
                     <RefreshCw className={`h-4 w-4 ${isTransactionsLoading ? 'animate-spin' : ''}`} />
                   </Button>
+                  
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsRecurringTransactionsOpen(true)}
+                    className="ml-2"
+                  >
+                    <Calendar className="h-4 w-4 mr-2" />
+                    Recurring Transactions
+                  </Button>
                 </div>
                 
                 {/* Transaction Tab Content */}
@@ -591,7 +601,51 @@ useEffect(() => {
             )}
           </CardContent>
         </Card>
+        
+        {student && (
+          <RecurringTransactionsDialog
+            open={isRecurringTransactionsOpen}
+            onClose={() => setIsRecurringTransactionsOpen(false)}
+            studentId={student.id}
+            students={[{
+              id: student.id,
+              firstName: student.firstName,
+              lastName: student.lastName
+            }]}
+            onComplete={() => {
+              // Refresh data if needed
+              fetchStudentData();
+              fetchTransactions();
+            }}
+          />
+        )}
       </div>
     </div>
+  );
+}
+
+// Loading fallback component
+function LoadingStudentAccount() {
+  return (
+    <div className="flex h-full items-center justify-center">
+      <div className="animate-spin h-10 w-10 rounded-full border-4 border-orange-500 border-t-transparent"></div>
+    </div>
+  );
+}
+
+// Main component that resolves the params promise and wraps content with Suspense
+export default function StudentAccountPage({ 
+  params 
+}: { 
+  params: Promise<{ studentId: string }> 
+}) {
+  // Use React.use() to unwrap the params Promise
+  const resolvedParams = use(params); 
+  const { studentId } = resolvedParams;
+
+  return (
+    <Suspense fallback={<LoadingStudentAccount />}>
+      <StudentAccountContent studentId={studentId} />
+    </Suspense>
   );
 }

@@ -44,6 +44,7 @@ export async function GET(
         lastName: true,
         schoolEmail: true,
         userId: true,
+        lastLogin: true, // Include lastLogin here
         bankAccounts: {
           select: {
             id: true,
@@ -55,26 +56,6 @@ export async function GET(
       },
     });
 
-    // Get last login information from User model for each student that has a userId
-    const studentIds = students.map(student => student.userId).filter(Boolean);
-    
-    const userLoginInfo = studentIds.length > 0 
-      ? await db.user.findMany({
-          where: { 
-            id: { in: studentIds as string[] }
-          },
-          select: {
-            id: true,
-            createdAt: true // Use createdAt instead of lastLogin
-          }
-        })
-      : [];
-
-    // Create a map of userId -> createdAt for quick lookup
-    const userLoginMap = Object.fromEntries(
-      userLoginInfo.map(user => [user.id, user.createdAt]) // Fix the user.lastLogin access
-    );
-
     // Format the student data for the frontend
     const formattedStudents = students.map((student) => {
       const checkingAccount = student.bankAccounts.find(
@@ -85,8 +66,9 @@ export async function GET(
         (acc) => acc.accountType === "SAVINGS"
       ) || { id: "", accountNumber: "", balance: 0 };
 
-      const lastLogin = student.userId && userLoginMap[student.userId]
-        ? new Date(userLoginMap[student.userId]).toLocaleDateString()
+      // Use the actual lastLogin field from the student model instead of trying to get it from User
+      const lastLogin = student.lastLogin 
+        ? new Date(student.lastLogin).toLocaleDateString() 
         : "Never";
 
       return {
