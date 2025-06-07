@@ -12,22 +12,30 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Find the teacher record
+    // Find the user record
     const user = await db.user.findUnique({
       where: { id: session.user.id },
-      include: { teacherProfile: true }
     });
 
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
+    
+    // Get teacher record
+    const teacher = await db.teacher.findUnique({
+      where: { userId: session.user.id },
+    });
+    
+    if (!teacher) {
+      return NextResponse.json({ error: "Teacher profile not found" }, { status: 404 });
+    }
 
     // Process form data
     const formData = await request.formData();
-    const file = formData.get('file') as File;
+    const file = formData.get('file');
 
-    if (!file) {
-      return NextResponse.json({ error: "No file provided" }, { status: 400 });
+    if (!file || !(file instanceof File)) {
+      return NextResponse.json({ error: "No valid file provided" }, { status: 400 });
     }
 
     // Validate file (type and size)
@@ -45,27 +53,21 @@ export async function POST(request: Request) {
     
     // Upload to Vercel Blob
     try {
-      const blob = await put(
-        `teacher-profiles/${user.id}/${Date.now()}-${file.name.replace(/\s/g, '-')}`, 
-        file, 
-        {
-          access: 'public',
-          contentType: file.type
-        }
-      );
+      const filename = `teacher-${teacher.id}-${Date.now()}-${file.name.replace(/\s/g, '-')}`;
+      const blob = await put(filename, file, {
+        access: 'public',
+        contentType: file.type
+      });
       
       console.log("Blob upload successful:", blob.url);
       
-      // Update user with new image URL
-      await db.user.update({
-        where: { id: user.id },
-        data: { image: blob.url }
-      });
-
+      // Note: we don't update the database here anymore
+      // That will happen when the form is submitted
+      
       return NextResponse.json({
         success: true,
         imageUrl: blob.url,
-        message: "Profile image updated successfully"
+        message: "Image uploaded successfully"
       });
     } catch (blobError) {
       console.error("Vercel Blob upload error:", blobError);
