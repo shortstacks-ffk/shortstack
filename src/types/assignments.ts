@@ -8,4 +8,5 @@ export interface AssignmentRecord {
   size?: number;
   url?: string;
   classId: string; // Make this required
+  textAssignment?: string; // For text-based assignments
 }

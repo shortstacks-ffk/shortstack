@@ -15,6 +15,7 @@ interface AssignmentData {
   url?: string;
   fileType?: string;
   size?: number;
+  textAssignment?: string; // Add this field
 }
 
 interface CopyAssignmentParams {
@@ -44,7 +45,7 @@ async function createAssignmentCalendarEvents(assignment: any, classInfo: any): 
       startDate: assignment.dueDate,
       endDate: new Date(new Date(assignment.dueDate).getTime() + 60 * 60 * 1000), // One hour duration
       isRecurring: false,
-      createdById: classInfo.userId, // Teacher's ID
+      createdById: classInfo.teacherId, // Use teacherId from class
       assignmentId: assignment.id,
       classId: classInfo.id,
       variant: "warning" // Assignments are marked as warning color
@@ -71,7 +72,7 @@ async function createAssignmentCalendarEvents(assignment: any, classInfo: any): 
         assignmentId: assignment.id,
         studentId: enrollment.studentId,
         parentEventId: mainEvent.id,
-        createdById: classInfo.userId, // Add the teacher's ID as creator
+        createdById: classInfo.teacherId, // Use teacherId from class
         variant: "warning"
       }
     });
@@ -87,6 +88,15 @@ export async function createAssignment(data: AssignmentData): Promise<Assignment
       return { success: false, error: 'Unauthorized' };
     }
 
+    // Get teacher record
+    const teacher = await db.teacher.findUnique({
+      where: { userId: session.user.id }
+    });
+
+    if (!teacher) {
+      return { success: false, error: 'Teacher profile not found' };
+    }
+
     if (!data.name || !data.classId) {
       return { success: false, error: 'Missing required fields' };
     }
@@ -94,10 +104,9 @@ export async function createAssignment(data: AssignmentData): Promise<Assignment
     // Verify the class exists and belongs to this teacher
     const classObj = await db.class.findFirst({
       where: { 
-        code: data.classId, // Use code for lookup
-        userId: session.user.id
-      },
-      select: { id: true, code: true, userId: true }
+        code: data.classId,
+        teacherId: teacher.id
+      }
     });
     
     if (!classObj) {
@@ -106,22 +115,30 @@ export async function createAssignment(data: AssignmentData): Promise<Assignment
     
     console.log('Class found with code:', classObj.code, 'and ID:', classObj.id);
     
-    // Create assignment using class CODE as the classId (not the internal ID)
+    // Create assignment with teacherId and connect to class
     const createdAssignment = await db.assignment.create({
       data: {
         name: data.name,
         activity: data.activity,
         dueDate: data.dueDate ? new Date(data.dueDate) : undefined,
-        classId: classObj.code, // Use the class CODE, not the id
+        teacherId: teacher.id, // Use teacherId from schema
         url: data.url || '', 
         fileType: data.fileType || '',
         size: data.size || 0,
+        textAssignment: data.textAssignment, // Add this field
+        classes: {
+          connect: { id: classObj.id }
+        },
         lessonPlans: data.lessonPlanIds && data.lessonPlanIds.length > 0
           ? {
               connect: data.lessonPlanIds.map((id) => ({ id })),
             }
           : undefined,
       },
+      include: {
+        classes: true,
+        lessonPlans: true
+      }
     });
 
     console.log('Assignment created successfully:', createdAssignment.id);
@@ -130,7 +147,7 @@ export async function createAssignment(data: AssignmentData): Promise<Assignment
     if (data.dueDate) {
       await createAssignmentCalendarEvents(createdAssignment, {
         id: classObj.id,
-        userId: classObj.userId
+        teacherId: teacher.id
       });
       console.log('Calendar events created for assignment');
     }
@@ -157,7 +174,8 @@ export async function getAssignmentByID(id: string): Promise<AssignmentResponse>
       where: { id },
       include: { 
         lessonPlans: true,
-        class: { select: { userId: true, code: true } }
+        classes: true,
+        teacher: true
       },
     });
 
@@ -166,18 +184,34 @@ export async function getAssignmentByID(id: string): Promise<AssignmentResponse>
     }
     
     // Authorization check
-    if (session.user.role === "TEACHER" && assignment.class.userId !== session.user.id) {
-      return { success: false, error: 'Forbidden: You do not own this class' };
+    if (session.user.role === "TEACHER") {
+      const teacher = await db.teacher.findUnique({
+        where: { userId: session.user.id }
+      });
+      
+      if (!teacher || assignment.teacherId !== teacher.id) {
+        return { success: false, error: 'Forbidden: You do not own this assignment' };
+      }
     } else if (session.user.role === "STUDENT") {
-      const enrollment = await db.enrollment.findFirst({
+      // Check if student is enrolled in any of the classes this assignment belongs to
+      const student = await db.student.findFirst({
+        where: { userId: session.user.id }
+      });
+
+      if (!student) {
+        return { success: false, error: 'Student profile not found' };
+      }
+
+      const hasAccess = await db.enrollment.findFirst({
         where: {
-          student: { userId: session.user.id },
-          classId: assignment.classId,
+          studentId: student.id,
+          classId: { in: assignment.classes.map(c => c.id) },
           enrolled: true
         }
       });
-      if (!enrollment) {
-        return { success: false, error: 'Forbidden: Not enrolled in this class' };
+
+      if (!hasAccess) {
+        return { success: false, error: 'Forbidden: Not enrolled in any class with this assignment' };
       }
     }
 
@@ -198,22 +232,65 @@ export async function getAssignments(classId?: string): Promise<AssignmentRespon
     
     let whereClause: Prisma.AssignmentWhereInput = {};
     
-    if (classId) {
-      // If classId provided, filter by it
-      if (session.user.role === "TEACHER") {
-        // Teachers can only see assignments for classes they own
+    if (session.user.role === "TEACHER") {
+      const teacher = await db.teacher.findUnique({
+        where: { userId: session.user.id }
+      });
+
+      if (!teacher) {
+        return { success: false, error: 'Teacher profile not found' };
+      }
+
+      if (classId) {
+        // Get assignments for specific class
+        const classObj = await db.class.findFirst({
+          where: {
+            code: classId,
+            teacherId: teacher.id
+          }
+        });
+
+        if (!classObj) {
+          return { success: false, error: 'Class not found or you do not have permission' };
+        }
+
         whereClause = {
-          classId,
-          class: {
-            userId: session.user.id
+          teacherId: teacher.id,
+          classes: {
+            some: {
+              id: classObj.id
+            }
           }
         };
-      } else if (session.user.role === "STUDENT") {
-        // Students can only see assignments for classes they're enrolled in
+      } else {
+        // Get all assignments for this teacher
+        whereClause = {
+          teacherId: teacher.id
+        };
+      }
+    } else if (session.user.role === "STUDENT") {
+      const student = await db.student.findFirst({
+        where: { userId: session.user.id }
+      });
+
+      if (!student) {
+        return { success: false, error: 'Student profile not found' };
+      }
+
+      if (classId) {
+        // Check if student is enrolled in this specific class
+        const classObj = await db.class.findFirst({
+          where: { code: classId }
+        });
+
+        if (!classObj) {
+          return { success: false, error: 'Class not found' };
+        }
+
         const enrollment = await db.enrollment.findFirst({
           where: {
-            student: { userId: session.user.id },
-            classId,
+            studentId: student.id,
+            classId: classObj.id,
             enrolled: true
           }
         });
@@ -221,23 +298,19 @@ export async function getAssignments(classId?: string): Promise<AssignmentRespon
         if (!enrollment) {
           return { success: false, error: 'Forbidden: Not enrolled in this class' };
         }
-        
-        whereClause = { classId };
-      }
-    } else {
-      // No classId provided
-      if (session.user.role === "TEACHER") {
-        // Teachers see assignments for all their classes
+
         whereClause = {
-          class: {
-            userId: session.user.id
+          classes: {
+            some: {
+              id: classObj.id
+            }
           }
         };
-      } else if (session.user.role === "STUDENT") {
-        // Students see assignments for all classes they're enrolled in
+      } else {
+        // Get assignments for all classes the student is enrolled in
         const enrollments = await db.enrollment.findMany({
           where: {
-            student: { userId: session.user.id },
+            studentId: student.id,
             enrolled: true
           },
           select: { classId: true }
@@ -246,7 +319,11 @@ export async function getAssignments(classId?: string): Promise<AssignmentRespon
         const classIds = enrollments.map(e => e.classId);
         
         whereClause = {
-          classId: { in: classIds }
+          classes: {
+            some: {
+              id: { in: classIds }
+            }
+          }
         };
       }
     }
@@ -255,7 +332,7 @@ export async function getAssignments(classId?: string): Promise<AssignmentRespon
       where: whereClause,
       include: { 
         lessonPlans: true,
-        class: { select: { name: true, code: true } }
+        classes: { select: { name: true, code: true } }
       },
       orderBy: { createdAt: 'desc' }
     });
@@ -275,17 +352,28 @@ export async function updateAssignment(id: string, data: AssignmentData): Promis
       return { success: false, error: 'Unauthorized' };
     }
 
+    const teacher = await db.teacher.findUnique({
+      where: { userId: session.user.id }
+    });
+
+    if (!teacher) {
+      return { success: false, error: 'Teacher profile not found' };
+    }
+
     // Verify assignment exists and belongs to teacher
     const existingAssignment = await db.assignment.findUnique({
       where: { id },
-      include: { class: { select: { userId: true, code: true, id: true } } }
+      include: { 
+        classes: true,
+        teacher: true
+      }
     });
     
-    if (!existingAssignment || existingAssignment.class.userId !== session.user.id) {
+    if (!existingAssignment || existingAssignment.teacherId !== teacher.id) {
       return { success: false, error: 'Assignment not found or you do not have permission' };
     }
 
-    if (!data.name || !data.classId) {
+    if (!data.name) {
       return { success: false, error: 'Missing required fields' };
     }
 
@@ -295,14 +383,17 @@ export async function updateAssignment(id: string, data: AssignmentData): Promis
         name: data.name,
         activity: data.activity,
         dueDate: data.dueDate ? new Date(data.dueDate) : null,
-        classId: data.classId,
+        textAssignment: data.textAssignment, // Add this field
         lessonPlans: data.lessonPlanIds
           ? {
               set: data.lessonPlanIds.map((lpId) => ({ id: lpId })),
             }
           : undefined,
       },
-      include: { lessonPlans: true },
+      include: { 
+        lessonPlans: true,
+        classes: true
+      },
     });
 
     // Update any related calendar events if dueDate has changed
@@ -313,13 +404,19 @@ export async function updateAssignment(id: string, data: AssignmentData): Promis
       });
       
       // Create new calendar events with updated date
-      await createAssignmentCalendarEvents(updatedAssignment, {
-        id: existingAssignment.class.id,
-        userId: existingAssignment.class.userId
-      });
+      for (const classObj of existingAssignment.classes) {
+        await createAssignmentCalendarEvents(updatedAssignment, {
+          id: classObj.id,
+          teacherId: teacher.id
+        });
+      }
     }
 
-    revalidatePath(`/teacher/dashboard/classes/${existingAssignment.class.code}`);
+    // Revalidate paths for all classes this assignment belongs to
+    for (const classObj of existingAssignment.classes) {
+      revalidatePath(`/teacher/dashboard/classes/${classObj.code}`);
+    }
+    
     return { success: true, data: updatedAssignment };
   } catch (error: any) {
     console.error('Update assignment error:', error?.message || 'Unknown error');
@@ -339,23 +436,30 @@ export async function copyAssignmentToLessonPlan({
       return { success: false, error: 'Unauthorized' };
     }
 
+    const teacher = await db.teacher.findUnique({
+      where: { userId: session.user.id }
+    });
+
+    if (!teacher) {
+      return { success: false, error: 'Teacher profile not found' };
+    }
+
     // Verify source assignment exists and belongs to teacher
     const sourceAssignment = await db.assignment.findUnique({
       where: { id: sourceAssignmentId },
-      include: { class: { select: { userId: true, code: true } } }
+      include: { classes: true }
     });
 
-    if (!sourceAssignment || sourceAssignment.class.userId !== session.user.id) {
+    if (!sourceAssignment || sourceAssignment.teacherId !== teacher.id) {
       return { success: false, error: 'Source assignment not found or you do not have permission' };
     }
     
-    // Verify target class belongs to teacher - use code for lookup
+    // Verify target class belongs to teacher
     const targetClass = await db.class.findFirst({
       where: { 
-        code: targetClassId, // Use code instead of ID
-        userId: session.user.id
-      },
-      select: { id: true, code: true, userId: true }
+        code: targetClassId,
+        teacherId: teacher.id
+      }
     });
     
     if (!targetClass) {
@@ -366,7 +470,11 @@ export async function copyAssignmentToLessonPlan({
     const targetLessonPlan = await db.lessonPlan.findFirst({
       where: {
         id: targetLessonPlanId,
-        class: { code: targetClassId } // Join through class relation
+        classes: {
+          some: {
+            code: targetClassId
+          }
+        }
       }
     });
     
@@ -379,20 +487,29 @@ export async function copyAssignmentToLessonPlan({
         name: sourceAssignment.name,
         activity: sourceAssignment.activity,
         dueDate: sourceAssignment.dueDate,
-        classId: targetClassId, // Use class code
-        lessonPlans: {
-          connect: { id: targetLessonPlanId },
-        },
+        teacherId: teacher.id,
         fileType: sourceAssignment.fileType || 'unknown',
         size: sourceAssignment.size || 0,
         url: sourceAssignment.url || '',
+        classes: {
+          connect: { id: targetClass.id }
+        },
+        lessonPlans: {
+          connect: { id: targetLessonPlanId },
+        },
       },
-      include: { lessonPlans: true },
+      include: { 
+        lessonPlans: true,
+        classes: true
+      },
     });
 
     // Create calendar events for this assignment if it has a due date
     if (newAssignment.dueDate) {
-      await createAssignmentCalendarEvents(newAssignment, targetClass);
+      await createAssignmentCalendarEvents(newAssignment, {
+        id: targetClass.id,
+        teacherId: teacher.id
+      });
     }
 
     revalidatePath(`/teacher/dashboard/classes/${targetClass.code}`);
@@ -411,13 +528,21 @@ export async function deleteAssignment(id: string): Promise<AssignmentResponse> 
       return { success: false, error: 'Unauthorized' };
     }
 
+    const teacher = await db.teacher.findUnique({
+      where: { userId: session.user.id }
+    });
+
+    if (!teacher) {
+      return { success: false, error: 'Teacher profile not found' };
+    }
+
     // Verify assignment exists and belongs to teacher
     const existingAssignment = await db.assignment.findUnique({
       where: { id },
-      include: { class: { select: { userId: true, code: true } } }
+      include: { classes: true }
     });
     
-    if (!existingAssignment || existingAssignment.class.userId !== session.user.id) {
+    if (!existingAssignment || existingAssignment.teacherId !== teacher.id) {
       return { success: false, error: 'Assignment not found or you do not have permission' };
     }
 
@@ -436,7 +561,11 @@ export async function deleteAssignment(id: string): Promise<AssignmentResponse> 
       where: { id },
     });
 
-    revalidatePath(`/teacher/dashboard/classes/${existingAssignment.class.code}`);
+    // Revalidate paths for all classes this assignment belonged to
+    for (const classObj of existingAssignment.classes) {
+      revalidatePath(`/teacher/dashboard/classes/${classObj.code}`);
+    }
+    
     return { success: true };
   } catch (error: any) {
     console.error('Delete assignment error:', error?.message || 'Unknown error');
@@ -452,7 +581,14 @@ export async function submitAssignment(formData: FormData): Promise<AssignmentRe
       return { success: false, error: 'Unauthorized: Students only' };
     }
     
-    const studentId = session.user.id;
+    const student = await db.student.findFirst({
+      where: { userId: session.user.id }
+    });
+
+    if (!student) {
+      return { success: false, error: 'Student profile not found' };
+    }
+
     const assignmentId = formData.get('assignmentId') as string;
     
     if (!assignmentId) {
@@ -463,16 +599,21 @@ export async function submitAssignment(formData: FormData): Promise<AssignmentRe
     const assignment = await db.assignment.findFirst({
       where: {
         id: assignmentId,
-        class: {
-          enrollments: {
-            some: {
-              studentId,
-              enrolled: true
+        classes: {
+          some: {
+            enrollments: {
+              some: {
+                studentId: student.id,
+                enrolled: true
+              }
             }
           }
         }
       },
-      include: { class: true }
+      include: { 
+        classes: true,
+        teacher: true
+      }
     });
     
     if (!assignment) {
@@ -491,7 +632,7 @@ export async function submitAssignment(formData: FormData): Promise<AssignmentRe
     const existingSubmission = await db.studentAssignmentSubmission.findFirst({
       where: {
         assignmentId,
-        studentId
+        studentId: student.id
       }
     });
 
@@ -517,7 +658,7 @@ export async function submitAssignment(formData: FormData): Promise<AssignmentRe
       submission = await db.studentAssignmentSubmission.create({
         data: {
           assignmentId,
-          studentId,
+          studentId: student.id,
           fileUrl,
           textContent,
           comments,
@@ -531,15 +672,14 @@ export async function submitAssignment(formData: FormData): Promise<AssignmentRe
 
     // Create or update a calendar event for this submission
     try {
-      // Get teacher ID for the class
-      const teacherId = assignment.class.userId;
+      const teacherId = assignment.teacher.id;
       
       if (teacherId) {
         // First check if there's an existing calendar event
         const existingEvent = await db.calendarEvent.findFirst({
           where: {
             assignmentId,
-            studentId,
+            studentId: student.id,
             title: { contains: 'Submitted:' }
           }
         });
@@ -567,7 +707,7 @@ export async function submitAssignment(formData: FormData): Promise<AssignmentRe
               isRecurring: false,
               createdById: teacherId,
               assignmentId,
-              studentId,
+              studentId: student.id,
               variant: "success"
             }
           });
@@ -578,8 +718,10 @@ export async function submitAssignment(formData: FormData): Promise<AssignmentRe
       // Don't fail the submission if the calendar event fails
     }
 
-    // Revalidate relevant paths
-    revalidatePath(`/student/dashboard/classes/${assignment.classId}`);
+    // Revalidate relevant paths for all classes this assignment belongs to
+    for (const classObj of assignment.classes) {
+      revalidatePath(`/student/dashboard/classes/${classObj.code}`);
+    }
     revalidatePath(`/student/dashboard/assignments`);
     
     return {
@@ -605,7 +747,8 @@ export async function getStudentAssignment(assignmentId: string): Promise<Assign
       where: { id: assignmentId },
       include: {
         lessonPlans: true,
-        class: true
+        classes: true,
+        teacher: true
       }
     });
     
@@ -615,12 +758,19 @@ export async function getStudentAssignment(assignmentId: string): Promise<Assign
 
     // Check permission based on role
     if (session.user.role === "STUDENT") {
-      // For students, check if they're enrolled in the class
-      const studentId = session.user.id;
+      const student = await db.student.findFirst({
+        where: { userId: session.user.id }
+      });
+
+      if (!student) {
+        return { success: false, error: 'Student profile not found' };
+      }
+
+      // Check if student is enrolled in any of the classes this assignment belongs to
       const enrollment = await db.enrollment.findFirst({
         where: {
-          studentId,
-          classId: assignment.class.id,
+          studentId: student.id,
+          classId: { in: assignment.classes.map(c => c.id) },
           enrolled: true
         }
       });
@@ -633,7 +783,7 @@ export async function getStudentAssignment(assignmentId: string): Promise<Assign
       const submission = await db.studentAssignmentSubmission.findFirst({
         where: {
           assignmentId,
-          studentId
+          studentId: student.id
         }
       });
 
@@ -643,7 +793,7 @@ export async function getStudentAssignment(assignmentId: string): Promise<Assign
         data: {
           id: assignment.id,
           name: assignment.name,
-          description: assignment.rubric || '',
+          description: assignment.description || '',
           dueDate: assignment.dueDate,
           activity: assignment.activity || "Assignment",
           fileType: assignment.fileType,
@@ -657,8 +807,16 @@ export async function getStudentAssignment(assignmentId: string): Promise<Assign
       };
     } 
     else if (session.user.role === "TEACHER") {
-      // For teachers, check if they own the class
-      if (assignment.class.userId !== session.user.id) {
+      const teacher = await db.teacher.findUnique({
+        where: { userId: session.user.id }
+      });
+
+      if (!teacher) {
+        return { success: false, error: 'Teacher profile not found' };
+      }
+
+      // Check if teacher owns this assignment
+      if (assignment.teacherId !== teacher.id) {
         return { success: false, error: "You don't have permission to view this assignment" };
       }
 
@@ -684,7 +842,7 @@ export async function getStudentAssignment(assignmentId: string): Promise<Assign
         data: {
           id: assignment.id,
           name: assignment.name,
-          description: assignment.rubric || '',
+          description: assignment.description || '',
           dueDate: assignment.dueDate,
           activity: assignment.activity || "Assignment",
           fileType: assignment.fileType,
@@ -709,13 +867,19 @@ export async function getAssignmentSubmissions(assignmentId: string): Promise<As
       return { success: false, error: 'Unauthorized: Teachers only' };
     }
 
+    const teacher = await db.teacher.findUnique({
+      where: { userId: session.user.id }
+    });
+
+    if (!teacher) {
+      return { success: false, error: 'Teacher profile not found' };
+    }
+
     // Verify the assignment exists and belongs to this teacher
     const assignment = await db.assignment.findUnique({
       where: { id: assignmentId },
       include: {
-        class: {
-          select: { userId: true, code: true }
-        }
+        classes: true
       }
     });
 
@@ -723,7 +887,7 @@ export async function getAssignmentSubmissions(assignmentId: string): Promise<As
       return { success: false, error: 'Assignment not found' };
     }
 
-    if (assignment.class.userId !== session.user.id) {
+    if (assignment.teacherId !== teacher.id) {
       return { success: false, error: 'You do not have permission to view these submissions' };
     }
 
@@ -765,13 +929,21 @@ export async function gradeSubmission({
       return { success: false, error: 'Unauthorized: Teachers only' };
     }
 
+    const teacher = await db.teacher.findUnique({
+      where: { userId: session.user.id }
+    });
+
+    if (!teacher) {
+      return { success: false, error: 'Teacher profile not found' };
+    }
+
     // Get the submission with assignment info to verify ownership
     const submission = await db.studentAssignmentSubmission.findUnique({
       where: { id: submissionId },
       include: {
         assignment: {
           include: {
-            class: { select: { userId: true, code: true } }
+            classes: true
           }
         }
       }
@@ -781,8 +953,8 @@ export async function gradeSubmission({
       return { success: false, error: 'Submission not found' };
     }
 
-    // Verify the teacher owns the class
-    if (submission.assignment.class.userId !== session.user.id) {
+    // Verify the teacher owns the assignment
+    if (submission.assignment.teacherId !== teacher.id) {
       return { success: false, error: 'You do not have permission to grade this submission' };
     }
 
@@ -812,7 +984,7 @@ export async function gradeSubmission({
           startDate: new Date(),
           endDate: new Date(new Date().getTime() + 30 * 60 * 1000), // 30 minute duration
           isRecurring: false,
-          createdById: session.user.id,
+          createdById: teacher.id,
           assignmentId: submission.assignmentId,
           studentId: submission.studentId,
           variant: "success"
@@ -823,8 +995,10 @@ export async function gradeSubmission({
       // Don't fail if calendar event creation fails
     }
 
-    // Revalidate paths
-    revalidatePath(`/teacher/dashboard/classes/${submission.assignment.class.code}`);
+    // Revalidate paths for all classes this assignment belongs to
+    for (const classObj of submission.assignment.classes) {
+      revalidatePath(`/teacher/dashboard/classes/${classObj.code}`);
+    }
     
     return {
       success: true,
