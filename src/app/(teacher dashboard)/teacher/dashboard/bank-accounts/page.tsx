@@ -83,11 +83,16 @@ function BankAccountsContent() {
           const data = await response.json();
           setClasses(data);
           
-          // Auto-select the first class if no class is selected
-          if (data.length > 0 && !selectedClass) {
+          // First check if saved class ID exists in current classes
+          const savedClassId = localStorage.getItem('selectedClass');
+          const classExists = savedClassId && data.some(cls => cls.id === savedClassId);
+          
+          if (classExists) {
+            setSelectedClass(savedClassId!);
+          } else if (data.length > 0) {
+            // If not, select the first available class
             const classToSelect = data[0].id;
             setSelectedClass(classToSelect);
-            // Save selection to localStorage
             localStorage.setItem('selectedClass', classToSelect);
           }
         } else {
@@ -112,14 +117,6 @@ function BankAccountsContent() {
     }
   }, [selectedClass]);
 
-  // Set initial selected class from localStorage
-  useEffect(() => {
-    const savedClass = localStorage.getItem('selectedClass');
-    if (savedClass) {
-      setSelectedClass(savedClass);
-    }
-  }, []);
-
   // Fetch students when class is selected
   useEffect(() => {
     async function fetchStudents() {
@@ -127,14 +124,40 @@ function BankAccountsContent() {
       
       setIsLoading(true);
       try {
+        console.log("Fetching students for class:", selectedClass);
         const response = await fetch(`/api/teacher/classes/${selectedClass}/students/accounts`);
-        if (response.ok) {
-          const data = await response.json();
-          setStudents(data);
-        } else {
-          console.error("Failed to fetch students:", await response.text());
-          toast.error("Failed to load student accounts");
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error("Failed to fetch students:", errorText);
+          
+          // If the class doesn't exist or access is denied, reset the class selection
+          if (errorText.includes("Class not found") || errorText.includes("access denied")) {
+            // Clear invalid class from localStorage
+            localStorage.removeItem('selectedClass');
+            
+            // Refetch classes to get a valid selection
+            const classesResponse = await fetch("/api/teacher/classes");
+            if (classesResponse.ok) {
+              const classes = await classesResponse.json();
+              if (classes.length > 0) {
+                const newClassId = classes[0].id;
+                setSelectedClass(newClassId);
+                localStorage.setItem('selectedClass', newClassId);
+                toast.info("Switched to another available class");
+              } else {
+                setSelectedClass("");
+                toast.error("No classes available");
+              }
+            }
+          } else {
+            toast.error("Failed to load student accounts");
+          }
+          return;
         }
+        
+        const data = await response.json();
+        setStudents(data);
       } catch (error) {
         console.error("Error fetching students:", error);
         toast.error("Error loading student accounts");

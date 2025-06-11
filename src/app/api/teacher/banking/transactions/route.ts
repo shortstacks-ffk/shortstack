@@ -40,7 +40,7 @@ export async function GET(req: Request) {
     }
     
     // Check if the teacher has access to the student through a class
-    const teacherClasses = account.student.enrollments.map(e => e.class).filter(c => c.userId === session.user.id);
+    const teacherClasses = account.student.enrollments.map(e => e.class).filter(c => c.teacherId === session.user.id);
     
     if (!teacherClasses.length) {
       return NextResponse.json({ error: "Access denied to this account" }, { status: 403 });

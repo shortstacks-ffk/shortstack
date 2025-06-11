@@ -3,6 +3,8 @@ import { db } from "@/src/lib/db";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/src/lib/auth/config";
 
+// Add more logging to help diagnose the issue
+
 export async function GET(
   req: Request,
   context: { params: Promise<{ classId: string }> } 
@@ -14,15 +16,29 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { classId } = await context.params; 
+    const { classId } = await context.params;
+    console.log("API: Fetching students for class ID:", classId);
 
-    // Verify teacher owns the class
+    // Get the teacher record first
+    const teacher = await db.teacher.findUnique({
+      where: { userId: session.user.id }
+    });
+    
+    if (!teacher) {
+      return NextResponse.json({ error: "Teacher profile not found" }, { status: 404 });
+    }
+
+    console.log("API: Teacher ID:", teacher.id);
+
+    // Verify teacher owns the class using teacherId
     const classExists = await db.class.findFirst({
       where: {
         id: classId,
-        userId: session.user.id,
+        teacherId: teacher.id,
       },
     });
+
+    console.log("API: Class exists check:", !!classExists);
 
     if (!classExists) {
       return NextResponse.json({ error: "Class not found or access denied" }, { status: 403 });

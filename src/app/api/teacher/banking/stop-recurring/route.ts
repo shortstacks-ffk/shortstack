@@ -11,6 +11,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Get teacher record
+    const teacher = await db.teacher.findUnique({
+      where: { userId: session.user.id },
+      select: { id: true }
+    });
+
+    if (!teacher) {
+      return NextResponse.json({ error: "Teacher profile not found" }, { status: 404 });
+    }
+
     const { eventId } = await request.json();
     
     if (!eventId) {
@@ -37,7 +47,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 
-    if (event.createdById !== session.user.id) {
+    if (event.createdById !== teacher.id) { // Use teacher.id instead of session.user.id
       return NextResponse.json({ error: "Unauthorized to modify this event" }, { status: 403 });
     }
 

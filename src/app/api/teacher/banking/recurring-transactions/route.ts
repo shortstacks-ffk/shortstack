@@ -11,47 +11,72 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Get teacher record
+    const teacher = await db.teacher.findUnique({
+      where: { userId: session.user.id },
+      select: { id: true }
+    });
+
+    if (!teacher) {
+      return NextResponse.json({ error: "Teacher profile not found" }, { status: 404 });
+    }
+
     // Parse the URL to get query parameters
     const url = new URL(request.url);
     const studentId = url.searchParams.get('studentId');
     
-    // Fix: Create a properly structured query that won't fail when empty
+    // Build the where clause
     let whereClause: any = {
-      createdById: session.user.id,
+      createdById: teacher.id, // Use teacher.id instead of session.user.id
       isRecurring: true,
     };
     
-    // Add metadata filter only if we need to filter by student
+    // Add metadata filter for banking transactions
     if (studentId) {
-      whereClause = {
-        ...whereClause,
-        metadata: {
-          path: ['studentId'],
-          equals: studentId
-        }
-      };
-    } else {
-      // When not filtering by studentId, ensure we only get banking transactions
-      whereClause = {
-        ...whereClause,
-        OR: [
-          {
-            metadata: {
-              path: ['transactionType'],
-              equals: 'ADD_FUNDS'
-            }
-          },
-          {
-            metadata: {
-              path: ['transactionType'],
-              equals: 'REMOVE_FUNDS'
-            }
+      // Filter by specific student and transaction type
+      whereClause.AND = [
+        {
+          metadata: {
+            path: ['studentId'],
+            equals: studentId
           }
-        ]
-      };
+        },
+        {
+          OR: [
+            {
+              metadata: {
+                path: ['transactionType'],
+                equals: 'ADD_FUNDS'
+              }
+            },
+            {
+              metadata: {
+                path: ['transactionType'],
+                equals: 'REMOVE_FUNDS'
+              }
+            }
+          ]
+        }
+      ];
+    } else {
+      // When not filtering by studentId, get all banking transactions
+      whereClause.OR = [
+        {
+          metadata: {
+            path: ['transactionType'],
+            equals: 'ADD_FUNDS'
+          }
+        },
+        {
+          metadata: {
+            path: ['transactionType'],
+            equals: 'REMOVE_FUNDS'
+          }
+        }
+      ];
     }
     
-    // Get the recurring transactions with the fixed query structure
+    // Get the recurring transactions
     const recurringTransactions = await db.calendarEvent.findMany({
       where: whereClause,
       orderBy: {

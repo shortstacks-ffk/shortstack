@@ -38,11 +38,15 @@ export async function POST(request: Request) {
     const startDate = new Date(statementYear, statementMonth, 1);
     const endDate = new Date(statementYear, statementMonth + 1, 0); // Last day of month
     
-    // Get all students with bank accounts
+    // Get all students with bank accounts - include enrollments to get class info
     const students = await db.student.findMany({
       include: {
         bankAccounts: true,
-        class: true
+        enrollments: {
+          include: {
+            class: true
+          }
+        }
       }
     });
     
@@ -102,10 +106,14 @@ export async function POST(request: Request) {
             continue;
           }
           
+          // Get class name from enrollments
+          const activeEnrollment = student.enrollments.find(e => e.enrolled);
+          const className = activeEnrollment?.class?.name || 'N/A';
+          
           // Format transaction data for the statement
           const statementData = transactions.map(transaction => ({
             'Student Name': `${student.firstName} ${student.lastName}`,
-            'Class': student.class?.name || 'N/A',
+            'Class': className,
             'Date': format(new Date(transaction.createdAt), 'MM/dd/yyyy'),
             'Time': format(new Date(transaction.createdAt), 'HH:mm:ss'),
             'Description': transaction.description,

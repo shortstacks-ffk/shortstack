@@ -10,9 +10,6 @@ import { Label } from "@/src/components/ui/label";
 import { Textarea } from "@/src/components/ui/textarea";
 import { toast } from "sonner";
 import { formatCurrency } from "@/src/lib/utils";
-import { CalendarIcon } from "lucide-react";
-import { Calendar } from "@/src/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/src/components/ui/popover";
 import { format } from "date-fns";
 
 interface Student {
@@ -56,6 +53,10 @@ export default function AddFundsDialog({
     onClose();
   };
 
+  // Get today's date for minimum date constraint
+  const today = new Date();
+  const todayStr = format(today, 'yyyy-MM-dd');
+
   const handleSubmit = async () => {
     if (!amount || parseFloat(amount) <= 0) {
       toast.error("Invalid amount", {
@@ -64,9 +65,30 @@ export default function AddFundsDialog({
       return;
     }
 
+    // Validate issue date is not in the past
+    const selectedDate = new Date(issueDate);
+    const todayDate = new Date();
+    todayDate.setHours(0, 0, 0, 0); // Reset time for comparison
+    selectedDate.setHours(0, 0, 0, 0);
+
+    if (selectedDate < todayDate) {
+      toast.error("Invalid date", {
+        description: "Issue date cannot be in the past."
+      });
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
+      // Get user's timezone
+      const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      
+      // Create a proper date object for the selected issue date
+      const submitDate = new Date(issueDate);
+      // Set to noon for better calendar visibility
+      submitDate.setHours(12, 0, 0, 0);
+
       const response = await fetch('/api/teacher/banking/add-funds', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -75,8 +97,9 @@ export default function AddFundsDialog({
           accountType,
           amount: parseFloat(amount),
           description: description || `Funds added by teacher`,
-          issueDate: issueDate.toISOString(),
+          issueDate: submitDate.toISOString(),
           recurrence: recurrence,
+          timezone: userTimezone, // Send user's timezone
         })
       });
 
@@ -85,8 +108,9 @@ export default function AddFundsDialog({
         throw new Error(error.error || "Failed to add funds");
       }
 
-      toast.success("Funds added successfully", {
-        description: `Added ${formatCurrency(parseFloat(amount))} to ${selectedStudents.length} student(s).`
+      const result = await response.json();
+      toast.success("Funds operation scheduled successfully", {
+        description: result.message
       });
       
       handleClose();
@@ -138,22 +162,20 @@ export default function AddFundsDialog({
 
           <div className="space-y-2">
             <Label htmlFor="issue-date">Issue on</Label>
-            <div className="flex gap-2">
-              <Input
-                id="issue-date"
-                type="date"
-                className="flex-1"
-                min={new Date().toISOString().split('T')[0]} // Prevents selecting dates in the past
-                value={issueDate ? issueDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0]}
-                onChange={(e) => {
-                  const newDate = e.target.value ? new Date(e.target.value) : new Date();
-                  // Set the time to current time to ensure it's valid
-                  newDate.setHours(new Date().getHours(), new Date().getMinutes());
+            <Input
+              id="issue-date"
+              type="date"
+              min={todayStr} // Prevent selecting past dates
+              value={format(issueDate, 'yyyy-MM-dd')}
+              onChange={(e) => {
+                if (e.target.value) {
+                  // Create date from the input value (which is in YYYY-MM-DD format)
+                  // Use local timezone interpretation
+                  const newDate = new Date(e.target.value + 'T12:00:00');
                   setIssueDate(newDate);
-                }}
-              />
-              
-            </div>
+                }
+              }}
+            />
           </div>
 
           <div className="flex flex-col space-y-2">

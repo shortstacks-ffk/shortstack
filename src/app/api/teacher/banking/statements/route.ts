@@ -11,6 +11,16 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     
+    // Get teacher record
+    const teacher = await db.teacher.findUnique({
+      where: { userId: session.user.id },
+      select: { id: true }
+    });
+
+    if (!teacher) {
+      return NextResponse.json({ error: "Teacher profile not found" }, { status: 404 });
+    }
+    
     const url = new URL(req.url);
     const accountId = url.searchParams.get("accountId");
     const month = url.searchParams.get("month");
@@ -30,7 +40,11 @@ export async function GET(req: Request) {
       include: {
         student: {
           include: {
-            class: true
+            enrollments: {
+              include: {
+                class: true
+              }
+            }
           }
         }
       }
@@ -40,13 +54,10 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Account not found" }, { status: 404 });
     }
     
-    // Verify the teacher has access to this student's class
-    const teacherHasAccess = await db.class.findFirst({
-      where: {
-        userId: session.user.id,
-        code: account.student.classId ?? undefined // Use classId if available
-      }
-    });
+    // Verify the teacher has access to this student through enrollment
+    const teacherHasAccess = account.student.enrollments.some(enrollment => 
+      enrollment.class.teacherId === teacher.id && enrollment.enrolled
+    );
     
     if (!teacherHasAccess) {
       return NextResponse.json({ error: "Unauthorized access" }, { status: 403 });

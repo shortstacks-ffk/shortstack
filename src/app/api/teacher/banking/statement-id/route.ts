@@ -11,6 +11,16 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     
+    // Get teacher record
+    const teacher = await db.teacher.findUnique({
+      where: { userId: session.user.id },
+      select: { id: true }
+    });
+
+    if (!teacher) {
+      return NextResponse.json({ error: "Teacher profile not found" }, { status: 404 });
+    }
+    
     // Parse query parameters
     const url = new URL(request.url);
     const accountId = url.searchParams.get('accountId');
@@ -28,7 +38,13 @@ export async function GET(request: Request) {
       where: { id: accountId },
       include: { 
         student: {
-          include: { class: true }
+          include: {
+            enrollments: {
+              include: {
+                class: true
+              }
+            }
+          }
         }
       }
     });
@@ -37,13 +53,10 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Account not found" }, { status: 404 });
     }
     
-    // Verify teacher has access to student's class
-    const teacherHasAccess = await db.class.findFirst({
-      where: {
-        userId: session.user.id,
-        code: account.student.classId ?? undefined // Use classId if available
-      }
-    });
+    // Verify teacher has access to student through enrollment
+    const teacherHasAccess = account.student.enrollments.some(enrollment => 
+      enrollment.class.teacherId === teacher.id && enrollment.enrolled
+    );
     
     if (!teacherHasAccess) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
