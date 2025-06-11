@@ -136,9 +136,6 @@ export default function TemplateLessonPlanCard({
       searchParams.set('grade', plan.gradeLevel);
     }
     
-    if (isSuperUser) {
-      return `/teacher/dashboard/lesson-plans/templates/${plan.id}?${searchParams}`;
-    }
     
     return `/teacher/dashboard/lesson-plans/generic/${plan.id}?${searchParams}`;
   };
