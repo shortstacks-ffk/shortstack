@@ -808,9 +808,11 @@ export async function copyTemplateToLessonPlan(
               name: file.name,
               url: file.url,
               size: file.size,
-              type: file.type,
-              uploadedBy: session.user.id,
-              lessonPlanId: newLessonPlan.id
+              fileType: file.fileType,
+              teacherId: session.user.id,
+              lessonPlans: {
+                connect: { id: newLessonPlan.id }
+              }
             }
           });
           fileConnections.push({ id: newFile.id });
@@ -828,18 +830,20 @@ export async function copyTemplateToLessonPlan(
           // Create a new assignment record based on the template assignment
           const newAssignment = await db.assignment.create({
             data: {
-              title: assignment.title,
+              name: assignment.name,
               description: assignment.description,
               dueDate: assignment.dueDate,
-              points: assignment.points,
-              instructions: assignment.instructions,
-              createdBy: session.user.id,
-              lessonPlanId: newLessonPlan.id
+              rubric: assignment.rubric,
+              fileType: assignment.fileType,  // Add the missing fileType field
+              teacherId: session.user.id,
+              lessonPlans: {
+                connect: { id: newLessonPlan.id }
+              }
             }
           });
           assignmentConnections.push({ id: newAssignment.id });
         } catch (assignmentError) {
-          console.warn('Failed to copy assignment:', assignment.title, assignmentError);
+          console.warn('Failed to copy assignment:', assignment.name, assignmentError);
           // Continue with other assignments even if one fails
         }
       }

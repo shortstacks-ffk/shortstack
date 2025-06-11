@@ -87,7 +87,7 @@ function TeacherAccountSettings() {
       await updateSession({
         ...session?.user,
         name: `${updatedUser.firstName} ${updatedUser.lastName}`,
-        image: updatedUser.profileImage || session?.user.image
+        image: updatedUser.profileImage || (session?.user as any).image
       });
     }
     

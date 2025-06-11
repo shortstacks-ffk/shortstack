@@ -89,8 +89,8 @@ export default function AccountSecurityTab({
             },
             body: JSON.stringify({
               to: session.user.email,
-              firstName: session.user.name?.split(' ')[0] || 'User',
-              lastName: session.user.name?.split(' ')[1] || '',
+              firstName: (session?.user as any)?.name?.split(' ')[0] || 'User',
+              lastName: (session?.user as any)?.name?.split(' ')[1] || '',
               className: isStudent ? 'your classes' : 'your account',
               classCode: 'N/A', // Not applicable for password changes
               isNewStudent: false,

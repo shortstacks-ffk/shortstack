@@ -4,20 +4,20 @@ import { db } from "./db";
 import { Session } from "next-auth";
 
 // Extend the session user type to include our custom properties
-declare module "next-auth" {
-  interface Session {
-    user: {
-      id: string;
-      role: string;
-      teacherId?: string | null;
-      studentId?: string | null;
-      firstName?: string | null;
-      lastName?: string | null;
-      email?: string | null;
-      isSuperUser?: boolean;
-    }
-  }
-}
+// declare module "next-auth" {
+//   interface Session {
+//     user: {
+//       id: string;
+//       role: string;
+//       teacherId?: string | null;
+//       studentId?: string | null;
+//       firstName?: string | null;
+//       lastName?: string | null;
+//       email?: string | null;
+//       isSuperUser?: boolean;
+//     }
+//   }
+// }
 
 export async function getAuthSession(): Promise<Session | null> {
   const session = await getServerSession(authOptions);

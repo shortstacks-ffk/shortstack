@@ -1,4 +1,4 @@
-import NextAuth, { DefaultSession } from "next-auth";
+import NextAuth, { DefaultSession, DefaultUser } from "next-auth";
 import { Role } from "@prisma/client";
 
 declare module "next-auth" {
@@ -11,10 +11,11 @@ declare module "next-auth" {
       role: Role;
       teacherId?: string | null;
       studentId?: string | null;
-      firstName?: string | null; 
-      lastName?: string | null; 
+      firstName?: string | null;
+      lastName?: string | null;
       email?: string | null;
       image?: string | null;
+      name?: string | null;
       isSuperUser?: boolean;
     } & DefaultSession["user"];
   }
@@ -23,11 +24,16 @@ declare module "next-auth" {
    * The shape of the user object returned in the OAuth providers' `profile` callback,
    * or the second parameter of the `session` callback, when using a database.
    */
-  interface User {
+  interface User extends DefaultUser {
     id: string;
     role: Role;
-    teacherId?: string;
-    studentId?: string;
+    teacherId?: string | null;
+    studentId?: string | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    email?: string | null;
+    image?: string | null;
+    name?: string | null;
   }
 }
 
@@ -38,5 +44,10 @@ declare module "next-auth/jwt" {
     role?: Role;
     teacherId?: string | null;
     studentId?: string | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    email?: string | null;
+    image?: string | null;
+    name?: string | null;
   }
 }

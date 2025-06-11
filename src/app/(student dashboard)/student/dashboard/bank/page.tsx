@@ -60,12 +60,12 @@ const StudentBank = () => {
 
   useEffect(() => {
     if (session?.user) {
-      console.log("Student session info:", {
-        id: session.user.id,
-        email: session.user.email,
-        role: session.user.role,
-        name: session.user.name
-      });
+      // console.log("Student session info:", {
+      //   id: session.user.id,
+      //   email: session.user.email,
+      //   role: session.user.role,
+      //   name: session.user.name
+      // });
       fetchAccounts();
     }
   }, [session]);

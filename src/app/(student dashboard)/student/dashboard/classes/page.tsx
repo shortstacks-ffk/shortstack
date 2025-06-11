@@ -126,7 +126,7 @@ export default function StudentClassesPage() {
   }, [status, session]);
 
   // Handle newly joined class
-  const handleClassJoined = (data: JoinedClassData) => {
+  const handleClassJoined = (data: JoinedClassData | null) => {
     // Add null checks before accessing properties
     if (!data || !data.schedule) {
       console.warn("Missing schedule data:", data);

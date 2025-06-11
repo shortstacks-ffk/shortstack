@@ -59,8 +59,8 @@ export function StudentAvatar() {
       <DropdownMenuTrigger className="flex items-center space-x-2 rounded-full p-1 hover:bg-gray-100 focus:outline-none">
         <Avatar className="h-8 w-8 border">
           <AvatarImage
-            src={session?.user?.image || ""}
-            alt={session?.user?.name || "Student"}
+            src={(session?.user as any).image || ""}
+            alt={(session?.user as any).name || "Student"}
           />
           <AvatarFallback className="text-xs bg-green-100 text-green-800">
             {getInitials()}

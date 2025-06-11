@@ -41,7 +41,7 @@ const ModalProvider: React.FC<ModalProviderProps> = ({ children }) => {
     modalId: string = "default"
   ) => {
     try {
-      let fetchedData;
+      let fetchedData: Record<string, any> | null;
 
       // Check if fetchdata is a function or direct data
       if (typeof fetchdata === "function") {

@@ -85,7 +85,7 @@ function BankAccountsContent() {
           
           // First check if saved class ID exists in current classes
           const savedClassId = localStorage.getItem('selectedClass');
-          const classExists = savedClassId && data.some(cls => cls.id === savedClassId);
+            const classExists: boolean = savedClassId && data.some((cls: { id: string; name: string }) => cls.id === savedClassId);
           
           if (classExists) {
             setSelectedClass(savedClassId!);

@@ -32,16 +32,11 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Missing credentials");
         }
 
-        // Check role for determining login type
         const role = (credentials.role || "TEACHER") as Role;
 
-        // Add SUPER user login handling
         if (role === "SUPER") {
-          // Super user login logic
           const user = await db.user.findUnique({
-            where: {
-              email: credentials.email,
-            },
+            where: { email: credentials.email },
           });
 
           if (!user || !user.password || user.role !== "SUPER") {
@@ -62,11 +57,10 @@ export const authOptions: NextAuthOptions = {
             email: user.email,
             name: user.name,
             role: user.role,
+            image: user.image,
             isSuperUser: true,
-          } as any;
-        }
-        else if (role === "TEACHER") {
-          // Existing teacher login logic
+          };
+        } else if (role === "TEACHER") {
           const user = await db.user.findUnique({
             where: {
               email: credentials.email,
@@ -365,6 +359,11 @@ export const authOptions: NextAuthOptions = {
         token.role = user.role;
         token.teacherId = user.teacherId;
         token.studentId = user.studentId;
+        token.firstName = user.firstName;
+        token.lastName = user.lastName;
+        token.image = user.image;
+        token.name = user.name;
+        token.email = user.email;
         
         // Add super user flag to token if the role is SUPER
         if (user.role === "SUPER") {
@@ -388,6 +387,11 @@ export const authOptions: NextAuthOptions = {
         session.user.role = token.role as Role;
         session.user.teacherId = token.teacherId;
         session.user.studentId = token.studentId;
+        session.user.firstName = token.firstName;
+        session.user.lastName = token.lastName;
+        session.user.email = token.email;
+        session.user.image = token.image;
+        session.user.name = token.name;
         
         // Set isSuperUser flag in the session
         if (token.role === "SUPER" || token.isSuperUser) {

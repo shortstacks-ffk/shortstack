@@ -29,14 +29,14 @@ interface DashboardClientProps {
   }>
 }
 
-declare module "next-auth" {
-  interface User {
-    id: string;
-    firstName?: string;
-    lastName?: string;
-    role: "TEACHER" | "STUDENT" | "SUPER";
-  }
-}
+// declare module "next-auth" {
+//   interface User {
+//     id: string;
+//     firstName?: string;
+//     lastName?: string;
+//     role: "TEACHER" | "STUDENT" | "SUPER";
+//   }
+// }
 
 const DashboardClient = ({ classes }: DashboardClientProps) => {
   const { data: session } = useSession({
