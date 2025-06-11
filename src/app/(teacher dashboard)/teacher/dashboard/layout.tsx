@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { SidebarLeft } from "@/src/components/sidebar-left";
 import { SidebarProvider, SidebarInset } from "@/src/components/ui/sidebar";
 import { Toaster } from "@/src/components/ui/sonner";
@@ -12,6 +12,21 @@ import { X, LogOut } from "lucide-react";
 import { NavMain } from "@/src/components/nav-main";
 import { NavLogo } from "@/src/components/nav-logo";
 import { dashboardData } from "@/src/lib/constants/nav-data";
+import SuperUserBadge from "@/src/components/SuperUserBadge";
+
+// Define a more specific type for session user to avoid TypeScript errors
+type UserWithExtendedProfile = {
+  id: string;
+  name?: string | null;
+  email?: string | null;
+  image?: string | null;
+  role: string;
+  teacherId?: string | null;
+  studentId?: string | null;
+  // These might come from the teacher profile, not directly on user
+  firstName?: string | null; 
+  lastName?: string | null;
+};
 
 const getFilteredNavItems = (role: string, originalItems: any[]) => {
   if (role === "SUPER") {
@@ -28,11 +43,46 @@ const getFilteredNavItems = (role: string, originalItems: any[]) => {
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [pageTitle, setPageTitle] = useState("Dashboard");
+  const [profileVersion, setProfileVersion] = useState(0);
+  const [userData, setUserData] = useState<UserWithExtendedProfile | null>(null);
   const pathname = usePathname();
   
   const { data: session } = useSession({
     required: true,
   });
+
+  // Fetch the teacher profile to get complete user data
+  useEffect(() => {
+    const fetchTeacherProfile = async () => {
+      if (!session?.user?.id) return;
+      
+      try {
+        const response = await fetch(`/api/teacher/profile?t=${Date.now()}`, {
+          headers: { 'Cache-Control': 'no-cache' }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          setUserData({
+            ...session.user,
+            firstName: data.firstName,
+            lastName: data.lastName,
+            image: data.image || data.profileImage || session.user.image
+          });
+        } else {
+          // If API fails, use session data
+          setUserData(session.user as UserWithExtendedProfile);
+        }
+      } catch (error) {
+        console.error('Error fetching teacher profile:', error);
+        setUserData(session.user as UserWithExtendedProfile);
+      }
+    };
+    
+    if (session?.user) {
+      fetchTeacherProfile();
+    }
+  }, [session, profileVersion]);
   
   // Get filtered navigation items based on user role
   const filteredNavItems = getFilteredNavItems(
@@ -40,13 +90,36 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     dashboardData.navMain
   );
   
+  // Prepare user display name from profile or session data
+  const getUserDisplayName = () => {
+    // First try from userData if available
+    if (userData?.firstName && userData?.lastName) {
+      return `${userData.firstName} ${userData.lastName}`;
+    }
+    
+    // Then try session name
+    if (session?.user?.name) {
+      return session.user.name;
+    }
+    
+    // Fallback
+    return "Teacher";
+  };
+  
   // Get teacher info for avatar
-  const teacherName =
-    session?.user?.name ||
-    `${session?.user?.firstName || ""} ${session?.user?.lastName || ""}`.trim() ||
-    "Teacher";
-  const teacherInitial = teacherName.charAt(0);
-  const teacherImage = session?.user?.image;
+  const teacherName = getUserDisplayName();
+  const userInitials = useMemo(() => {
+    const name = teacherName;
+    const parts = name.split(' ').filter(p => p.length > 0);
+    
+    if (parts.length === 0) return 'T';
+    if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+    
+    return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+  }, [teacherName]);
+  
+  // Pass correct image URL
+  const teacherImage = userData?.image || session?.user?.image;
   
   // Update page title based on current path
   useEffect(() => {
@@ -91,6 +164,37 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     
     return false;
   };
+
+  // Listen for profile updates
+  useEffect(() => {
+    // Function to handle storage changes
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'profileUpdated') {
+        setProfileVersion(v => v + 1);
+      }
+    };
+    
+    // Function to handle custom events
+    const handleProfileUpdated = () => {
+      setProfileVersion(v => v + 1);
+    };
+    
+    // Add event listeners
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('profileUpdated', handleProfileUpdated);
+    
+    // Check localStorage on mount
+    const lastUpdate = localStorage.getItem('profileUpdated');
+    if (lastUpdate) {
+      setProfileVersion(v => v + 1);
+    }
+    
+    // Cleanup
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('profileUpdated', handleProfileUpdated);
+    };
+  }, []);
 
   return (
     <SidebarProvider>
@@ -144,10 +248,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <DashboardHeader
           pageTitle={pageTitle}
           teacherImage={teacherImage || ""}
-          teacherInitial={teacherInitial}
+          teacherInitial={userInitials}
           teacherName={teacherName}
           onLogout={handleLogout}
           onMobileMenuToggle={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+          profileVersion={profileVersion}
         />
         
         {/* Main content area */}

@@ -59,14 +59,20 @@ export async function POST(request: Request) {
             endTime: true
           }
         },
-        user: {
+        teacher: {
           select: {
             id: true,
-            name: true,
             firstName: true,
             lastName: true,
-            email: true,
-            image: true
+            profileImage: true,
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                image: true
+              }
+            }
           }
         }
       }
@@ -107,9 +113,9 @@ export async function POST(request: Request) {
     });
     
     // Format teacher name
-    const teacher = classData.user;
-    const teacherName = teacher?.name || 
-      `${teacher?.firstName || ''} ${teacher?.lastName || ''}`.trim() || 
+    const teacher = classData.teacher;
+    const teacherName = teacher.user?.name || 
+      `${teacher.firstName || ''} ${teacher.lastName || ''}`.trim() || 
       'Your Teacher';
     
     // Format schedule from class sessions
@@ -151,10 +157,10 @@ export async function POST(request: Request) {
             schedule: formattedSchedule,
             createdAt: classData.createdAt,
             teacher: {
-              id: teacher?.id,
+              id: teacher.id,
               name: teacherName,
-              email: teacher?.email,
-              image: teacher?.image
+              email: teacher.user?.email,
+              image: teacher.user?.image || teacher.profileImage
             }
           }
         });
@@ -175,10 +181,10 @@ export async function POST(request: Request) {
             schedule: formattedSchedule,
             createdAt: classData.createdAt,
             teacher: {
-              id: teacher?.id,
+              id: teacher.id,
               name: teacherName,
-              email: teacher?.email,
-              image: teacher?.image
+              email: teacher.user?.email,
+              image: teacher.user?.image || teacher.profileImage
             }
           }
         });
@@ -208,10 +214,10 @@ export async function POST(request: Request) {
           schedule: formattedSchedule,
           createdAt: classData.createdAt,
           teacher: {
-            id: teacher?.id,
+            id: teacher.id,
             name: teacherName,
-            email: teacher?.email,
-            image: teacher?.image
+            email: teacher.user?.email,
+            image: teacher.user?.image || teacher.profileImage
           }
         }
       });

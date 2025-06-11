@@ -2,10 +2,11 @@
 
 // Custom Components
 import { ClassCard } from "@/src/components/class/ClassCard";
-import DashboardAddClassCard from "@/src/components/class/dashboard-add-class-card";
 import { PerformanceChart } from "@/src/components/dashboard/performance-chart";
 import { useSession } from "next-auth/react";
 import { formatClassSchedule } from "@/src/lib/date-utils";
+import AddAnything from "@/src/components/AddAnything";
+import AddClass from "@/src/components/class/AddClass";
 
 interface ClassSession {
   id: string;
@@ -70,7 +71,18 @@ const DashboardClient = ({ classes }: DashboardClientProps) => {
                 overview={cls.overview}
               />
             ))}
-            {displayedClasses.length < 3 && <DashboardAddClassCard />}
+            {displayedClasses.length < 3 && (
+              <AddAnything
+                title="Create a Class"
+                FormComponent={AddClass}
+                onItemAdded={(newClass) => {
+                  if (newClass) {
+                    // This will refresh the page to show the new class
+                    window.location.reload();
+                  }
+                }}
+              />
+            )}
           </div>
         </section>
 
