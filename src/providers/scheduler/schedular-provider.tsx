@@ -220,13 +220,22 @@ export const SchedulerProvider = ({
 const shouldEventAppearOnDate = (event: Event, targetDate: Date): boolean => {
   const eventStartDate = new Date(event.startDate);
   
+  // First, check if the date matches original event date
+  const isSameOriginalDate = 
+    eventStartDate.getFullYear() === targetDate.getFullYear() &&
+    eventStartDate.getMonth() === targetDate.getMonth() &&
+    eventStartDate.getDate() === targetDate.getDate();
+    
+  // If it's the original date and we should start on original date, return true immediately
+  const shouldShowOnOriginalDate = (event.metadata as any)?.startsOnOriginalDate || 
+                                 (event as any)?.startsOnOriginalDate;
+  if (isSameOriginalDate && shouldShowOnOriginalDate) {
+    return true;
+  }
+  
   // For non-recurring events, just check if dates match
   if (!event.isRecurring) {
-    return (
-      eventStartDate.getFullYear() === targetDate.getFullYear() &&
-      eventStartDate.getMonth() === targetDate.getMonth() &&
-      eventStartDate.getDate() === targetDate.getDate()
-    );
+    return isSameOriginalDate;
   }
 
   // For recurring events, check based on recurrence type
@@ -615,6 +624,21 @@ const getters: Getters = {
     openEditModal,
     refreshEvents, // Make sure this is included
   };
+
+  useEffect(() => {
+    // Function to handle calendar refresh events
+    const handleCalendarRefresh = async () => {
+      await refreshEvents();
+    };
+
+    // Add event listener for the custom refresh event
+    window.addEventListener('calendar-refresh-needed', handleCalendarRefresh);
+
+    // Clean up the event listener on unmount
+    return () => {
+      window.removeEventListener('calendar-refresh-needed', handleCalendarRefresh);
+    };
+  }, []);
 
   return (
     <SchedulerContext.Provider

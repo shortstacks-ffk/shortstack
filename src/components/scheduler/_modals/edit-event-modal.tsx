@@ -1,98 +1,31 @@
 "use client";
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
 import { Textarea } from "@/src/components/ui/textarea";
 import { Label } from "@/src/components/ui/label";
 import { useModal } from "@/src/providers/scheduler/modal-context";
-import { format } from "date-fns";
+import { format, isValid } from "date-fns";
 import { Event } from "@/src/types/scheduler/index";
 import { useScheduler } from "@/src/providers/scheduler/schedular-provider";
-import { v4 as uuidv4 } from "uuid";
 import { toast } from "sonner";
 import { Check } from "lucide-react";
 import { Calendar } from "lucide-react";
 import { TimePicker } from "@/src/components/ui/time-picker";
 
-export default function AddEventModal({
-  CustomAddEventModal,
-}: {
-  CustomAddEventModal?: React.FC<{ register: any; errors: any }>;
-}) {
+export default function EditEventModal() {
   const { setClose, data } = useModal();
   const { handlers } = useScheduler();
 
-  // Initialize with current date and one hour later as defaults
-  const defaultDatesRef = useRef({
-    now: new Date(),
-    oneHourLater: new Date(new Date().getTime() + 60 * 60 * 1000),
-  });
-
-  // Form state
+  // Set state for form fields
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [startDate, setStartDate] = useState<Date>(defaultDatesRef.current.now);
-  const [endDate, setEndDate] = useState<Date>(defaultDatesRef.current.oneHourLater);
+  const [startDate, setStartDate] = useState<Date>(new Date());
+  const [endDate, setEndDate] = useState<Date>(new Date());
   const [variant, setVariant] = useState<string>("primary");
-  const [isFormReady, setIsFormReady] = useState(false);
-
-  // Initialize form with any preset data (for default dates/times)
-  useEffect(() => {
-    console.log("Modal context data:", data);
-    
-    // If data contains preset dates, use them
-    if (data?.default) {
-      const preset = data.default;
-      
-      if (preset.startDate) {
-        setStartDate(new Date(preset.startDate));
-      }
-      
-      if (preset.endDate) {
-        setEndDate(new Date(preset.endDate));
-      }
-    }
-
-    // Mark form as ready
-    const timer = setTimeout(() => setIsFormReady(true), 100);
-    return () => clearTimeout(timer);
-  }, [data]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!title.trim()) {
-      toast.error("Event title is required");
-      return;
-    }
-
-    try {
-      // Create new event object
-      const event: Event = {
-        id: uuidv4(),
-        title,
-        description,
-        startDate,
-        endDate,
-        variant,
-        isRecurring: false,
-        recurringDays: [],
-        metadata: { type: 'event' },
-      };
-
-      console.log("CREATING EVENT:", event);
-
-      await handlers.handleAddEvent(event);
-      toast.success("Event created successfully");
-
-      // Close the modal
-      setClose();
-    } catch (error) {
-      console.error("Error creating event:", error);
-      toast.error("Failed to create event");
-    }
-  };
+  const [isLoading, setIsLoading] = useState(true);
+  const [eventId, setEventId] = useState("");
 
   // Color options for events
   const colorOptions = [
@@ -103,12 +36,155 @@ export default function AddEventModal({
     { value: "default", label: "Gray", bgClass: "bg-gray-500 text-white" },
   ];
 
-  // If CustomAddEventModal is provided, use it instead
-  if (CustomAddEventModal) {
-    return <CustomAddEventModal register={{}} errors={{}} />;
-  }
+  // Initialize form with event data
+  useEffect(() => {
+    console.log("EditEventModal: Raw modal data:", data);
+    
+    // First check if data exists at all
+    if (!data) {
+      console.error("Edit form received no data");
+      setIsLoading(false);
+      return;
+    }
+    
+    const eventToEdit = data.default.default;
+    console.log("EditEventModal: Event data to edit:", eventToEdit);
+    
+    // Properly check for valid event data
+    if (!eventToEdit || typeof eventToEdit !== 'object') {
+      console.error("Invalid event data format:", eventToEdit);
+      toast.error("Invalid event data format");
+      setIsLoading(false);
+      return;
+    }
+    
+    if (!eventToEdit.id) {
+      console.error("Event data missing ID:", eventToEdit);
+      toast.error("Event data missing ID");
+      setIsLoading(false);
+      return;
+    }
+    
+    try {
+      // Set ID
+      setEventId(eventToEdit.id);
+      
+      // Set basic fields
+      setTitle(eventToEdit.title || "");
+      setDescription(eventToEdit.description || "");
+      setVariant(eventToEdit.variant || "primary");
+      
+      // Log dates for debugging
+      console.log("Start date from event:", eventToEdit.startDate);
+      console.log("End date from event:", eventToEdit.endDate);
+      
+      // Handle dates carefully
+      // For startDate
+      if (eventToEdit.startDate) {
+        try {
+          let parsedStartDate;
+          
+          if (eventToEdit.startDate instanceof Date) {
+            parsedStartDate = eventToEdit.startDate;
+          } else if (typeof eventToEdit.startDate === 'string') {
+            parsedStartDate = new Date(eventToEdit.startDate);
+          } else {
+            console.error("Unexpected startDate format:", eventToEdit.startDate);
+            parsedStartDate = new Date();
+          }
+          
+          if (isValid(parsedStartDate)) {
+            setStartDate(parsedStartDate);
+            console.log("Set start date to:", parsedStartDate);
+          } else {
+            console.error("Invalid parsed startDate:", parsedStartDate);
+            setStartDate(new Date());
+          }
+        } catch (dateError) {
+          console.error("Error parsing startDate:", dateError);
+          setStartDate(new Date());
+        }
+      }
+      
+      // For endDate - with similar careful handling
+      if (eventToEdit.endDate) {
+        try {
+          let parsedEndDate;
+          
+          if (eventToEdit.endDate instanceof Date) {
+            parsedEndDate = eventToEdit.endDate;
+          } else if (typeof eventToEdit.endDate === 'string') {
+            parsedEndDate = new Date(eventToEdit.endDate);
+          } else {
+            console.error("Unexpected endDate format:", eventToEdit.endDate);
+            parsedEndDate = new Date();
+          }
+          
+          if (isValid(parsedEndDate)) {
+            setEndDate(parsedEndDate);
+            console.log("Set end date to:", parsedEndDate);
+          } else {
+            console.error("Invalid parsed endDate:", parsedEndDate);
+            setEndDate(new Date());
+          }
+        } catch (dateError) {
+          console.error("Error parsing endDate:", dateError);
+          setEndDate(new Date());
+        }
+      }
+    } catch (error) {
+      console.error("Error processing event data:", error);
+      toast.error("Error loading event data");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [data, setClose]);
 
-  if (!isFormReady) {
+  // Handle form submission
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!eventId) {
+      toast.error("No event ID available");
+      return;
+    }
+    
+    if (!title.trim()) {
+      toast.error("Event title is required");
+      return;
+    }
+    
+    try {
+      // Create updated event object
+      const updatedEvent: Event = {
+        id: eventId,
+        title,
+        description,
+        startDate,
+        endDate,
+        variant,
+        isRecurring: data?.default?.isRecurring || false,
+        recurringDays: data?.default?.recurringDays || [],
+        metadata: data?.default?.metadata || {},
+      };
+      
+      console.log("Updating event:", updatedEvent);
+      
+      await handlers.handleUpdateEvent(updatedEvent, eventId);
+      
+      // Refresh events to get latest data from server
+      await handlers.refreshEvents();
+      
+      toast.success("Event updated successfully");
+      setClose();
+      
+    } catch (error) {
+      console.error("Error updating event:", error);
+      toast.error("Failed to update event");
+    }
+  };
+
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center p-8">
         <div className="animate-spin h-6 w-6 border-2 border-blue-500 border-t-transparent rounded-full"></div>
@@ -251,7 +327,7 @@ export default function AddEventModal({
       </div>
 
       <Button type="submit" className="w-full">
-        Create Event
+        Update Event
       </Button>
     </form>
   );

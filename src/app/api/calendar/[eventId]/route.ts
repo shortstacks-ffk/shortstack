@@ -23,11 +23,19 @@ export async function GET(
     // Authorization check based on role
     let event;
     
-    if (session.user.role === "TEACHER") {
+    if (session.user.role === "TEACHER" || session.user.role === "SUPER") {
+      const teacher = await db.teacher.findUnique({
+        where: { userId: session.user.id }
+      });
+
+      if (!teacher) {
+        return NextResponse.json({ error: "Teacher profile not found" }, { status: 404 });
+      }
+
       event = await db.calendarEvent.findFirst({
         where: {
           id: eventId,
-          createdById: session.user.id
+          createdById: teacher.id // Use teacher.id
         },
         include: {
           bill: true,
@@ -37,7 +45,12 @@ export async function GET(
       });
     } else if (session.user.role === "STUDENT") {
       const student = await db.student.findFirst({
-        where: { userId: session.user.id },
+        where: { 
+          OR: [
+            { userId: session.user.id },
+            ...(session.user.email ? [{ schoolEmail: session.user.email }] : [])
+          ]
+        },
         select: { id: true }
       });
       
@@ -45,21 +58,26 @@ export async function GET(
         return NextResponse.json({ error: "Student profile not found" }, { status: 404 });
       }
       
+      // Get enrolled class IDs
+      const enrollments = await db.enrollment.findMany({
+        where: {
+          studentId: student.id,
+          enrolled: true
+        },
+        select: { classId: true }
+      });
+
+      const enrolledClassIds = enrollments.map(e => e.classId);
+      
       event = await db.calendarEvent.findFirst({
         where: {
           id: eventId,
           OR: [
-            { studentId: student.id },
-            {
-              class: {
-                enrollments: {
-                  some: {
-                    studentId: student.id,
-                    enrolled: true
-                  }
-                }
-              }
-            }
+            { createdById: session.user.id }, // Events created by student
+            { studentId: student.id }, // Events specifically for this student
+            ...(enrolledClassIds.length > 0 ? [{
+              classId: { in: enrolledClassIds }
+            }] : [])
           ]
         },
         include: {
@@ -87,23 +105,36 @@ export async function PUT(
   context: { params: Promise<{ eventId: string }> }
 ) {
   try {
-    // Get the session first before using it
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Access eventId from params (now using await)
     const params = await context.params;
     const { eventId } = params;
     
     const data = await request.json();
 
+    let createdById = session.user.id;
+    
+    // For teachers, use teacher.id as createdById
+    if (session.user.role === "TEACHER" || session.user.role === "SUPER") {
+      const teacher = await db.teacher.findUnique({
+        where: { userId: session.user.id }
+      });
+
+      if (!teacher) {
+        return NextResponse.json({ error: "Teacher profile not found" }, { status: 404 });
+      }
+      
+      createdById = teacher.id;
+    }
+
     // Check if user can edit this event
     const existingEvent = await db.calendarEvent.findFirst({
       where: {
         id: eventId,
-        createdById: session.user.id
+        createdById: createdById
       }
     });
 
@@ -118,7 +149,7 @@ export async function PUT(
       startDate: data.startDate ? new Date(data.startDate) : undefined,
       endDate: data.endDate ? new Date(data.endDate) : undefined,
       variant: data.variant,
-      isRecurring: data.isRecurring === true, // Ensure boolean
+      isRecurring: data.isRecurring === true,
       recurringDays: Array.isArray(data.recurringDays) ? data.recurringDays : undefined
     };
 
@@ -157,34 +188,51 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     
-    // Access eventId from params (now using await)
     const params = await context.params;
     const { eventId } = params;
+
+    let createdById = session.user.id;
     
-    // Check if user can delete this event
+    // For teachers, use teacher.id as createdById
+    if (session.user.role === "TEACHER" || session.user.role === "SUPER") {
+      const teacher = await db.teacher.findUnique({
+        where: { userId: session.user.id }
+      });
+
+      if (!teacher) {
+        return NextResponse.json({ error: "Teacher profile not found" }, { status: 404 });
+      }
+      
+      createdById = teacher.id;
+    }
+    
+    // Check if user can delete this event with proper error logging
     const existingEvent = await db.calendarEvent.findFirst({
       where: {
         id: eventId,
-        createdById: session.user.id
+        createdById: createdById
       }
     });
-    
+
+    console.log("Delete attempt:", {
+      eventId,
+      createdById,
+      found: !!existingEvent
+    });
+
     if (!existingEvent) {
-      return NextResponse.json({ error: "Event not found or unauthorized" }, { status: 404 });
+      return NextResponse.json({ 
+        error: "Event not found or you don't have permission to delete it" 
+      }, { status: 404 });
     }
-    
-    // Delete child events if this is a parent event
-    if (existingEvent.classId) {
-      await db.calendarEvent.deleteMany({
-        where: { parentEventId: eventId }
-      });
-    }
-    
+
     // Delete the event
     await db.calendarEvent.delete({
-      where: { id: eventId }
+      where: {
+        id: eventId
+      }
     });
-    
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Delete calendar event error:", error);

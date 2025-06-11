@@ -16,30 +16,99 @@ export async function GET(request: Request) {
     const start = searchParams.get('start') ? new Date(searchParams.get('start')!) : undefined;
     const end = searchParams.get('end') ? new Date(searchParams.get('end')!) : undefined;
 
-    let whereClause: any = {
-      createdById: session.user.id
-    };
+    let whereClause: any = {};
 
-    if (session.user.role === 'STUDENT') {
+    if (session.user.role === 'TEACHER' || session.user.role === 'SUPER') {
+      // Teachers and super users see events they created
+      const teacher = await db.teacher.findUnique({
+        where: { userId: session.user.id }
+      });
+
+      if (teacher) {
+        whereClause = {
+          createdById: teacher.id // Use teacher.id instead of session.user.id
+        };
+      } else {
+        // If no teacher profile found, only show events created by user ID
+        whereClause = {
+          createdById: session.user.id
+        };
+      }
+    } else if (session.user.role === 'STUDENT') {
+      // Students see their own events and events from their enrolled classes
       const student = await db.student.findFirst({
-        where: { userId: session.user.id },
+        where: { 
+          OR: [
+            { userId: session.user.id },
+            ...(session.user.email ? [{ schoolEmail: session.user.email }] : [])
+          ]
+        },
         select: { id: true }
       });
 
       if (student) {
+        // Get classes the student is enrolled in
+        const enrollments = await db.enrollment.findMany({
+          where: {
+            studentId: student.id,
+            enrolled: true
+          },
+          select: { classId: true }
+        });
+
+        const enrolledClassIds = enrollments.map(e => e.classId);
+
         whereClause = {
           OR: [
-            { createdById: session.user.id },
-            { studentId: student.id }
+            { createdById: session.user.id }, // Events created by the student
+            { studentId: student.id }, // Events specifically for this student
+            ...(enrolledClassIds.length > 0 ? [{
+              classId: { in: enrolledClassIds } // Events for classes they're enrolled in
+            }] : [])
           ]
         };
+      } else {
+        // If no student profile found, only show events they created
+        whereClause = {
+          createdById: session.user.id
+        };
       }
+    } else {
+      // Default: only show events created by the user
+      whereClause = {
+        createdById: session.user.id
+      };
     }
 
-    if (start) {
+    // Add date filters if provided
+    if (start && end) {
+      whereClause.AND = [
+        {
+          OR: [
+            {
+              startDate: {
+                gte: start,
+                lte: end
+              }
+            },
+            {
+              endDate: {
+                gte: start,
+                lte: end
+              }
+            },
+            {
+              AND: [
+                { startDate: { lte: start } },
+                { endDate: { gte: end } }
+              ]
+            }
+          ]
+        }
+      ];
+    } else if (start) {
       whereClause.startDate = { gte: start };
-    }
-    if (end) {
+    } else if (end) {
       whereClause.endDate = { lte: end };
     }
 
@@ -51,8 +120,11 @@ export async function GET(request: Request) {
         class: true,
         student: true,
         todos: session.user.role === 'STUDENT' ? {
-          where: { userId: session.user.id }
+          where: { teacherId: session.user.id } // Fix: use teacherId instead of userId
         } : false
+      },
+      orderBy: {
+        startDate: 'asc'
       }
     });
 
@@ -105,7 +177,6 @@ export async function GET(request: Request) {
   }
 }
 
-// For POST, ensure we maintain teacher functionality while adding student limitations
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -116,7 +187,58 @@ export async function POST(request: Request) {
     const data = await request.json();
     
     // For teacher users - preserve existing functionality
-    if (session.user.role === 'TEACHER') {
+    if (session.user.role === 'TEACHER' || session.user.role === 'SUPER') {
+      // Get teacher record
+      const teacher = await db.teacher.findUnique({
+        where: { userId: session.user.id }
+      });
+
+      if (!teacher) {
+        return NextResponse.json({ error: "Teacher profile not found" }, { status: 404 });
+      }
+
+      // Validate class ownership if classId is provided
+      if (data.metadata?.classId) {
+        const classObj = await db.class.findFirst({
+          where: {
+            id: data.metadata.classId,
+            teacherId: teacher.id
+          }
+        });
+
+        if (!classObj) {
+          return NextResponse.json({ error: "Class not found or you don't have permission" }, { status: 403 });
+        }
+      }
+
+      // Validate assignment ownership if assignmentId is provided
+      if (data.metadata?.assignmentId) {
+        const assignment = await db.assignment.findFirst({
+          where: {
+            id: data.metadata.assignmentId,
+            teacherId: teacher.id
+          }
+        });
+
+        if (!assignment) {
+          return NextResponse.json({ error: "Assignment not found or you don't have permission" }, { status: 403 });
+        }
+      }
+
+      // Validate bill ownership if billId is provided
+      if (data.metadata?.billId) {
+        const bill = await db.bill.findFirst({
+          where: {
+            id: data.metadata.billId,
+            creatorId: teacher.id
+          }
+        });
+
+        if (!bill) {
+          return NextResponse.json({ error: "Bill not found or you don't have permission" }, { status: 403 });
+        }
+      }
+
       // Create the event with all possible fields
       const event = await db.calendarEvent.create({
         data: {
@@ -127,10 +249,19 @@ export async function POST(request: Request) {
           variant: data.variant || "primary",
           isRecurring: data.isRecurring === true,
           recurringDays: data.recurringDays || [],
-          createdById: session.user.id,
-          classId: data.metadata?.classId,
-          billId: data.metadata?.billId,
-          assignmentId: data.metadata?.assignmentId
+          createdById: teacher.id, // Use teacher.id
+          classId: data.metadata?.classId || null,
+          billId: data.metadata?.billId || null,
+          assignmentId: data.metadata?.assignmentId || null,
+          metadata: {
+            type: 'event', // Add this line to ensure regular events have type 'event'
+            ...(data.metadata || {})
+          }
+        },
+        include: {
+          bill: true,
+          assignment: true,
+          class: true
         }
       });
       
@@ -141,26 +272,34 @@ export async function POST(request: Request) {
     if (session.user.role === 'STUDENT') {
       // Find student profile
       const student = await db.student.findFirst({
-        where: { userId: session.user.id },
-        select: { id: true }
+        where: { 
+          OR: [
+            { userId: session.user.id },
+            ...(session.user.email ? [{ schoolEmail: session.user.email }] : [])
+          ]
+        },
+        select: { id: true, teacherId: true }
       });
       
       if (!student) {
         return NextResponse.json({ error: "Student profile not found" }, { status: 404 });
       }
       
-      // Students can only create todo events
-      // First create the todo
-      const todo = await db.todo.create({
-        data: {
-          title: data.title,
-          dueDate: new Date(data.dueDate || data.startDate),
-          priority: data.priority || "UPCOMING",
-          userId: session.user.id
-        }
-      });
+      // Create todo first if this is a todo event
+      let todoId = null;
+      if (data.createTodo !== false) { // Default to creating todo unless explicitly disabled
+        const todo = await db.todo.create({
+          data: {
+            title: data.title,
+            dueDate: new Date(data.dueDate || data.startDate),
+            priority: data.priority || "UPCOMING",
+            teacherId: student.teacherId // Use teacherId from student record
+          }
+        });
+        todoId = todo.id;
+      }
       
-      // Then create a calendar event linked to the todo
+      // Create a calendar event
       const event = await db.calendarEvent.create({
         data: {
           title: data.title,
@@ -169,20 +308,37 @@ export async function POST(request: Request) {
           endDate: new Date(data.endDate),
           variant: data.variant || "primary",
           isRecurring: false, // Students can't create recurring events
-          createdById: session.user.id,
+          recurringDays: [],
+          createdById: session.user.id, // Use session.user.id for students
           studentId: student.id,
-          todos: {
-            connect: {
-              id: todo.id
-            }
+          metadata: {
+            type: data.createTodo !== false ? 'todo' : 'event', // Set type based on whether it's a todo
+            ...(data.metadata || {})
           }
+        },
+        include: {
+          student: true,
+          ...(todoId ? {
+            todos: {
+              where: { id: todoId }
+            }
+          } : {})
         }
       });
+
+      // Connect todo to calendar event if created
+      if (todoId) {
+        await db.calendarEvent.update({
+          where: { id: event.id },
+          data: {
+            todos: {
+              connect: { id: todoId }
+            }
+          }
+        });
+      }
       
-      return NextResponse.json({
-        ...event,
-        todo
-      });
+      return NextResponse.json(event);
     }
     
     return NextResponse.json({ error: "Invalid user role" }, { status: 400 });
