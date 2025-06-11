@@ -18,19 +18,26 @@ export async function getClassGradebook(classCode: string): Promise<GradebookRes
       return { success: false, error: "Unauthorized" };
     }
 
-    // Verify the class exists and the user has access
-    const classData = await db.class.findUnique({
-      where: { code: classCode },
-      select: { id: true, userId: true }
+    // Get teacher record
+    const teacher = await db.teacher.findUnique({
+      where: { userId: session.user.id }
+    });
+
+    if (!teacher) {
+      return { success: false, error: "Teacher profile not found" };
+    }
+
+    // Verify the class exists and belongs to the teacher
+    const classData = await db.class.findFirst({
+      where: { 
+        code: classCode,
+        teacherId: teacher.id
+      },
+      select: { id: true }
     });
 
     if (!classData) {
-      return { success: false, error: "Class not found" };
-    }
-
-    // Authorization check
-    if (session.user.role === "TEACHER" && classData.userId !== session.user.id) {
-      return { success: false, error: "You don't have permission to access this class" };
+      return { success: false, error: "Class not found or you don't have permission to access it" };
     }
 
     // Get all students in the class
@@ -52,9 +59,15 @@ export async function getClassGradebook(classCode: string): Promise<GradebookRes
       orderBy: { lastName: 'asc' }
     });
 
-    // Get all assignments for the class
+    // Get all assignments for the class using many-to-many relationship
     const assignments = await db.assignment.findMany({
-      where: { classId: classCode },
+      where: { 
+        classes: {
+          some: {
+            id: classData.id
+          }
+        }
+      },
       select: {
         id: true,
         name: true,
@@ -107,6 +120,15 @@ export async function updateAssignmentGrade(
       return { success: false, error: "Unauthorized" };
     }
 
+    // Get teacher record
+    const teacher = await db.teacher.findUnique({
+      where: { userId: session.user.id }
+    });
+
+    if (!teacher) {
+      return { success: false, error: "Teacher profile not found" };
+    }
+
     // Find the submission
     const submission = await db.studentAssignmentSubmission.findFirst({
       where: {
@@ -115,39 +137,44 @@ export async function updateAssignmentGrade(
       },
       include: {
         assignment: {
-          select: {
-            classId: true
+          include: {
+            classes: {
+              select: {
+                id: true,
+                code: true,
+                teacherId: true
+              }
+            }
           }
         }
       }
     });
 
-    // Get the class to verify ownership
-    let classCode: string;
-    
+    // Get assignment and verify teacher ownership
+    let assignment;
     if (submission) {
-      classCode = submission.assignment.classId;
+      assignment = submission.assignment;
     } else {
-      // If no submission exists yet, get the class from the assignment
-      const assignment = await db.assignment.findUnique({
+      assignment = await db.assignment.findUnique({
         where: { id: assignmentId },
-        select: { classId: true }
+        include: {
+          classes: {
+            select: {
+              id: true,
+              code: true,
+              teacherId: true
+            }
+          }
+        }
       });
-      
-      if (!assignment) {
-        return { success: false, error: "Assignment not found" };
-      }
-      
-      classCode = assignment.classId;
     }
 
-    // Verify class ownership
-    const classData = await db.class.findUnique({
-      where: { code: classCode },
-      select: { userId: true }
-    });
+    if (!assignment) {
+      return { success: false, error: "Assignment not found" };
+    }
 
-    if (!classData || classData.userId !== session.user.id) {
+    // Verify teacher owns the assignment
+    if (assignment.teacherId !== teacher.id) {
       return { success: false, error: "You don't have permission to grade this assignment" };
     }
 
@@ -180,8 +207,10 @@ export async function updateAssignmentGrade(
       });
     }
 
-    // Revalidate the class page
-    revalidatePath(`/teacher/dashboard/classes/${classCode}`);
+    // Revalidate the class page using the first class code
+    if (assignment.classes.length > 0) {
+      revalidatePath(`/teacher/dashboard/classes/${assignment.classes[0].code}`);
+    }
 
     return {
       success: true,
@@ -206,8 +235,7 @@ export async function getStudentGrades(classCode: string): Promise<GradebookResp
       where: {
         OR: [
           { userId: session.user.id },
-          ...(session.user.email ? [{ schoolEmail: session.user.email }] : []),
-          { id: session.user.id }
+          ...(session.user.email ? [{ schoolEmail: session.user.email }] : [])
         ]
       }
     });
@@ -230,9 +258,15 @@ export async function getStudentGrades(classCode: string): Promise<GradebookResp
        return { success: false, error: 'Not enrolled in this class or class not found' };
     }
 
-    // Get all assignments for the class
+    // Get all assignments for the class using many-to-many relationship
     const assignments = await db.assignment.findMany({
-      where: { classId: classCode },
+      where: { 
+        classes: {
+          some: {
+            id: enrollment.classId
+          }
+        }
+      },
       select: {
         id: true,
         name: true,
@@ -287,8 +321,7 @@ export async function getStudentOverallProgress(): Promise<GradebookResponse> {
       where: {
         OR: [
           { userId: session.user.id },
-          ...(session.user.email ? [{ schoolEmail: session.user.email }] : []),
-          { id: session.user.id }
+          ...(session.user.email ? [{ schoolEmail: session.user.email }] : [])
         ]
       }
     });
@@ -314,19 +347,28 @@ export async function getStudentOverallProgress(): Promise<GradebookResponse> {
       }
     });
 
-    // Use class codes for assignment lookup
-    const classCodes = enrollments.map(e => e.class.code);
+    // Get class IDs for assignment lookup
+    const classIds = enrollments.map(e => e.class.id);
 
-    // Get all assignments across all enrolled classes
+    // Get all assignments across all enrolled classes using many-to-many relationship
     const assignments = await db.assignment.findMany({
       where: { 
-        classId: { in: classCodes }
+        classes: {
+          some: {
+            id: { in: classIds }
+          }
+        }
       },
       select: {
         id: true,
         name: true,
-        classId: true,
-        dueDate: true
+        dueDate: true,
+        classes: {
+          select: {
+            id: true,
+            code: true
+          }
+        }
       }
     });
 
@@ -359,7 +401,7 @@ export async function getStudentOverallProgress(): Promise<GradebookResponse> {
       ? Math.round(totalPoints / gradedSubmissions.length) 
       : 0;
 
-    // ✅ NEW: Get actual bank account balances
+    // Get actual bank account balances
     let totalBankBalance = 0;
     try {
       const bankAccounts = await db.bankAccount.findMany({
@@ -391,7 +433,7 @@ export async function getStudentOverallProgress(): Promise<GradebookResponse> {
       completedAssignments,
       totalAssignments,
       points: totalPoints,
-      balance: totalBankBalance, // ✅ Use real bank balance
+      balance: totalBankBalance,
       streak,
       averageGrade,
       gradedCount: gradedSubmissions.length
@@ -403,7 +445,7 @@ export async function getStudentOverallProgress(): Promise<GradebookResponse> {
         progress: progressSummary,
         assignments,
         submissions,
-        enrolledClasses: classCodes.length
+        enrolledClasses: classIds.length
       }
     };
   } catch (error: any) {
