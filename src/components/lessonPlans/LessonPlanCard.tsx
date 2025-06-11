@@ -4,12 +4,20 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/src/components/ui/card';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/src/components/ui/dropdown-menu';
-import { MoreHorizontal, Pencil, Trash2, Copy } from 'lucide-react';
-import { deleteLessonPlan, deleteGenericLessonPlan } from '@/src/app/actions/lessonPlansActions';
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger 
+} from '@/src/components/ui/dropdown-menu';
+import { MoreHorizontal, Pencil, Trash2, BookOpen } from 'lucide-react';
+import { deleteLessonPlan, removePlanFromClass } from '@/src/app/actions/lessonPlansActions';
 import { toast } from 'sonner';
 import EditLessonPlanDialog from './EditLessonPlanDialog';
 import { Badge } from '@/src/components/ui/badge';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/src/components/ui/alert-dialog';
+import { Button } from '@/src/components/ui/button';
+import AssignLessonPlanDialog from './AssignLessonPlanDialog';
 
 interface LessonPlanCardProps {
   plan: {
@@ -18,58 +26,65 @@ interface LessonPlanCardProps {
     description?: string;
     createdAt: string;
     updatedAt: string;
-    classId?: string;
-    grade?: string; 
-    class?: {       
+    gradeLevel?: string;
+    class?: {
+      code?: string;
       name?: string;
       emoji?: string;
       grade?: string;
-      code?: string; // Added code field for class
     };
+    classes?: Array<{
+      code: string;
+      name: string;
+      emoji?: string;
+      grade?: string;
+    }>;
   };
-  backgroundColor: string;
-  isTemplate?: boolean;
-  isSuperUser?: boolean;
+  backgroundColor?: string;
+  classCode?: string;
   onEdit?: () => void;
   onDelete?: () => void;
   onUpdate?: () => void;
   viewContext?: 'class' | 'dashboard';
+  isTemplate?: boolean;
 }
 
 export default function LessonPlanCard({ 
   plan, 
-  backgroundColor,
-  isTemplate = false,
-  isSuperUser = false,
+  backgroundColor = 'bg-blue-50',
+  classCode,
   onEdit,
   onDelete,
   onUpdate,
   viewContext = 'dashboard',
+  isTemplate = false,
 }: LessonPlanCardProps) {
   const router = useRouter();
   const [isDeleting, setIsDeleting] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isRemoveDialogOpen, setIsRemoveDialogOpen] = useState(false);
+  const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
 
-  // Determine the link URL based on whether this is a template or regular plan
+  // Determine the link URL based on context
   const getLinkUrl = () => {
-    // For templates, always use the template view route
+    // Add navigation params to preserve the current context
+    const searchParams = new URLSearchParams();
+    
+    if (viewContext === 'class' && classCode) {
+      return `/teacher/dashboard/classes/${classCode}/lesson-plans/${plan.id}`;
+    }
+    
+    // Add from parameter to know which tab user came from
     if (isTemplate) {
-      return `/teacher/dashboard/lesson-plans/${plan.id}`;
-    } 
-    
-    // For regular lesson plans, prioritize class code if available
-    // First check for class.code (preferred way)
-    if (plan.class?.code) {
-      return `/teacher/dashboard/classes/${plan.class.code}/lesson-plans/${plan.id}`;
+      searchParams.set('from', 'templates');
+      if (plan.gradeLevel && plan.gradeLevel !== 'all') {
+        searchParams.set('grade', plan.gradeLevel);
+      }
+    } else {
+      searchParams.set('from', 'my-plans');
     }
     
-    // Fall back to classId if that's all we have
-    if (plan.classId) {
-      return `/teacher/dashboard/classes/${plan.classId}/lesson-plans/${plan.id}`;
-    }
-    
-    // Last resort fallback for any edge cases
-    return `/teacher/dashboard/lesson-plans/${plan.id}`;
+    return `/teacher/dashboard/lesson-plans/${plan.id}?${searchParams.toString()}`;
   };
 
   const handleCardClick = (e: React.MouseEvent) => {
@@ -77,13 +92,13 @@ export default function LessonPlanCard({
     const target = e.target as HTMLElement;
     if (
       target.closest('.dropdown-menu') || 
-      target.closest('[role="menu"]')
+      target.closest('[role="menu"]') ||
+      target.closest('button')
     ) {
       e.preventDefault();
       e.stopPropagation();
       return;
     }
-    // Otherwise navigation will happen naturally through the Link
   };
 
   const handleDelete = async () => {
@@ -98,11 +113,8 @@ export default function LessonPlanCard({
       async () => {
         setIsDeleting(true);
         try {
-          // Delete the appropriate type of lesson plan
-          const response = isTemplate
-            ? await deleteGenericLessonPlan(plan.id)
-            : await deleteLessonPlan(plan.id);
-            
+          const response = await deleteLessonPlan(plan.id);
+          
           if (!response.success) {
             throw new Error(response.error || 'Failed to delete lesson plan');
           }
@@ -119,9 +131,43 @@ export default function LessonPlanCard({
         }
       },
       {
-        loading: `Deleting ${isTemplate ? 'template' : 'lesson plan'}...`,
-        success: `${isTemplate ? 'Template' : 'Lesson plan'} deleted successfully`,
+        loading: 'Deleting lesson plan...',
+        success: 'Lesson plan deleted successfully',
         error: (err) => `${err.message || 'Failed to delete'}`
+      }
+    );
+  };
+
+  const handleRemoveFromClass = async () => {
+    if (!classCode) return;
+    
+    setIsRemoveDialogOpen(false);
+    
+    toast.promise(
+      async () => {
+        try {
+          const response = await removePlanFromClass({
+            lessonPlanId: plan.id,
+            classCode
+          });
+          
+          if (!response.success) {
+            throw new Error(response.error || 'Failed to remove lesson plan from class');
+          }
+          
+          // Trigger refresh in parent component
+          if (onUpdate) onUpdate();
+          
+          return response;
+        } catch (error) {
+          console.error('Error removing lesson plan from class:', error);
+          throw error;
+        }
+      },
+      {
+        loading: 'Removing lesson plan from class...',
+        success: 'Lesson plan removed from class successfully',
+        error: (err) => `${err.message || 'Failed to remove lesson plan from class'}`
       }
     );
   };
@@ -144,97 +190,168 @@ export default function LessonPlanCard({
     router.refresh();
   };
 
+  const formattedDate = new Date(plan.createdAt).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
+  });
+
   return (
     <>
-      <Link href={getLinkUrl()} onClick={handleCardClick}>
-        <Card 
-          className={`${backgroundColor} w-[250px] h-[250px] rounded-xl relative cursor-pointer hover:shadow-lg transition-shadow`}
-        >
-          {/* Template badge if applicable */}
-          {isTemplate && (
-            <Badge 
-              variant="secondary" 
-              className="absolute top-2 left-2 bg-white/30 backdrop-blur-sm text-black"
-            >
-              Template
-            </Badge>
-          )}
-          
-          {/* Grade badge */}
-          {plan.grade && !isTemplate && (
-            <Badge 
-              variant="outline" 
-              className="absolute top-2 left-2 bg-white/20 backdrop-blur-sm text-black border-black/20"
-            >
-              Grade {plan.grade}
-            </Badge>
-          )}
-          
-          {/* Adjust template badge position if both are present */}
-          {isTemplate && plan.grade && (
-            <Badge 
-              variant="outline" 
-              className="absolute top-11 left-2 bg-white/20 backdrop-blur-sm text-black border-black/20"
-            >
-              Grade {plan.grade}
-            </Badge>
-          )}
-          
-          {/* Only show dropdown if not a template or if super user */}
-          {(!isTemplate || isSuperUser) && (
-            <div className="absolute top-2 right-2 z-10 dropdown-menu" onClick={(e) => e.stopPropagation()}>
-              <DropdownMenu>
-                <DropdownMenuTrigger className="bg-white/20  rounded-full p-1 hover:bg-white/40 transition-colors">
-                  <MoreHorizontal className="h-5 w-5 text-black" />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={handleEdit} disabled={isDeleting}>
-                    <Pencil className="h-4 w-4 mr-2" />
-                    Edit Lesson Plan
+      <Card className={`w-[250px] h-[250px] rounded-xl overflow-hidden hover:shadow-md transition-shadow ${backgroundColor} cursor-pointer relative`}>
+        <div className="absolute right-2 top-2 z-10" onClick={e => e.stopPropagation()}>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-gray-200">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="dropdown-menu">
+              <DropdownMenuItem onClick={(e) => {
+                e.stopPropagation();
+                handleEdit();
+              }}>
+                <Pencil className="h-4 w-4 mr-2" />
+                Edit
+              </DropdownMenuItem>
+              
+              {viewContext === 'class' ? (
+                <DropdownMenuItem onClick={(e) => {
+                  e.stopPropagation();
+                  setIsRemoveDialogOpen(true);
+                }}>
+                  <BookOpen className="h-4 w-4 mr-2" />
+                  Remove from Class
+                </DropdownMenuItem>
+              ) : (
+                !isTemplate && (
+                  <DropdownMenuItem onClick={(e) => {
+                    e.stopPropagation();
+                    setIsAssignDialogOpen(true);
+                  }}>
+                    <BookOpen className="h-4 w-4 mr-2" />
+                    Assign to Class
                   </DropdownMenuItem>
-                  
-                  {/* Special template actions for non-super users */}
-                  {isTemplate && !isSuperUser && (
-                    <DropdownMenuItem onClick={() => router.push(`/teacher/dashboard/lesson-plans/use-template/${plan.id}`)}>
-                      <Copy className="h-4 w-4 mr-2" />
-                      Use Template
-                    </DropdownMenuItem>
-                  )}
-                  
-                  {/* Only super users can delete templates */}
-                  {(!isTemplate || isSuperUser) && (
-                    <DropdownMenuItem onClick={handleDelete} disabled={isDeleting} className="text-red-600">
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      {isDeleting ? 'Deleting...' : 'Delete'}
-                    </DropdownMenuItem>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          )}
+                )
+              )}
+              
+              <DropdownMenuItem 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDelete();
+                }}
+                className="text-red-600"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
 
-          <CardContent className="flex flex-col items-center justify-center h-full">
-            <h1 className="text-2xl font-bold text-black text-center">{plan.name}</h1>
-            
-            {/* Show class context when viewed from dashboard */}
-            {viewContext === 'dashboard' && plan.class && (
-              <div className="mt-2 text-center">
-                <p className="text-black/60 text-xs">
-                  {plan.class.emoji} {plan.class.name}
+        <Link href={getLinkUrl()} onClick={handleCardClick}>
+          <CardContent className="flex flex-col h-full p-0">
+            <div className="p-4 flex-1 flex flex-col">
+              {/* Title */}
+              <h1 className="text-lg font-bold text-black line-clamp-2 mb-2 mt-6">
+                {plan.name}
+              </h1>
+              
+              {/* Description */}
+              {plan.description && (
+                <p className="text-sm text-black/70 line-clamp-3 mb-3">
+                  {plan.description.replace(/<[^>]*>/g, '').substring(0, 120)}
+                  {plan.description.length > 120 ? '...' : ''}
                 </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </Link>
+              )}
+              
+              {/* Grade level badge */}
+              {plan.gradeLevel && plan.gradeLevel !== 'all' && (
+                <div className="mb-3">
+                  <Badge variant="outline" className="text-xs bg-white/70">
+                    Grades {plan.gradeLevel}
+                  </Badge>
+                </div>
+              )}
+              
+              {/* Footer with class assignment status and date */}
+              <div className="mt-auto space-y-2">
+                {/* Class assignment status - similar to BillCard */}
+                <div className="flex flex-wrap gap-1.5">
+                  {plan.classes && plan.classes.length > 0 ? (
+                    plan.classes.slice(0, 2).map((cls) => (
+                      <span key={cls.code} className="inline-flex items-center text-xs bg-white rounded-full px-2 py-1 border">
+                        <span className="mr-1">📚</span>
+                        <span className="truncate max-w-[80px]">{cls.name}</span>
+                      </span>
+                    ))
+                  ) : (
+                    viewContext === 'dashboard' && !isTemplate && (
+                      <span className="inline-flex items-center text-xs bg-white rounded-full px-2 py-1 border text-gray-500">
+                        <span className="mr-1">📝</span>
+                        <span>Unassigned</span>
+                      </span>
+                    )
+                  )}
 
-      {/* Edit Dialog - only shown for non-template plans or if super user */}
-      {(!isTemplate || isSuperUser) && (
-        <EditLessonPlanDialog
-          isOpen={isEditDialogOpen}
-          onClose={() => setIsEditDialogOpen(false)}
-          onSuccess={handleEditSuccess}
-          lessonPlan={plan}
+                  {plan.classes && plan.classes.length > 2 && (
+                    <span className="inline-flex items-center text-xs bg-white rounded-full px-2 py-1 border">
+                      +{plan.classes.length - 2} more
+                    </span>
+                  )}
+                </div>
+                
+                {/* Created date */}
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-black/60">
+                    {formattedDate}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Link>
+      </Card>
+
+      {/* Edit Dialog */}
+      <EditLessonPlanDialog
+        isOpen={isEditDialogOpen}
+        onClose={() => setIsEditDialogOpen(false)}
+        onSuccess={handleEditSuccess}
+        lessonPlan={plan}
+      />
+
+      {/* Remove from class confirmation dialog */}
+      <AlertDialog open={isRemoveDialogOpen} onOpenChange={setIsRemoveDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Lesson Plan from Class</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove &quot;{plan.name}&quot; from this class. The lesson plan will still be available in your
+              lesson plans library. Are you sure?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction asChild>
+              <Button variant="destructive" onClick={handleRemoveFromClass}>
+                Remove from Class
+              </Button>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Assign to Class Dialog */}
+      {!isTemplate && (
+        <AssignLessonPlanDialog
+          isOpen={isAssignDialogOpen}
+          onClose={() => setIsAssignDialogOpen(false)}
+          lessonPlanId={plan.id}
+          lessonPlanName={plan.name}
+          onSuccess={() => {
+            if (onUpdate) onUpdate();
+          }}
         />
       )}
     </>

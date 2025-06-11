@@ -2,21 +2,16 @@
 
 import { useEffect, useState } from 'react';
 import { getLessonPlansByClass } from '@/src/app/actions/lessonPlansActions';
-import  LessonPlanCard from '@/src/components/lessonPlans/LessonPlanCard';
-import AddLessonPlanCard from '@/src/components/lessonPlans/AddLessonPlanCard';
-import AddLessonPlanDialog from '@/src/components/lessonPlans/AddLessonPlanDialog';
+import LessonPlanCard from '@/src/components/lessonPlans/LessonPlanCard';
+import AddLessonPlanToClassCard from '@/src/components/lessonPlans/AddLessonPlanToClassCard';
+import AddLessonPlanToClassDialog from '@/src/components/lessonPlans/AddLessonPlanToClassDialog';
 import Breadcrumbs from '@/src/components/Breadcrumbs';
+import { toast } from 'sonner';
+import { Loader2 } from 'lucide-react';
 
 interface LessonPlansListProps {
   classCode: string;
   cName: string;
-}
-
-interface AddLessonPlanDialogProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSuccess: () => Promise<void>;
-  classCode: string;
 }
 
 export default function LessonPlansList({ classCode, cName }: LessonPlansListProps) {
@@ -25,13 +20,22 @@ export default function LessonPlansList({ classCode, cName }: LessonPlansListPro
   const [loading, setLoading] = useState(true);
 
   const fetchLessonPlans = async () => {
-    const response = await getLessonPlansByClass(classCode);
-    if (response.success) {
-      setLessonPlans(response.data);
-    } else {
+    setLoading(true);
+    try {
+      const response = await getLessonPlansByClass(classCode);
+      if (response.success) {
+        setLessonPlans(response.data || []);
+      } else {
+        toast.error(response.error || 'Failed to fetch lesson plans');
+        setLessonPlans([]);
+      }
+    } catch (error) {
+      console.error('Error fetching lesson plans:', error);
+      toast.error('An error occurred while fetching lesson plans');
       setLessonPlans([]);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffect(() => {
@@ -47,25 +51,34 @@ export default function LessonPlansList({ classCode, cName }: LessonPlansListPro
           { label: 'Lesson Plans', href: `/teacher/dashboard/classes/${classCode}/lesson-plans` },
         ]}
       />
+      
       <h2 className="text-xl font-semibold">Lesson Plans</h2>
+      
       {loading ? (
-        <div>Loading...</div>
+        <div className="flex justify-center items-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
           {lessonPlans.map((plan) => (
             <LessonPlanCard 
               key={plan.id}
               plan={plan}
-              onUpdate={fetchLessonPlans} // Pass the fetch function to update when changes happen
-              backgroundColor={''}            />
+              classCode={classCode}
+              onUpdate={fetchLessonPlans}
+              viewContext='class'
+            />
           ))}
-          <AddLessonPlanCard onClick={() => setIsDialogOpen(true)} />
+          
+          <AddLessonPlanToClassCard onClick={() => setIsDialogOpen(true)} />
         </div>
       )}
-      <AddLessonPlanDialog
+      
+      <AddLessonPlanToClassDialog
         isOpen={isDialogOpen}
         onClose={() => setIsDialogOpen(false)}
         classCode={classCode}
+        className={cName}
         onSuccess={fetchLessonPlans}
       />
     </div>
