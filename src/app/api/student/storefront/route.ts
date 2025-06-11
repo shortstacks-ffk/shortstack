@@ -59,17 +59,18 @@ export async function GET(req: NextRequest) {
       return NextResponse.json([]);
     }
 
-    // Step 3: Find ALL store items for these classes (no filters first)
+    // Step 3: Find ALL store items for these classes
+    // Updated to use the new schema's relationship structure
     const allStoreItemsInClasses = await db.storeItem.findMany({
       where: {
-        class: {
+        classes: {
           some: {
             id: { in: classIds }
           }
         }
       },
       include: {
-        class: {
+        classes: {
           select: {
             id: true,
             name: true,

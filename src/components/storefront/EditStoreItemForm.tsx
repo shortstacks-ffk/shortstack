@@ -1,14 +1,17 @@
 'use client'
 
-import { useState } from "react"
+import { useState, useRef } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/src/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/src/components/ui/dialog"
 import { Input } from "@/src/components/ui/input"
+import { Label } from "@/src/components/ui/label"
 import { Switch } from "@/src/components/ui/switch"
 import { Textarea } from "@/src/components/ui/textarea"
 import { updateStoreItem } from "@/src/app/actions/storeFrontActions"
-import { Popover, PopoverContent, PopoverTrigger } from "@/src/components/ui/popover"
-import EmojiPicker, { EmojiClickData } from "emoji-picker-react"
+import { Loader2 } from "lucide-react"
+import { toast } from "sonner"
+import { EmojiPickerButton } from "@/src/components/ui/emoji-picker-button"
 
 interface EditStoreItemFormProps {
   isOpen: boolean
@@ -25,108 +28,155 @@ interface EditStoreItemFormProps {
 }
 
 export function EditStoreItemForm({ isOpen, onClose, itemData }: EditStoreItemFormProps) {
-  const [formData, setFormData] = useState({
-    name: itemData.name,
-    emoji: itemData.emoji,
-    price: itemData.price,
-    description: itemData.description || '',
-    quantity: itemData.quantity,
-    isAvailable: itemData.isAvailable,
-  })
+  const router = useRouter()
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  
+  const [title, setTitle] = useState(itemData.name)
+  const [emoji, setEmoji] = useState(itemData.emoji || "🛍️")
+  const [price, setPrice] = useState(itemData.price.toString())
+  const [quantity, setQuantity] = useState(itemData.quantity.toString())
+  const [description, setDescription] = useState(itemData.description || '')
+  const [isAvailable, setIsAvailable] = useState(itemData.isAvailable)
 
-  const handleUpdate = async () => {
-    const result = await updateStoreItem(itemData.id, formData)
-    if (result.success) {
-      onClose()
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!title || !price) {
+      toast.error("Please fill all required fields")
+      return
+    }
+
+    setIsSubmitting(true)
+    
+    try {
+      const result = await updateStoreItem(itemData.id, {
+        name: title,
+        emoji: emoji,
+        price: parseFloat(price),
+        quantity: parseInt(quantity),
+        description: description,
+        isAvailable: isAvailable
+      })
+      
+      if (result.success) {
+        toast.success("Store item updated successfully")
+        router.refresh()
+        onClose()
+      } else {
+        toast.error(result.error || "Failed to update store item")
+      }
+    } catch (error) {
+      console.error("Error updating store item:", error)
+      toast.error("An error occurred while updating the store item")
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
-  const onEmojiClick = (emojiData: EmojiClickData) => {
-    setFormData(prev => ({ ...prev, emoji: emojiData.emoji }))
-  }
-
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
+    <Dialog open={isOpen} onOpenChange={(open) => !isSubmitting && !open && onClose()}>
+      <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Update Store Item</DialogTitle>
+          <DialogTitle>Edit Store Item</DialogTitle>
         </DialogHeader>
         
-        <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="grid gap-2">
-              <label htmlFor="name">Item Name</label>
-              <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-              />
-            </div>
-
-            <div className="grid gap-2">
-              <label htmlFor="price">Price</label>
-              <Input
-                id="price"
-                type="number"
-                min="0"
-                step="0.01"
-                value={formData.price}
-                onChange={(e) => setFormData(prev => ({ ...prev, price: parseFloat(e.target.value) }))}
-              />
-            </div>
-
-            <div className="grid gap-2">
-              <label htmlFor="quantity">Quantity</label>
-              <Input
-                id="quantity"
-                type="number"
-                min="0"
-                value={formData.quantity}
-                onChange={(e) => setFormData(prev => ({ ...prev, quantity: parseInt(e.target.value) }))}
-              />
-            </div>
-
-            <div className="grid gap-2">
-              <label>Item Emoji</label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-full text-2xl">
-                    {formData.emoji}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-80 p-0">
-                  <EmojiPicker
-                    onEmojiClick={onEmojiClick}
-                    autoFocusSearch={false}
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            <div className="col-span-2 grid gap-2">
-              <label htmlFor="description">Description</label>
-              <Textarea
-                id="description"
-                value={formData.description}
-                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-              />
-            </div>
-
-            <div className="col-span-2 flex items-center justify-between">
-              <label htmlFor="isAvailable">Available for Purchase</label>
-              <Switch
-                id="isAvailable"
-                checked={formData.isAvailable}
-                onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isAvailable: checked }))}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Title and emoji picker - same layout as bills */}
+          <div className="flex items-center gap-3">
+            <Input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Item name"
+              className="flex-1"
+              required
+              disabled={isSubmitting}
+            />
+            
+            <div className="shrink-0">
+              <EmojiPickerButton 
+                value={emoji}
+                onChange={setEmoji}
+                className="text-2xl h-14 w-14"
               />
             </div>
           </div>
-        </div>
 
-        <div className="flex justify-end gap-4">
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleUpdate}>Update Item</Button>
-        </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="price">Price</Label>
+              <Input
+                id="price"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                type="number"
+                min="0"
+                step="0.01"
+                required
+                disabled={isSubmitting}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="quantity">Quantity</Label>
+              <Input
+                id="quantity"
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+                type="number"
+                min="0"
+                step="1"
+                required
+                disabled={isSubmitting}
+              />
+            </div>
+          </div>
+
+          <div>
+            <Label htmlFor="description">Description (Optional)</Label>
+            <Textarea
+              id="description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Item Description"
+              className="min-h-[100px]"
+              disabled={isSubmitting}
+            />
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="isAvailable"
+              checked={isAvailable}
+              onCheckedChange={setIsAvailable}
+              disabled={isSubmitting}
+            />
+            <Label htmlFor="isAvailable">Available for Purchase</Label>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-4 mt-4 border-t border-gray-200">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Save Changes"
+              )}
+            </Button>
+          </div>
+        </form>
       </DialogContent>
     </Dialog>
   )

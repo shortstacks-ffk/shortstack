@@ -89,12 +89,13 @@ export async function POST(request: Request) {
     console.log("📚 Enrolled classes:", classIds);
 
     // 2. Check if the item exists and is available in student's classes
+    // Update to use new schema relationships
     const item = await db.storeItem.findFirst({
       where: {
         id: itemId,
         isAvailable: true,
         quantity: { gte: quantity },
-        class: {
+        classes: {
           some: {
             id: { in: classIds },
           },
@@ -139,12 +140,10 @@ export async function POST(request: Request) {
     }
 
     // 3.5. Check for existing purchase (due to unique constraint)
-    const existingPurchase = await db.studentPurchase.findUnique({
+    const existingPurchase = await db.studentPurchase.findFirst({
       where: {
-        itemId_studentId: {
-          itemId: item.id,
-          studentId: student.id,
-        },
+        itemId: item.id,
+        studentId: student.id,
       },
     });
 
@@ -162,10 +161,7 @@ export async function POST(request: Request) {
           // Update existing purchase
           db.studentPurchase.update({
             where: {
-              itemId_studentId: {
-                itemId: item.id,
-                studentId: student.id,
-              },
+              id: existingPurchase.id,
             },
             data: {
               quantity: existingPurchase.quantity + quantity,
