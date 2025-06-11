@@ -3,7 +3,6 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/src/lib/auth/config";
 import { db } from "@/src/lib/db";
 import { put } from "@vercel/blob";
-import { Readable } from "stream";
 
 // Set maximum request body size
 export const config = {
@@ -12,9 +11,6 @@ export const config = {
     responseLimit: '250mb',
   },
 };
-
-// Temporary buffer cache for multiple chunk uploads
-const uploadBuffers = new Map();
 
 // Helper function to parse multipart form data with streaming
 async function parseFormData(req: Request): Promise<{ fields: Record<string, string>, file: File | null }> {
@@ -46,12 +42,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Find the teacher profile
-    const teacherProfile = await db.teacherProfile.findFirst({
+    // Find the teacher record - using Teacher model from new schema
+    const teacher = await db.teacher.findUnique({
       where: { userId: session.user.id }
     });
 
-    if (!teacherProfile) {
+    if (!teacher) {
       return NextResponse.json({ error: "Teacher profile not found" }, { status: 404 });
     }
 
@@ -67,18 +63,33 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing required data (lessonPlanId or classId)" }, { status: 400 });
     }
 
-    // Increased file size limit to 100MB for larger files
+    // Increased file size limit to 250MB for larger files
     if (file.size > 250 * 1024 * 1024) {
       return NextResponse.json({ error: "File too large (max 250MB)" }, { status: 400 });
     }
 
     // Verify the teacher has access to this class and lesson plan
+    const classObj = await db.class.findFirst({
+      where: { 
+        code: classId,
+        teacherId: teacher.id
+      }
+    });
+
+    if (!classObj) {
+      return NextResponse.json({ 
+        error: "Class not found or you don't have access to it" 
+      }, { status: 403 });
+    }
+
     const lessonPlan = await db.lessonPlan.findFirst({
       where: {
         id: lessonPlanId,
-        class: {
-          code: classId,
-          userId: session.user.id
+        teacherId: teacher.id,
+        classes: {
+          some: {
+            id: classObj.id
+          }
         }
       }
     });
@@ -95,7 +106,7 @@ export async function POST(request: Request) {
     const sanitizedFileName = (fileName || file.name).replace(/\s/g, '-');
     const fileExtension = file.name.includes('.') ? file.name.substring(file.name.lastIndexOf('.')) : '';
     const uniqueId = `${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
-    const uniqueFileName = `materials/${teacherProfile.userId}/${lessonPlanId}/${uniqueId}${fileExtension}`;
+    const uniqueFileName = `materials/${teacher.id}/${lessonPlanId}/${uniqueId}${fileExtension}`;
     
     // Use optimized blob upload with proper content type detection
     const blob = await put(uniqueFileName, file, {

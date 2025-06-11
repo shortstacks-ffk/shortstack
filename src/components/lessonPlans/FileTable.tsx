@@ -36,6 +36,13 @@ interface FileRecord {
   classId: string;
 }
 
+// Add canDelete parameter to the component props
+interface FileTableProps {
+  files: FileRecord[];
+  onUpdate?: () => void;
+  canDelete?: boolean;  // Add this prop
+}
+
 const formatFileSize = (bytes?: number | string): string => {
   if (!bytes) return 'N/A';
   
@@ -57,11 +64,9 @@ const formatDate = (dateString?: string) => {
 
 export default function FileTable({ 
   files, 
-  onUpdate 
-}: { 
-  files: FileRecord[],
-  onUpdate?: () => void
-}) {
+  onUpdate, 
+  canDelete = true 
+}: FileTableProps) {
   const [fileToDelete, setFileToDelete] = useState<string | null>(null);
   const [fileToEdit, setFileToEdit] = useState<FileRecord | null>(null);
   const [fileToAssign, setFileToAssign] = useState<FileRecord | null>(null);
@@ -144,10 +149,12 @@ export default function FileTable({
                         <FileEdit className="mr-2 h-4 w-4" />
                         Edit
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setFileToDelete(file.id)}>
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete
-                      </DropdownMenuItem>
+                      {canDelete && (
+                        <DropdownMenuItem onClick={() => setFileToDelete(file.id)}>
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuItem onClick={() => setFileToAssign(file)}>
                         <Send className="mr-2 h-4 w-4" />
                         Assign to Class
@@ -197,10 +204,12 @@ export default function FileTable({
                         <FileEdit className="mr-2 h-4 w-4" />
                         Edit
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setFileToDelete(file.id)}>
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete
-                      </DropdownMenuItem>
+                      {canDelete && (
+                        <DropdownMenuItem onClick={() => setFileToDelete(file.id)}>
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuItem onClick={() => setFileToAssign(file)}>
                         <Send className="mr-2 h-4 w-4" />
                         Assign

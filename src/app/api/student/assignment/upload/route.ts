@@ -45,16 +45,23 @@ export async function POST(request: Request) {
     }
 
     // Verify the assignment exists and student has access to it
-    const assignment = await db.assignment.findUnique({
-      where: { id: assignmentId },
-      include: {
-        class: {
-          include: {
-            students: {
-              where: { id: student.id }
+    // Updated to work with new schema: assignments connect to classes via many-to-many
+    const assignment = await db.assignment.findFirst({
+      where: {
+        id: assignmentId,
+        classes: {
+          some: {
+            enrollments: {
+              some: {
+                studentId: student.id,
+                enrolled: true
+              }
             }
           }
         }
+      },
+      include: {
+        classes: true
       }
     });
 
@@ -62,7 +69,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Assignment not found" }, { status: 404 });
     }
     
-    if (assignment.class?.students.length === 0) {
+    // Check if student is enrolled in any of the classes this assignment belongs to
+    const hasAccess = await db.enrollment.findFirst({
+      where: {
+        studentId: student.id,
+        classId: { in: assignment.classes.map(c => c.id) },
+        enrolled: true
+      }
+    });
+
+    if (!hasAccess) {
       return NextResponse.json({ error: "You don't have access to this assignment" }, { status: 403 });
     }
 

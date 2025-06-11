@@ -12,12 +12,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Find the teacher record - using teacherProfile instead of teacher
-    const teacherProfile = await db.teacherProfile.findFirst({
+    // Find the teacher record - using Teacher model from new schema
+    const teacher = await db.teacher.findUnique({
       where: { userId: session.user.id }
     });
 
-    if (!teacherProfile) {
+    if (!teacher) {
       return NextResponse.json({ error: "Teacher profile not found" }, { status: 404 });
     }
 
@@ -36,16 +36,44 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing required data (lessonPlanId or classId)" }, { status: 400 });
     }
 
-    // Validate file size (50MB limit)
+    // Validate file size (250MB limit)
     if (file.size > 250 * 1024 * 1024) {
       return NextResponse.json({ error: "File too large (max 250MB)" }, { status: 400 });
+    }
+
+    // Verify the teacher owns the class and lesson plan
+    const classObj = await db.class.findFirst({
+      where: { 
+        code: classId,
+        teacherId: teacher.id
+      }
+    });
+
+    if (!classObj) {
+      return NextResponse.json({ error: "Class not found or you don't have access" }, { status: 403 });
+    }
+
+    const lessonPlan = await db.lessonPlan.findFirst({
+      where: {
+        id: lessonPlanId,
+        teacherId: teacher.id,
+        classes: {
+          some: {
+            id: classObj.id
+          }
+        }
+      }
+    });
+
+    if (!lessonPlan) {
+      return NextResponse.json({ error: "Lesson plan not found or you don't have access" }, { status: 403 });
     }
 
     console.log("Teacher assignment upload - starting process");
     
     // Create a unique, sanitized filename
     const sanitizedFileName = fileName.replace(/\s/g, '-');
-    const uniqueFileName = `assignments/${teacherProfile.userId}/${lessonPlanId}/${Date.now()}-${sanitizedFileName}`;
+    const uniqueFileName = `assignments/${teacher.id}/${lessonPlanId}/${Date.now()}-${sanitizedFileName}`;
     
     // Upload to Vercel Blob
     const blob = await put(uniqueFileName, file, {

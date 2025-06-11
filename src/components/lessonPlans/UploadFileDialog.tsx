@@ -20,6 +20,13 @@ interface FileRecord {
   size?: string | number;
 }
 
+// Update props interface
+interface UploadFileDialogProps {
+  lessonPlanId: string;
+  isTemplate?: boolean; // Add this prop
+  onFileUploaded?: (file: any) => void;
+}
+
 // Function to get appropriate icon based on file type
 const getFileIcon = (fileType: string) => {
   if (fileType.includes('image')) return <FileImage className="h-6 w-6" />;
@@ -32,10 +39,7 @@ const getFileIcon = (fileType: string) => {
 export default function UploadFileDialog({
   lessonPlanId,
   onFileUploaded,
-}: {
-  lessonPlanId: string;
-  onFileUploaded: (file: FileRecord) => void;
-}) {
+}: UploadFileDialogProps) {
   // Get classId from URL params
   const params = useParams();
   const classId = params.classId as string;
@@ -207,7 +211,7 @@ export default function UploadFileDialog({
           description: `${name} has been uploaded and added to the lesson plan.`,
           duration: 5000,
         });
-        onFileUploaded(res.data);
+        onFileUploaded?.(res.data);
         setOpen(false);
         setName('');
         setActivity('interactive');

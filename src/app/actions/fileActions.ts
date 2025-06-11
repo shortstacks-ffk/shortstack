@@ -3,6 +3,7 @@
 import { db } from '@/src/lib/db';
 import { getAuthSession } from '@/src/lib/auth';
 import { revalidatePath } from 'next/cache';
+import { Prisma } from '@prisma/client';
 
 interface FileData {
   name: string;
@@ -29,6 +30,15 @@ export async function createFile(data: FileData): Promise<FileResponse> {
       return { success: false, error: 'Unauthorized' };
     }
 
+    // Get teacher record
+    const teacher = await db.teacher.findUnique({
+      where: { userId: session.user.id }
+    });
+
+    if (!teacher) {
+      return { success: false, error: 'Teacher profile not found' };
+    }
+
     if (!data.name || !data.fileType || !data.url || !data.classId) {
       return { success: false, error: 'Missing required fields' };
     }
@@ -37,7 +47,7 @@ export async function createFile(data: FileData): Promise<FileResponse> {
     const classObj = await db.class.findFirst({
       where: { 
         code: data.classId,
-        userId: session.user.id
+        teacherId: teacher.id
       }
     });
     
@@ -52,16 +62,23 @@ export async function createFile(data: FileData): Promise<FileResponse> {
         activity: data.activity,
         size: data.size || 0,
         url: data.url,
-        classId: data.classId,
+        teacherId: teacher.id,
+        classes: {
+          connect: { id: classObj.id }
+        },
         lessonPlans: data.lessonPlanIds && data.lessonPlanIds.length > 0
           ? {
               connect: data.lessonPlanIds.map((id) => ({ id })),
             }
           : undefined,
       },
+      include: {
+        classes: true,
+        lessonPlans: true
+      }
     });
 
-    revalidatePath(`/dashboard/classes/${classObj.code}`);
+    revalidatePath(`/teacher/dashboard/classes/${classObj.code}`);
     return { success: true, data: createdFile };
   } catch (error: any) {
     console.error('Create file error:', error?.message || 'Unknown error');
@@ -80,26 +97,43 @@ export async function getFileByID(id: string): Promise<FileResponse> {
     const file = await db.file.findUnique({
       where: { id },
       include: { 
-        lessonPlans: true, // LessonPlanFiles relation
-        class: { select: { userId: true } }
+        lessonPlans: true,
+        classes: true,
+        teacher: true
       },
     });
 
     if (!file) return { success: false, error: 'File not found' };
 
-    // Authorization: Teachers should own the class, students should be enrolled
-    if (session.user.role === "TEACHER" && file.class.userId !== session.user.id) {
-      return { success: false, error: 'Forbidden: You do not own this class' };
+    // Authorization: Teachers should own the file, students should be enrolled in a class that has this file
+    if (session.user.role === "TEACHER") {
+      const teacher = await db.teacher.findUnique({
+        where: { userId: session.user.id }
+      });
+
+      if (!teacher || file.teacherId !== teacher.id) {
+        return { success: false, error: 'Forbidden: You do not own this file' };
+      }
     } else if (session.user.role === "STUDENT") {
-      const enrollment = await db.enrollment.findFirst({
+      const student = await db.student.findFirst({
+        where: { userId: session.user.id }
+      });
+
+      if (!student) {
+        return { success: false, error: 'Student profile not found' };
+      }
+
+      // Check if student is enrolled in any of the classes this file belongs to
+      const hasAccess = await db.enrollment.findFirst({
         where: {
-          student: { userId: session.user.id },
-          classId: file.classId,
+          studentId: student.id,
+          classId: { in: file.classes.map(c => c.id) },
           enrolled: true
         }
       });
-      if (!enrollment) {
-        return { success: false, error: 'Forbidden: Not enrolled in this class' };
+
+      if (!hasAccess) {
+        return { success: false, error: 'Forbidden: Not enrolled in any class with this file' };
       }
     }
 
@@ -126,29 +160,54 @@ export async function getFiles(lessonPlanId?: string): Promise<FileResponse> {
     // Verify access to the lesson plan first
     const lessonPlan = await db.lessonPlan.findUnique({
       where: { id: lessonPlanId },
-      include: { class: { select: { id: true, userId: true } } },
+      include: { 
+        classes: true,
+        teacher: true
+      },
     });
 
     if (!lessonPlan) return { success: false, error: 'Lesson Plan not found' };
 
     // Authorization check
-    if (session.user.role === 'TEACHER' && lessonPlan.class.userId !== session.user.id) {
-      return { success: false, error: 'Forbidden: You do not own this class' };
-    } else if (session.user.role === 'STUDENT') {
-      const enrollment = await db.enrollment.findFirst({
-        where: {
-          student: { userId: session.user.id },
-          classId: lessonPlan.classId,
-          enrolled: true,
-        },
+    if (session.user.role === 'TEACHER') {
+      const teacher = await db.teacher.findUnique({
+        where: { userId: session.user.id }
       });
-      if (!enrollment) {
-        return { success: false, error: 'Forbidden: Not enrolled in this class' };
+
+      if (!teacher || lessonPlan.teacherId !== teacher.id) {
+        return { success: false, error: 'Forbidden: You do not own this lesson plan' };
+      }
+    } else if (session.user.role === 'STUDENT') {
+      const student = await db.student.findFirst({
+        where: { userId: session.user.id }
+      });
+
+      if (!student) {
+        return { success: false, error: 'Student profile not found' };
+      }
+
+      // Check if student is enrolled in any of the classes this lesson plan belongs to
+      const hasAccess = await db.enrollment.findFirst({
+        where: {
+          studentId: student.id,
+          classId: { in: lessonPlan.classes.map(c => c.id) },
+          enrolled: true
+        }
+      });
+
+      if (!hasAccess) {
+        return { success: false, error: 'Forbidden: Not enrolled in any class with this lesson plan' };
       }
     }
 
     const files = await db.file.findMany({
-      where: { lessonPlans: { some: { id: lessonPlanId } } },
+      where: { 
+        lessonPlans: { some: { id: lessonPlanId } }
+      },
+      include: {
+        classes: { select: { name: true, code: true } },
+        teacher: { select: { firstName: true, lastName: true } }
+      },
       orderBy: { createdAt: 'asc' },
     });
 
@@ -167,47 +226,59 @@ export async function updateFile(id: string, data: FileData): Promise<FileRespon
       return { success: false, error: 'Unauthorized' };
     }
 
-    if (!data.name || !data.fileType || !data.url || !data.size || !data.classId) {
-      return { success: false, error: 'Missing required fields' };
+    const teacher = await db.teacher.findUnique({
+      where: { userId: session.user.id }
+    });
+
+    if (!teacher) {
+      return { success: false, error: 'Teacher profile not found' };
     }
-    
-    // Verify file exists and belongs to teacher
+
+    // Verify file exists and belongs to teacher first
     const existingFile = await db.file.findUnique({
       where: { id },
-      include: { class: { select: { userId: true, code: true } } } // Ensure 'class' relation is included
+      include: { 
+        classes: { select: { code: true } },
+        teacher: true
+      }
     });
 
     if (!existingFile) {
       return { success: false, error: 'File not found' };
     }
     
-    if (!existingFile || existingFile.class.userId !== session.user.id) {
+    if (existingFile.teacherId !== teacher.id) {
       return { success: false, error: 'File not found or you do not have permission' };
+    }
+
+    // Validate only essential fields, use existing data as fallbacks
+    if (!data.name?.trim()) {
+      return { success: false, error: 'File name is required' };
     }
 
     const updatedFile = await db.file.update({
       where: { id },
       data: {
-        name: data.name,
-        fileType: data.fileType,
-        activity: data.activity,
-        size: data.size,
-        url: data.url,
-        classId: data.classId,
-        lessonPlans: data.lessonPlanIds
-          ? {
-              set: data.lessonPlanIds.map((lpId) => ({ id: lpId })),
-            }
-          : undefined,
+        name: data.name.trim(),
+        activity: data.activity || existingFile.activity,
+        // Don't update fileType, size, or url as these are set during upload
+        // Only update name and activity which are user-editable
       },
-      include: { lessonPlans: true },
+      include: { 
+        lessonPlans: true,
+        classes: true
+      },
     });
 
-    revalidatePath(`/dashboard/classes/${existingFile.class.code}`);
+    // Revalidate paths for all classes this file belongs to
+    for (const classObj of existingFile.classes) {
+      revalidatePath(`/teacher/dashboard/classes/${classObj.code}`);
+    }
+    
     return { success: true, data: updatedFile };
   } catch (error: any) {
     console.error('Update file error:', error);
-    return { success: false, error: 'Failed to update file' };
+    return { success: false, error: 'Failed to update file: ' + (error?.message || '') };
   }
 }
 
@@ -229,35 +300,46 @@ export async function copyFileToLessonPlan({
       return { success: false, error: 'Unauthorized' };
     }
 
+    const teacher = await db.teacher.findUnique({
+      where: { userId: session.user.id }
+    });
+
+    if (!teacher) {
+      return { success: false, error: 'Teacher profile not found' };
+    }
+
     // Verify source file exists and belongs to teacher
     const sourceFile = await db.file.findUnique({
       where: { id: sourceFileId },
-      include: { class: { select: { userId: true, code: true } } } // Include code for display
+      include: { classes: true }
     });
 
-    if (!sourceFile || sourceFile.class.userId !== session.user.id) {
+    if (!sourceFile || sourceFile.teacherId !== teacher.id) {
       return { success: false, error: 'Source file not found or you do not have permission' };
     }
 
-    // Verify target class and lesson plan belong to teacher
-    // Important: Use code for lookup since classId in schema is code
+    // Verify target class belongs to teacher
     const targetClass = await db.class.findFirst({
       where: { 
-        code: targetClassId, // Using code here since that's what you pass in UI
-        userId: session.user.id
-      },
-      select: { id: true, code: true }
+        code: targetClassId,
+        teacherId: teacher.id
+      }
     });
     
     if (!targetClass) {
       return { success: false, error: 'Target class not found or you do not have permission' };
     }
     
-    // Verify target lesson plan exists in target class
+    // Verify target lesson plan exists and belongs to teacher
     const targetLessonPlan = await db.lessonPlan.findFirst({
       where: {
         id: targetLessonPlanId,
-        class: { code: targetClassId } // Join through class relation
+        teacherId: teacher.id,
+        classes: {
+          some: {
+            code: targetClassId
+          }
+        }
       }
     });
     
@@ -273,15 +355,21 @@ export async function copyFileToLessonPlan({
         activity: sourceFile.activity,
         size: sourceFile.size || 0,
         url: sourceFile.url,
-        classId: targetClassId, // Use class code
+        teacherId: teacher.id,
+        classes: {
+          connect: { id: targetClass.id }
+        },
         lessonPlans: {
           connect: { id: targetLessonPlanId },
         },
       },
-      include: { lessonPlans: true },
+      include: { 
+        lessonPlans: true,
+        classes: true
+      },
     });
 
-    revalidatePath(`/dashboard/classes/${targetClass.code}`);
+    revalidatePath(`/teacher/dashboard/classes/${targetClass.code}`);
     return { success: true, data: newFile };
   } catch (error: any) {
     console.error('Copy file error:', error);
@@ -297,13 +385,21 @@ export async function deleteFile(id: string): Promise<FileResponse> {
       return { success: false, error: 'Unauthorized' };
     }
 
+    const teacher = await db.teacher.findUnique({
+      where: { userId: session.user.id }
+    });
+
+    if (!teacher) {
+      return { success: false, error: 'Teacher profile not found' };
+    }
+
     // Verify file exists and belongs to teacher
     const existingFile = await db.file.findUnique({
       where: { id },
-      include: { class: { select: { userId: true, code: true } } }
+      include: { classes: true }
     });
     
-    if (!existingFile || existingFile.class.userId !== session.user.id) {
+    if (!existingFile || existingFile.teacherId !== teacher.id) {
       return { success: false, error: 'File not found or you do not have permission' };
     }
 
@@ -311,7 +407,11 @@ export async function deleteFile(id: string): Promise<FileResponse> {
       where: { id },
     });
 
-    revalidatePath(`/dashboard/classes/${existingFile.class.code}`);
+    // Revalidate paths for all classes this file belonged to
+    for (const classObj of existingFile.classes) {
+      revalidatePath(`/teacher/dashboard/classes/${classObj.code}`);
+    }
+    
     return { success: true };
   } catch (error: any) {
     console.error('Delete file error:', error?.message || 'Unknown error');
