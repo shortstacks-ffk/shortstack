@@ -18,16 +18,25 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Get the bill and verify ownership
+    // Get teacher record
+    const teacher = await db.teacher.findUnique({
+      where: { userId: session.user.id }
+    });
+
+    if (!teacher) {
+      return NextResponse.json({ error: "Teacher profile not found" }, { status: 404 });
+    }
+
+    // Get the bill and verify ownership using new schema
     const bill = await db.bill.findFirst({
       where: {
         id: billId,
         OR: [
-          { creatorId: session.user.id },
+          { creatorId: teacher.id }, // Use teacherId instead of userId
           {
             class: {
               some: {
-                userId: session.user.id
+                teacherId: teacher.id // Use teacherId instead of userId
               }
             }
           }
@@ -36,10 +45,14 @@ export async function GET(
       include: {
         excludedStudents: {
           include: {
-            class: {
-              select: {
-                name: true,
-                id: true
+            enrollments: {
+              include: {
+                class: {
+                  select: {
+                    name: true,
+                    id: true
+                  }
+                }
               }
             }
           }
@@ -51,13 +64,21 @@ export async function GET(
       return NextResponse.json({ error: "Bill not found" }, { status: 404 });
     }
 
-    // Fix for the name property error
-    const excludedStudents = bill.excludedStudents.map(student => ({
-      id: student.id,
-      name: `${student.firstName} ${student.lastName}`,
-      className: student.class?.name,
-      classId: student.class?.id
-    }));
+    // Format excluded students data with their class information
+    const excludedStudents = bill.excludedStudents.map(student => {
+      // Get the first enrolled class for display (students can be in multiple classes)
+      const enrolledClass = student.enrollments.find(e => e.enrolled)?.class;
+      
+      return {
+        id: student.id,
+        name: `${student.firstName} ${student.lastName}`,
+        firstName: student.firstName,
+        lastName: student.lastName,
+        schoolEmail: student.schoolEmail,
+        className: enrolledClass?.name || 'No active class',
+        classId: enrolledClass?.id || null
+      };
+    });
 
     return NextResponse.json(excludedStudents);
   } catch (error) {

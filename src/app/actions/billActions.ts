@@ -53,7 +53,8 @@ function getBillRecurringPattern(bill: any) {
         recurrenceInterval: 1,
         monthlyDate: null,
         yearlyMonth: null,
-        yearlyDate: null
+        yearlyDate: null,
+        startsOnOriginalDate: true  // Add this flag
       };
     
     case "BIWEEKLY":
@@ -64,7 +65,8 @@ function getBillRecurringPattern(bill: any) {
         recurrenceInterval: 2,
         monthlyDate: null,
         yearlyMonth: null,
-        yearlyDate: null
+        yearlyDate: null,
+        startsOnOriginalDate: true  // Add this flag
       };
     
     case "MONTHLY":
@@ -75,7 +77,8 @@ function getBillRecurringPattern(bill: any) {
         recurrenceInterval: 1,
         monthlyDate: startDate.getDate(),
         yearlyMonth: null,
-        yearlyDate: null
+        yearlyDate: null,
+        startsOnOriginalDate: true  // Add this flag
       };
     
     case "QUARTERLY":
@@ -86,7 +89,8 @@ function getBillRecurringPattern(bill: any) {
         recurrenceInterval: 3,
         monthlyDate: startDate.getDate(),
         yearlyMonth: null,
-        yearlyDate: null
+        yearlyDate: null,
+        startsOnOriginalDate: true  // Add this flag
       };
     
     case "YEARLY":
@@ -97,7 +101,8 @@ function getBillRecurringPattern(bill: any) {
         recurrenceInterval: 1,
         monthlyDate: null,
         yearlyMonth: startDate.getMonth(),
-        yearlyDate: startDate.getDate()
+        yearlyDate: startDate.getDate(),
+        startsOnOriginalDate: true  // Add this flag
       };
     
     default: // "ONCE"
@@ -294,6 +299,15 @@ export async function createBill(formData: FormData): Promise<BillResponse> {
       return { success: false, error: "Unauthorized" };
     }
 
+    // First get the teacher record
+    const teacher = await db.teacher.findUnique({
+      where: { userId: session.user.id }
+    });
+    
+    if (!teacher) {
+      return { success: false, error: "Teacher profile not found" };
+    }
+
     const data: CreateBillData = {
       title: formData.get("title") as string,
       emoji: (formData.get("emoji") as string) ?? "💰",
@@ -310,10 +324,10 @@ export async function createBill(formData: FormData): Promise<BillResponse> {
       return { success: false, error: "Missing required fields" };
     }
 
-    // Create bill data object
+    // Create bill data object - use teacherId instead of userId
     const billData: any = {
       ...data,
-      creatorId: session.user.id,
+      creatorId: teacher.id,  // Use teacherId instead of user.id
     };
 
     // Handle class connections
@@ -321,7 +335,7 @@ export async function createBill(formData: FormData): Promise<BillResponse> {
       const classes = await db.class.findMany({
         where: {
           id: { in: classIds },
-          userId: session.user.id
+          teacherId: teacher.id  // Use teacherId
         }
       });
 
@@ -344,14 +358,18 @@ export async function createBill(formData: FormData): Promise<BillResponse> {
 
     // Create StudentBill records and calendar events
     if (classIds.length > 0) {
-      const students = await db.student.findMany({
+      // Find students enrolled in these classes
+      const enrollments = await db.enrollment.findMany({
         where: {
-          classId: { in: classIds.map(id => {
-            const classObj = newBill.class.find(c => c.id === id);
-            return classObj?.code;
-          }).filter(Boolean) as string[] }
+          classId: { in: classIds },
+          enrolled: true
+        },
+        include: {
+          student: true
         }
       });
+
+      const students = enrollments.map(e => e.student);
 
       if (students.length > 0) {
         await db.studentBill.createMany({
@@ -384,7 +402,7 @@ export async function createBill(formData: FormData): Promise<BillResponse> {
 // Get Bills - filter by user's classes or created by user
 export async function getBills(filters?: {
   classId?: string;
-  includeUnassigned?: boolean; // Add option to include bills not assigned to any class
+  includeUnassigned?: boolean;
 }): Promise<BillResponse> {
   try {
     const session = await getAuthSession();
@@ -394,9 +412,18 @@ export async function getBills(filters?: {
 
     // Different logic based on user role
     if (session.user.role === "TEACHER") {
+      // First get the teacher record associated with this user
+      const teacher = await db.teacher.findUnique({
+        where: { userId: session.user.id }
+      });
+      
+      if (!teacher) {
+        return { success: false, error: "Teacher profile not found" };
+      }
+      
       // Get all classes owned by this teacher
       const userClasses = await db.class.findMany({
-        where: { userId: session.user.id },
+        where: { teacherId: teacher.id },
         select: { id: true }
       });
       
@@ -409,7 +436,7 @@ export async function getBills(filters?: {
         // Filter bills for a specific class
         whereCondition = {
           AND: [
-            { creatorId: session.user.id }, // Always filter by creator
+            { creatorId: teacher.id }, // Now using teacherId
             {
               class: {
                 some: {
@@ -420,9 +447,9 @@ export async function getBills(filters?: {
           ]
         };
       } else {
-        // Always include bills created by this user regardless of class assignment
+        // Always include bills created by this teacher regardless of class assignment
         whereCondition = {
-          creatorId: session.user.id
+          creatorId: teacher.id
         };
         
         // If not including unassigned bills, add class filter
@@ -461,7 +488,7 @@ export async function getBills(filters?: {
     } 
     else if (session.user.role === "STUDENT") {
       // Students should only see bills for classes they're enrolled in
-      const student = await db.student.findUnique({
+      const student = await db.student.findFirst({
         where: { userId: session.user.id }
       });
       
@@ -490,13 +517,13 @@ export async function getBills(filters?: {
         }
         
         whereClause = {
-          classes: {
+          class: {
             some: { id: filters.classId }
           }
         };
       } else {
         whereClause = {
-          classes: {
+          class: {
             some: {
               id: { in: enrolledClassIds }
             }
@@ -542,16 +569,25 @@ export async function getBill(billId: string): Promise<BillResponse> {
     }
 
     if (session.user.role === "TEACHER") {
-      // Fetch bill either created by this user OR assigned to their classes
+      // Get the teacher record first
+      const teacher = await db.teacher.findUnique({
+        where: { userId: session.user.id }
+      });
+      
+      if (!teacher) {
+        return { success: false, error: "Teacher profile not found" };
+      }
+      
+      // Fetch bill either created by this teacher OR assigned to their classes
       const bill = await db.bill.findFirst({
         where: {
           id: billId,
           OR: [
-            { creatorId: session.user.id }, // Created by this user
+            { creatorId: teacher.id }, // Created by this teacher
             {
               class: {
                 some: {
-                  userId: session.user.id // Or in one of their classes
+                  teacherId: teacher.id // Or in one of their classes
                 }
               }
             }
@@ -570,11 +606,17 @@ export async function getBill(billId: string): Promise<BillResponse> {
             include: {
               student: {
                 include: {
-                  class: {
-                    select: {
-                      id: true,
-                      name: true,
-                      emoji: true,
+                  // Use enrollments to determine class relationship
+                  enrollments: {
+                    where: { enrolled: true },
+                    include: {
+                      class: {
+                        select: {
+                          id: true,
+                          name: true,
+                          emoji: true,
+                        }
+                      }
                     }
                   }
                 }
@@ -588,7 +630,7 @@ export async function getBill(billId: string): Promise<BillResponse> {
         return { success: false, error: "Bill not found or you don't have permission to view it" };
       }
       
-      // Transform the bill with students property for easier access in UI
+      // Transform the bill with students property and class information for easier access in UI
       const transformedBill = {
         ...bill,
         students: bill.studentBills.map(sb => ({
@@ -596,7 +638,12 @@ export async function getBill(billId: string): Promise<BillResponse> {
           billId: sb.billId,
           isPaid: sb.isPaid,
           paidAt: sb.paidAt,
-          student: sb.student
+          paidAmount: sb.paidAmount,
+          student: {
+            ...sb.student,
+            // Find the primary class from enrollments
+            class: sb.student.enrollments?.length > 0 ? sb.student.enrollments[0].class : null
+          }
         }))
       };
 
@@ -604,7 +651,7 @@ export async function getBill(billId: string): Promise<BillResponse> {
     } 
     else if (session.user.role === "STUDENT") {
       // Handle student role access
-      // ... existing student code ...
+      // Implement based on your requirements
     }
     
     return { success: false, error: "Unknown user role" };
@@ -614,24 +661,33 @@ export async function getBill(billId: string): Promise<BillResponse> {
   }
 }
 
-// Enhanced updateBill function with calendar synchronization
+// Update the updateBill function to use teacherId instead of userId
 export async function updateBill(billId: string, data: Partial<CreateBillData> & { status?: BillStatus }): Promise<BillResponse> {
   try {
     const session = await getAuthSession();
     if (!session?.user?.id || session.user.role !== "TEACHER") {
       return { success: false, error: "Unauthorized" };
     }
+    
+    // Get the teacher record
+    const teacher = await db.teacher.findUnique({
+      where: { userId: session.user.id }
+    });
+    
+    if (!teacher) {
+      return { success: false, error: "Teacher profile not found" };
+    }
 
-    // Verify ownership
+    // Verify ownership - using teacherId now
     const billExists = await db.bill.findFirst({
       where: {
         id: billId,
         OR: [
-          { creatorId: session.user.id },
+          { creatorId: teacher.id },  // Use teacherId instead of session.user.id
           {
             class: {
               some: {
-                userId: session.user.id
+                teacherId: teacher.id  // Use teacherId instead of userId
               }
             }
           }
@@ -703,16 +759,25 @@ export async function copyBillToClasses({
       return { success: false, error: "Unauthorized" };
     }
 
-    // 1. Verify the bill exists and belongs to this user
+    // Get the teacher record
+    const teacher = await db.teacher.findUnique({
+      where: { userId: session.user.id }
+    });
+    
+    if (!teacher) {
+      return { success: false, error: "Teacher profile not found" };
+    }
+
+    // 1. Verify the bill exists and belongs to this teacher
     const originalBill = await db.bill.findFirst({
       where: {
         id: billId,
         OR: [
-          { creatorId: session.user.id }, // Bill creator
+          { creatorId: teacher.id }, // Bill creator
           {
             class: {
               some: {
-                userId: session.user.id // Assigned to one of their classes
+                teacherId: teacher.id // Or assigned to one of their classes
               }
             }
           }
@@ -727,11 +792,11 @@ export async function copyBillToClasses({
       return { success: false, error: "Bill not found or doesn't belong to you" };
     }
 
-    // 2. Verify all target classes belong to this user
+    // 2. Verify all target classes belong to this teacher
     const targetClasses = await db.class.findMany({
       where: {
         id: { in: targetClassIds },
-        userId: session.user.id
+        teacherId: teacher.id
       }
     });
 
@@ -762,12 +827,18 @@ export async function copyBillToClasses({
       }
     });
 
-    // 5. Get all students from the new classes
-    const students = await db.student.findMany({
+    // 5. Get all students from the new classes using enrollments
+    const enrollments = await db.enrollment.findMany({
       where: {
-        classId: { in: newClassIds }
+        classId: { in: newClassIds },
+        enrolled: true
+      },
+      include: {
+        student: true
       }
     });
+
+    const students = enrollments.map(e => e.student);
 
     // 6. Create StudentBill records for each student in the new classes
     if (students.length > 0) {
@@ -822,11 +893,20 @@ export async function removeBillFromClasses({
       return { success: false, error: "Unauthorized" };
     }
 
-    // Verify the bill belongs to this user
+    // Get the teacher record
+    const teacher = await db.teacher.findUnique({
+      where: { userId: session.user.id }
+    });
+    
+    if (!teacher) {
+      return { success: false, error: "Teacher profile not found" };
+    }
+
+    // Verify the bill belongs to this teacher
     const bill = await db.bill.findFirst({
       where: {
         id: billId,
-        creatorId: session.user.id // Only creator can remove the bill from classes
+        creatorId: teacher.id // Only creator can remove the bill from classes
       },
       include: {
         class: true
@@ -894,16 +974,16 @@ export async function removeBillFromClasses({
         }
       });
       
-      // Remove student bills for the students in these classes
-      // First get students from the specified classes
-      const studentsInClasses = await db.student.findMany({
+      // Find students enrolled in these classes
+      const enrollments = await db.enrollment.findMany({
         where: {
-          classId: { in: classIds }
+          classId: { in: classIds },
+          enrolled: true
         },
-        select: { id: true }
+        select: { studentId: true }
       });
       
-      const studentIds = studentsInClasses.map(s => s.id);
+      const studentIds = enrollments.map(e => e.studentId);
       
       // Then delete StudentBill records for these students
       if (studentIds.length > 0) {
@@ -945,11 +1025,20 @@ export async function deleteBill(id: string): Promise<BillResponse> {
       return { success: false, error: "Unauthorized" };
     }
 
-    // Verify the bill was created by this user
+    // Get the teacher record associated with this user
+    const teacher = await db.teacher.findUnique({
+      where: { userId: session.user.id }
+    });
+    
+    if (!teacher) {
+      return { success: false, error: "Teacher profile not found" };
+    }
+
+    // Verify the bill belongs to this teacher using teacherId
     const bill = await db.bill.findFirst({
       where: {
-        id: id,
-        creatorId: session.user.id
+        id,
+        creatorId: teacher.id // Use teacherId instead of session.user.id
       }
     });
 
@@ -961,6 +1050,10 @@ export async function deleteBill(id: string): Promise<BillResponse> {
     await db.calendarEvent.deleteMany({
       where: { billId: id }
     });
+
+    // The following tables have CASCADE delete relationships, so they're automatically handled:
+    // - StudentBill records (via onDelete: Cascade in the schema)
+    // - Payment records (via StudentBill cascade)
 
     // Then delete the bill
     await db.bill.delete({
@@ -987,16 +1080,26 @@ export async function updatePaymentStatus(
       return { success: false, error: "Unauthorized" };
     }
 
-    // Verify the bill belongs to this user and the student is in one of their classes
+    // Get the teacher record
+    const teacher = await db.teacher.findUnique({
+      where: { userId: session.user.id }
+    });
+    
+    if (!teacher) {
+      return { success: false, error: "Teacher profile not found" };
+    }
+
+    // Verify the bill belongs to this teacher and the student is in one of their classes
     const billAndStudent = await db.bill.findFirst({
       where: {
         id: billId,
         class: {
           some: {
-            userId: session.user.id,
-            students: {
+            teacherId: teacher.id,  // Use teacherId
+            enrollments: {
               some: {
-                id: studentId
+                studentId,
+                enrolled: true
               }
             }
           }
@@ -1122,16 +1225,25 @@ export async function excludeStudentsFromBill({
       return { success: false, error: "Unauthorized" };
     }
 
-    // Verify the bill belongs to this user
+    // Get the teacher record
+    const teacher = await db.teacher.findUnique({
+      where: { userId: session.user.id }
+    });
+    
+    if (!teacher) {
+      return { success: false, error: "Teacher profile not found" };
+    }
+
+    // Verify the bill belongs to this teacher
     const bill = await db.bill.findFirst({
       where: {
         id: billId,
         OR: [
-          { creatorId: session.user.id },
+          { creatorId: teacher.id },  // Use teacherId 
           {
             class: {
               some: {
-                userId: session.user.id
+                teacherId: teacher.id  // Use teacherId
               }
             }
           }
@@ -1207,16 +1319,25 @@ export async function includeStudentsInBill({
       return { success: false, error: "Unauthorized" };
     }
 
-    // Verify the bill belongs to this user
+    // Get the teacher record
+    const teacher = await db.teacher.findUnique({
+      where: { userId: session.user.id }
+    });
+    
+    if (!teacher) {
+      return { success: false, error: "Teacher profile not found" };
+    }
+
+    // Verify the bill belongs to this teacher
     const bill = await db.bill.findFirst({
       where: {
         id: billId,
         OR: [
-          { creatorId: session.user.id },
+          { creatorId: teacher.id },  // Use teacherId
           {
             class: {
               some: {
-                userId: session.user.id
+                teacherId: teacher.id  // Use teacherId
               }
             }
           }
@@ -1314,7 +1435,7 @@ export async function getBillStatusAsync(bill: any, studentBills?: any[]): Promi
   }
 }
 
-// Add this after the deleteBill function
+// Cancel a bill
 export async function cancelBill(billId: string, reason?: string): Promise<BillResponse> {
   try {
     const session = await getAuthSession();
@@ -1322,11 +1443,20 @@ export async function cancelBill(billId: string, reason?: string): Promise<BillR
       return { success: false, error: "Unauthorized" };
     }
 
-    // Verify the bill belongs to this user
+    // Get the teacher record
+    const teacher = await db.teacher.findUnique({
+      where: { userId: session.user.id }
+    });
+    
+    if (!teacher) {
+      return { success: false, error: "Teacher profile not found" };
+    }
+
+    // Verify the bill belongs to this teacher
     const bill = await db.bill.findFirst({
       where: {
         id: billId,
-        creatorId: session.user.id
+        creatorId: teacher.id  // Use teacherId
       }
     });
 
