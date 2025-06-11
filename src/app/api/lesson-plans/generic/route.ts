@@ -1,40 +1,45 @@
-import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/src/lib/auth/config";
+import { NextRequest, NextResponse } from "next/server";
+import { getAuthSession } from "@/src/lib/auth";
 import { db } from "@/src/lib/db";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const session = await getAuthSession();
+    if (!session?.user?.id || (session.user.role !== "TEACHER" && session.user.role !== "SUPER")) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
     }
     
-    // Fetch all generic lesson plans
-    const genericLessonPlans = await db.genericLessonPlan.findMany({
+    const searchParams = req.nextUrl.searchParams;
+    const gradeLevel = searchParams.get("gradeLevel");
+    
+    let whereClause = {};
+    if (gradeLevel && gradeLevel !== "all") {
+      whereClause = { gradeLevel };
+    }
+    
+    const templates = await db.genericLessonPlan.findMany({
+      where: whereClause,
       select: {
         id: true,
         name: true,
         description: true,
-        _count: {
-          select: {
-            lessonPlans: true // Count how many times this template has been used
-          }
-        }
+        gradeLevel: true,
+        createdAt: true,
+        updatedAt: true,
       },
-      orderBy: [
-        // Show most popular templates first
-        { lessonPlans: { _count: 'desc' } },
-        { name: 'asc' }
-      ]
+      orderBy: {
+        createdAt: "desc"
+      }
     });
     
-    return NextResponse.json(genericLessonPlans);
+    return NextResponse.json(templates);
   } catch (error) {
     console.error("Error fetching generic lesson plans:", error);
     return NextResponse.json(
-      { error: "Failed to fetch lesson plan templates" },
+      { error: "Failed to fetch templates" },
       { status: 500 }
     );
   }

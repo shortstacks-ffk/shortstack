@@ -1,9 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { useSession } from 'next-auth/react';
+import { useSearchParams } from 'next/navigation';
 import { getLessonPlanByID, updateLessonPlan, updateGenericLessonPlan } from '@/src/app/actions/lessonPlansActions';
-import Link from "next/link";
-import { ChevronLeft } from 'lucide-react';
+import Breadcrumbs from '@/src/components/Breadcrumbs';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import {
@@ -17,7 +19,7 @@ import FileTable from '@/src/components/lessonPlans/FileTable';
 import UploadAssignmentDialog from '@/src/components/lessonPlans/UploadAssignmentDialog';
 import AssignmentTable from '@/src/components/lessonPlans/AssignmentTable';
 import RichEditor from '@/src/components/RichEditor';
-import { useSession } from 'next-auth/react';
+import { Pen, ChevronLeft } from 'lucide-react';
 import { Badge } from '@/src/components/ui/badge';
 
 interface LessonPlanDetailViewProps {
@@ -26,6 +28,7 @@ interface LessonPlanDetailViewProps {
 
 export default function LessonPlanDetailView({ lessonId }: LessonPlanDetailViewProps) {
   const { data: session } = useSession();
+  const searchParams = useSearchParams();
   const [lessonPlan, setLessonPlan] = useState<any>(null);
   const [editMode, setEditMode] = useState(false);
   const [form, setForm] = useState({ name: '', description: '' });
@@ -37,6 +40,45 @@ export default function LessonPlanDetailView({ lessonId }: LessonPlanDetailViewP
   const isSuperUser = session?.user?.role === 'SUPER';
   const canEdit = !isTemplate || (isTemplate && isSuperUser);
 
+  // Get back navigation URL
+  const getBackUrl = () => {
+    const fromTab = searchParams.get('from');
+    const grade = searchParams.get('grade');
+    const classCode = searchParams.get('classCode');
+    
+    // If coming from a class context
+    if (classCode) {
+      return `/teacher/dashboard/classes/${classCode}?tab=lessonPlans`;
+    }
+    
+    // If coming from templates tab
+    if (fromTab === 'templates') {
+      const gradeParam = grade ? `?tab=templates&grade=${grade}` : '?tab=templates';
+      return `/teacher/dashboard/lesson-plans${gradeParam}`;
+    }
+    
+    // Default to my plans tab
+    return '/teacher/dashboard/lesson-plans?tab=my-plans';
+  };
+
+  const getBackLabel = () => {
+    const fromTab = searchParams.get('from');
+    const grade = searchParams.get('grade');
+    const classCode = searchParams.get('classCode');
+    
+    if (classCode) {
+      return 'Back to Class Lesson Plans';
+    }
+    
+    if (fromTab === 'templates') {
+      return grade && grade !== 'all' 
+        ? `Back to Templates (Grades ${grade})`
+        : 'Back to Templates';
+    }
+    
+    return 'Back to My Lesson Plans';
+  };
+
   // Fetch lesson plan on mount
   useEffect(() => {
     async function fetchPlan() {
@@ -44,6 +86,14 @@ export default function LessonPlanDetailView({ lessonId }: LessonPlanDetailViewP
       try {
         const res = await getLessonPlanByID(lessonId);
         if (res.success) {
+          // Check if this is actually a template and redirect if needed
+          if (res.data.__typename === 'GenericLessonPlan') {
+            const fromTab = searchParams.get('from') || 'templates';
+            const grade = searchParams.get('grade') || 'all';
+            window.location.href = `/teacher/dashboard/lesson-plans/templates/${lessonId}?from=${fromTab}&grade=${grade}`;
+            return;
+          }
+          
           setLessonPlan(res.data);
           if (res.data) {
             setForm({
@@ -116,32 +166,70 @@ export default function LessonPlanDetailView({ lessonId }: LessonPlanDetailViewP
     }
     setEditMode(false);
   }
+  
+  // Refetch lesson plan data
+  async function fetchPlan() {
+    try {
+      const res = await getLessonPlanByID(lessonId);
+      if (res.success) {
+        setLessonPlan(res.data);
+        if (res.data) {
+          setForm({
+            name: res.data.name,
+            description: res.data.description || '',
+          });
+        }
+        setError(null);
+      } else {
+        setError(res.error || 'Failed to fetch lesson plan');
+      }
+    } catch (error: any) {
+      setError(error.message || 'An unexpected error occurred');
+      console.error('Error fetching lesson plan:', error);
+    }
+  }
 
-  if (loading) return <div className="flex justify-center items-center h-96">Loading...</div>;
-  if (!lessonPlan) return <div className="flex justify-center items-center h-96">Lesson plan not found</div>;
+  if (loading) return <div className="flex justify-center items-center min-h-[60vh]">Loading...</div>;
+  if (!lessonPlan) return <div className="flex justify-center items-center min-h-[60vh]">Lesson plan not found</div>;
 
   return (
-    <main className="container mx-auto p-4">
-
-      <div className="mb-6 flex justify-between items-center">
-        <div className="flex items-center">
-          <Link
-            href="/teacher/dashboard/lesson-plans"
-            className="mr-2 flex items-center text-gray-500 hover:text-gray-700"
-          >
-            <ChevronLeft className="h-4 w-4" />
-            <span>Back to Lesson Plans</span>
-          </Link>
-        </div>
+    <div className="w-full h-[100vh] lg:w-5/6 xl:w-3/4 mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6 overflow-y-auto">
+      {/* Breadcrumbs - hidden on mobile */}
+      <div className="hidden sm:block">
+        <Breadcrumbs
+          items={[
+            { label: 'Dashboard', href: '/teacher/dashboard' },
+            { label: getBackLabel(), href: getBackUrl() },
+            { label: lessonPlan.name, href: '#' },
+          ]}
+        />
       </div>
 
-      <div className="max-w-5xl mx-auto w-full py-8">
+      {/* Mobile Back Link */}
+      <div className="sm:hidden mb-2">
+        <Button variant="ghost" className="p-0 h-auto" asChild>
+          <Link href={getBackUrl()}>
+            <ChevronLeft className="h-4 w-4 mr-1" />
+            {getBackLabel()}
+          </Link>
+        </Button>
+      </div>
 
-      {/* Header: Title, Edit, Save & Cancel */}
-      <div className="flex flex-wrap items-center justify-between mb-8 gap-4">
-        <div className="flex items-center gap-3">
+      {/* Desktop Back Button */}
+      {/* <div className="hidden sm:block">
+        <Button variant="ghost" className="mb-4" asChild>
+          <Link href={getBackUrl()}>
+            <ChevronLeft className="h-4 w-4 mr-2" />
+            {getBackLabel()}
+          </Link>
+        </Button>
+      </div> */}
+
+      {/* Header: Title, Type Badge, Edit, Save & Cancel */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
           {editMode ? (
-            <div className="flex-1 mr-4 min-w-[300px]">
+            <div className="flex-1 w-full sm:mr-4">
               <Input
                 className="text-xl font-bold"
                 value={form.name}
@@ -149,160 +237,135 @@ export default function LessonPlanDetailView({ lessonId }: LessonPlanDetailViewP
               />
             </div>
           ) : (
-            <h1 className="text-3xl font-bold">{lessonPlan.name}</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold break-words">{lessonPlan.name}</h1>
           )}
           
+          {/* Show template badge if applicable */}
           {isTemplate && (
-            <Badge variant="secondary" className="bg-primary/10 text-primary">
-              Template
-            </Badge>
+            <Badge className="bg-blue-100 text-blue-700 self-start">Template</Badge>
           )}
         </div>
         
         {canEdit && (
-          <div>
-            {editMode ? (
-              <div className="flex items-center space-x-2">
-                <Button onClick={handleSave}>Save</Button>
-                <Button variant="secondary" onClick={handleCancel}>
-                  Cancel
-                </Button>
-              </div>
-            ) : (
-              <Button onClick={() => setEditMode(true)}>Edit</Button>
-            )}
-          </div>
+          editMode ? (
+            <div className="flex items-center gap-2 self-end">
+              <Button onClick={handleSave} size="sm" className="bg-orange-500 hover:bg-orange-600">Save</Button>
+              <Button variant="secondary" onClick={handleCancel} size="sm">
+                Cancel
+              </Button>
+            </div>
+          ) : (
+            <Button 
+              onClick={() => setEditMode(true)} 
+              size="sm" 
+              className="bg-orange-500 hover:bg-orange-600 self-end"
+            >
+              <Pen className="h-4 w-4 mr-2" />
+              Edit
+            </Button>
+          )
         )}
       </div>
 
       {/* Description Section */}
-      <div className="mb-8">
-        <h2 className="text-xl font-semibold mb-4">Description</h2>
-        {editMode ? (
-          <div className="border rounded-md overflow-hidden">
-            <RichEditor
-              content={form.description}
-              onChange={(content) => setForm({ ...form, description: content })}
-              editable={true}
-            />
-          </div>
-        ) : (
-          <div 
-            className="rich-text-content p-4 border border-gray-200 rounded-md min-h-[150px] bg-white"
-            dangerouslySetInnerHTML={{ __html: lessonPlan.description || '<p class="text-gray-400 italic">No description provided</p>' }} 
-          />
-        )}
-      </div>
-
-      {/* Class Information (if not a template) */}
-      {!isTemplate && lessonPlan.class && (
-        <div className="bg-gray-50 p-4 rounded-md mb-8 border border-gray-200">
-          <h3 className="font-medium mb-2">Class Information</h3>
-          <p>
-            <span className="text-xl mr-2">{lessonPlan.class.emoji || '📚'}</span>
-            <span className="font-medium">{lessonPlan.class.name}</span> 
-            <span className="text-gray-500 ml-2">(Code: {lessonPlan.class.code})</span>
-          </p>
-        </div>
+      <h2 className="text-lg sm:text-xl font-semibold">Description</h2>
+      {editMode ? (
+        <RichEditor
+          content={form.description}
+          onChange={(content) => setForm({ ...form, description: content })}
+          editable={true}
+        />
+      ) : (
+        <div 
+          className="rich-text-content rounded-md max-w-full overflow-x-auto"
+          dangerouslySetInnerHTML={{ __html: lessonPlan.description || '<p></p>' }} 
+        />
       )}
 
       {/* Accordion for Files & Assignments */}
-      <div className="space-y-6">
-        <Accordion
-          type="single"
-          collapsible
-          value={accordionValue || undefined}
-          onValueChange={(val) => setAccordionValue(val)}
-          className="space-y-6"
-        >
-          {/* Files */}
-          <AccordionItem value="files" className="border rounded-md overflow-hidden border-gray-200">
-            <AccordionTrigger className="bg-orange-500 text-white px-6 py-3 rounded-t flex justify-between items-center">
-              <span className="font-semibold">Files</span>
+      <Accordion
+        type="single"
+        collapsible
+        value={accordionValue || undefined}
+        onValueChange={(val) => setAccordionValue(val)}
+        className="space-y-3 sm:space-y-4"
+      >
+        {/* Files */}
+        <AccordionItem value="files" className="border-none">
+          <AccordionTrigger className="bg-orange-500 text-white px-3 sm:px-4 py-2 rounded flex justify-between items-center">
+            <span className="font-semibold">Files</span>
+          </AccordionTrigger>
+          <AccordionContent className="mt-2 overflow-x-auto">
+            {canEdit && (
+              <div className="flex justify-end mb-2">
+                <UploadFileDialog
+                  lessonPlanId={lessonPlan.id}
+                  onFileUploaded={(newFile) =>
+                    setLessonPlan((prev: any) => ({
+                      ...prev,
+                      files: [...(prev.files || []), newFile],
+                    }))
+                  }
+                />
+              </div>
+            )}
+            {/* File Table */}
+            <FileTable 
+              files={lessonPlan.files || []} 
+              onUpdate={async () => {
+                // Refetch the lesson plan to update the UI
+                await fetchPlan();
+              }}
+            />
+            
+            {(!lessonPlan.files || lessonPlan.files.length === 0) && (
+              <div className="text-center py-4 text-gray-500">
+                No files have been uploaded yet.
+              </div>
+            )}
+          </AccordionContent>
+        </AccordionItem>
+
+        {/* Assignments - only show for normal lesson plans */}
+        {!isTemplate && (
+          <AccordionItem value="assignments" className="border-none">
+            <AccordionTrigger className="bg-orange-500 text-white px-3 sm:px-4 py-2 rounded flex justify-between items-center">
+              <span className="font-semibold">Assignments</span>
             </AccordionTrigger>
-            <AccordionContent className="p-4">
+            <AccordionContent className="mt-2 overflow-x-auto">
               {canEdit && (
-                <div className="flex justify-end mb-4">
-                  <UploadFileDialog
+                <div className="flex justify-end mb-2">
+                  <UploadAssignmentDialog
                     lessonPlanId={lessonPlan.id}
-                    onFileUploaded={(newFile) =>
+                    classId={lessonPlan.class?.code}
+                    onAssignmentUploaded={(newAssignment) =>
                       setLessonPlan((prev: any) => ({
                         ...prev,
-                        files: [...(prev.files || []), newFile],
+                        assignments: [...(prev.assignments || []), newAssignment],
                       }))
                     }
                   />
                 </div>
               )}
-              {/* File Table */}
-              <FileTable 
-                files={lessonPlan.files || []} 
-                onUpdate={async () => {
-                  // Refetch the lesson plan to update the UI
-                  const res = await getLessonPlanByID(lessonId);
-                  if (res.success) {
-                    setLessonPlan(res.data);
-                  }
-                }}
+              <AssignmentTable 
+                assignments={lessonPlan.assignments || []} 
+                onUpdate={() => {
+                  // Refresh lesson plan data
+                  fetchPlan();
+                }} 
               />
               
-              {lessonPlan.files?.length === 0 && (
-                <div className="text-center py-6 text-gray-500">
-                  No files have been uploaded yet.
+              {(!lessonPlan.assignments || lessonPlan.assignments.length === 0) && (
+                <div className="text-center py-4 text-gray-500">
+                  No assignments have been created yet.
                 </div>
               )}
             </AccordionContent>
           </AccordionItem>
-
-          {/* Assignments - Only show for regular lesson plans */}
-          {!isTemplate && (
-            <AccordionItem value="assignments" className="border rounded-md overflow-hidden border-gray-200">
-              <AccordionTrigger className="bg-orange-500 text-white px-6 py-3 rounded-t flex justify-between items-center">
-                <span className="font-semibold">Assignments</span>
-              </AccordionTrigger>
-              <AccordionContent className="p-4">
-                {canEdit && lessonPlan.class && (
-                  <div className="flex justify-end mb-4">
-                    <UploadAssignmentDialog
-                      lessonPlanId={lessonPlan.id}
-                      classId={lessonPlan.class.code}
-                      onAssignmentUploaded={(newAssignment) =>
-                        setLessonPlan((prev: any) => ({
-                          ...prev,
-                          assignments: [...(prev.assignments || []), newAssignment],
-                        }))
-                      }
-                    />
-                  </div>
-                )}
-                <AssignmentTable 
-                  assignments={lessonPlan.assignments || []} 
-                  onUpdate={async () => {
-                    // Refetch the lesson plan to update the UI
-                    const res = await getLessonPlanByID(lessonId);
-                    if (res.success) {
-                      setLessonPlan(res.data);
-                    }
-                  }}
-                />
-                
-                {lessonPlan.assignments?.length === 0 && (
-                  <div className="text-center py-6 text-gray-500">
-                    No assignments have been created yet.
-                  </div>
-                )}
-              </AccordionContent>
-            </AccordionItem>
-          )}
-        </Accordion>
-
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-600 p-4 rounded-md mt-6">
-            {error}
-          </div>
         )}
-      </div>
+      </Accordion>
+
+      {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
     </div>
-    </main>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { getLessonPlanByID, updateLessonPlan } from '@/src/app/actions/lessonPlansActions';
 import Breadcrumbs from '@/src/components/Breadcrumbs';
 import { Button } from '@/src/components/ui/button';
@@ -17,35 +18,40 @@ import FileTable from '@/src/components/lessonPlans/FileTable';
 import UploadAssignmentDialog from '@/src/components/lessonPlans/UploadAssignmentDialog';
 import AssignmentTable from '@/src/components/lessonPlans/AssignmentTable';
 import RichEditor from '@/src/components/RichEditor';
-import { Pen } from 'lucide-react';
-
+import { Pen, ChevronLeft } from 'lucide-react';
 
 interface LessonPlanDetailProps {
   classId: string;
   planId: string;
 }
-  
+
 export default function ClassLessonPlanDetailPage({ classId, planId }: LessonPlanDetailProps) {
   const [lessonPlan, setLessonPlan] = useState<any>(null);
   const [editMode, setEditMode] = useState(false);
   const [form, setForm] = useState({ name: '', description: '' });
   const [error, setError] = useState<string | null>(null);
-  const [accordionValue, setAccordionValue] = useState<string | null>(null);  
+  const [accordionValue, setAccordionValue] = useState<string | null>(null);
 
   // Fetch lesson plan on mount.
   useEffect(() => {
     async function fetchPlan() {
-      const res = await getLessonPlanByID(planId);
-      if (res.success) {
-        setLessonPlan(res.data);
-        if (res.data) {
-          setForm({
-            name: res.data.name,
-            description: res.data.description || '',
-          });
+      try {
+        const res = await getLessonPlanByID(planId);
+        if (res.success) {
+          setLessonPlan(res.data);
+          if (res.data) {
+            setForm({
+              name: res.data.name,
+              description: res.data.description || '',
+            });
+          }
+          setError(null);
+        } else {
+          setError(res.error || 'Failed to fetch lesson plan');
         }
-      } else {
-        setError(res.error || null);
+      } catch (error: any) {
+        setError(error.message || 'An unexpected error occurred');
+        console.error('Error fetching lesson plan:', error);
       }
     }
     if (planId) {
@@ -92,9 +98,8 @@ export default function ClassLessonPlanDetailPage({ classId, planId }: LessonPla
     }
     setEditMode(false);
   }
-
-  if (!lessonPlan) return <div className="flex justify-center items-center min-h-[60vh]">Loading...</div>;
-
+  
+  // Refetch lesson plan data
   async function fetchPlan() {
     try {
       const res = await getLessonPlanByID(planId);
@@ -116,8 +121,10 @@ export default function ClassLessonPlanDetailPage({ classId, planId }: LessonPla
     }
   }
 
+  if (!lessonPlan) return <div className="flex justify-center items-center min-h-[60vh]">Loading...</div>;
+
   return (
-    <div className="w-full h-[100vh] lg:w-5/6 xl:w-3/4 mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6 overflow-y-auto">
+    <div className="w-full h-[100vh] lg:w-5/6 xl:w-3/4 mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
       {/* Breadcrumbs - hidden on mobile */}
       <div className="hidden sm:block">
         <Breadcrumbs
@@ -132,32 +139,53 @@ export default function ClassLessonPlanDetailPage({ classId, planId }: LessonPla
       {/* Mobile Back Link */}
       <div className="sm:hidden mb-2">
         <Button variant="ghost" className="p-0 h-auto" asChild>
-          <a href={`/teacher/dashboard/classes/${classId}`}>← Back to Class</a>
+          <Link href={`/teacher/dashboard/classes/${classId}?tab=lessonPlans`}>
+            <ChevronLeft className="h-4 w-4 mr-1" />
+            Back to Class
+          </Link>
         </Button>
       </div>
 
+      {/* Desktop Back to Class Button */}
+      {/* <div className="hidden sm:block">
+        <Button variant="ghost" className="mb-4" asChild>
+          <Link href={`/teacher/dashboard/classes/${classId}?tab=lessonPlans`}>
+            <ChevronLeft className="h-4 w-4 mr-2" />
+            Back to Class Lesson Plans
+          </Link>
+        </Button>
+      </div> */}
+
       {/* Header: Title, Edit, Save & Cancel */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        {editMode ? (
-          <div className="flex-1 w-full sm:mr-4">
+        <div className="flex-1">
+          {editMode ? (
             <Input
               className="text-xl font-bold"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
             />
-          </div>
-        ) : (
-          <h1 className="text-2xl sm:text-3xl font-bold break-words">{lessonPlan.name}</h1>
-        )}
+          ) : (
+            <h1 className="text-2xl sm:text-3xl font-bold break-words">{lessonPlan.name}</h1>
+          )}
+        </div>
+        
         {editMode ? (
           <div className="flex items-center gap-2 self-end">
-            <Button onClick={handleSave} size="sm" className="sm:size-default bg-orange-500">Save</Button>
-            <Button variant="secondary" onClick={handleCancel} size="sm" className="sm:size-default">
+            <Button onClick={handleSave} size="sm" className="bg-orange-500 hover:bg-orange-600">Save</Button>
+            <Button variant="secondary" onClick={handleCancel} size="sm">
               Cancel
             </Button>
           </div>
         ) : (
-          <Button onClick={() => setEditMode(true)} size="sm" className="sm:size-default bg-orange-500 self-end"><Pen /></Button>
+          <Button 
+            onClick={() => setEditMode(true)} 
+            size="sm" 
+            className="bg-orange-500 hover:bg-orange-600 self-end"
+          >
+            <Pen className="h-4 w-4 mr-2" />
+            Edit
+          </Button>
         )}
       </div>
 
@@ -206,12 +234,15 @@ export default function ClassLessonPlanDetailPage({ classId, planId }: LessonPla
               files={lessonPlan.files || []} 
               onUpdate={async () => {
                 // Refetch the lesson plan to update the UI
-                const res = await getLessonPlanByID(planId);
-                if (res.success) {
-                  setLessonPlan(res.data);
-                }
+                await fetchPlan();
               }}
             />
+            
+            {(!lessonPlan.files || lessonPlan.files.length === 0) && (
+              <div className="text-center py-4 text-gray-500">
+                No files have been uploaded yet.
+              </div>
+            )}
           </AccordionContent>
         </AccordionItem>
 
@@ -240,6 +271,12 @@ export default function ClassLessonPlanDetailPage({ classId, planId }: LessonPla
                 fetchPlan();
               }} 
             />
+            
+            {(!lessonPlan.assignments || lessonPlan.assignments.length === 0) && (
+              <div className="text-center py-4 text-gray-500">
+                No assignments have been created yet.
+              </div>
+            )}
           </AccordionContent>
         </AccordionItem>
       </Accordion>

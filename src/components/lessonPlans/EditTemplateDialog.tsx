@@ -5,50 +5,49 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/src/componen
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Textarea } from '@/src/components/ui/textarea';
-import { updateLessonPlan, updateGenericLessonPlan } from '@/src/app/actions/lessonPlansActions';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/src/components/ui/select';
+import { updateGenericLessonPlan } from '@/src/app/actions/lessonPlansActions';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
-import { useSession } from 'next-auth/react';
+import { GradeLevel } from '@/src/app/actions/lessonPlansActions';
 
-interface EditLessonPlanDialogProps {
+interface EditTemplateDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  lessonPlan: {
+  template: {
     id: string;
     name: string;
     description?: string;
-    genericLessonPlanId?: string;
+    gradeLevel?: string;
   };
 }
 
-export default function EditLessonPlanDialog({
+export default function EditTemplateDialog({
   isOpen,
   onClose,
   onSuccess,
-  lessonPlan,
-}: EditLessonPlanDialogProps) {
+  template,
+}: EditTemplateDialogProps) {
   const router = useRouter();
-  const { data: session } = useSession();
   const [form, setForm] = useState({
     name: '',
     description: '',
+    gradeLevel: 'all' as GradeLevel,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  const isTemplate = !!lessonPlan.genericLessonPlanId;
-  const isSuperUser = session?.user?.role === 'SUPER';
-
-  // Set form data when dialog opens or lesson plan changes
+  // Set form data when dialog opens or template changes
   useEffect(() => {
-    if (isOpen && lessonPlan) {
+    if (isOpen && template) {
       setForm({
-        name: lessonPlan.name,
-        description: lessonPlan.description || '',
+        name: template.name || '',
+        description: template.description || '',
+        gradeLevel: (template.gradeLevel as GradeLevel) || 'all',
       });
     }
-  }, [isOpen, lessonPlan]);
+  }, [isOpen, template]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -56,34 +55,24 @@ export default function EditLessonPlanDialog({
     setError(null);
     
     try {
-      let response;
-      
-      // If super user is editing a template, use updateGenericLessonPlan
-      if (isSuperUser && isTemplate) {
-        response = await updateGenericLessonPlan(lessonPlan.id, {
-          name: form.name,
-          description: form.description,
-        });
-      } else {
-        // Otherwise use regular updateLessonPlan
-        response = await updateLessonPlan(lessonPlan.id, {
-          name: form.name,
-          description: form.description,
-        });
-      }
+      const response = await updateGenericLessonPlan(template.id, {
+        name: form.name,
+        description: form.description,
+        gradeLevel: form.gradeLevel !== 'all' ? form.gradeLevel : undefined,
+      });
       
       if (response.success) {
-        toast.success('Lesson plan updated successfully');
+        toast.success('Template updated successfully');
         onSuccess(); // Trigger refresh in parent component
         onClose(); // Close the dialog
       } else {
-        setError(response.error || 'Failed to update lesson plan');
-        toast.error(response.error || 'Failed to update lesson plan');
+        setError(response.error || 'Failed to update template');
+        toast.error(response.error || 'Failed to update template');
       }
     } catch (error: any) {
-      console.error('Edit lesson plan error:', error);
+      console.error('Edit template error:', error);
       setError('An unexpected error occurred');
-      toast.error('An error occurred while updating the lesson plan');
+      toast.error('An error occurred while updating the template');
     } finally {
       setIsSubmitting(false);
     }
@@ -93,7 +82,7 @@ export default function EditLessonPlanDialog({
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{isTemplate ? 'Edit Template' : 'Edit Lesson Plan'}</DialogTitle>
+          <DialogTitle>Edit Template</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
@@ -102,10 +91,30 @@ export default function EditLessonPlanDialog({
               id="name"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
-              placeholder="Lesson Plan Name"
+              placeholder="Template Name"
               required
               disabled={isSubmitting}
             />
+          </div>
+          
+          <div className="space-y-2">
+            <label htmlFor="gradeLevel" className="text-sm font-medium">Grade Level</label>
+            <Select
+              value={form.gradeLevel}
+              onValueChange={(value) => setForm({ ...form, gradeLevel: value as GradeLevel })}
+              disabled={isSubmitting}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select grade level" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Grades</SelectItem>
+                <SelectItem value="5-6">Grades 5-6</SelectItem>
+                <SelectItem value="7-8">Grades 7-8</SelectItem>
+                <SelectItem value="9-10">Grades 9-10</SelectItem>
+                <SelectItem value="11-12">Grades 11-12</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           
           <div className="space-y-2">
@@ -114,7 +123,7 @@ export default function EditLessonPlanDialog({
               id="description"
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
-              placeholder="Lesson Plan Description"
+              placeholder="Template Description"
               rows={5}
               disabled={isSubmitting}
             />
