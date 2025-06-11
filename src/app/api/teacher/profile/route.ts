@@ -9,7 +9,7 @@ export async function GET(req: Request) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session?.user?.id || session.user.role !== "TEACHER") {
+    if (!session?.user?.id || (session.user.role !== "TEACHER" && session.user.role !== "SUPER")) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -22,7 +22,22 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    // Check if the teacher profile exists
+    // For SUPER users, we might not have a teacher profile, so let's handle differently
+    if (session.user.role === "SUPER") {
+      return NextResponse.json({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        image: user.image,
+        role: "SUPER",
+        isSuperUser: true,
+        firstName: user.name?.split(" ")[0] || "Admin",
+        lastName: user.name?.split(" ").slice(1).join(" ") || "User",
+        profileImage: user.image,
+      });
+    }
+
+    // For TEACHER users, check if the teacher profile exists
     const teacher = await db.teacher.findUnique({
       where: { userId: session.user.id },
     });
@@ -92,10 +107,41 @@ export async function PUT(req: Request) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session?.user?.id || session.user.role !== "TEACHER") {
+    if (!session?.user?.id || (session.user.role !== "TEACHER" && session.user.role !== "SUPER")) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     
+    const data = await req.json();
+    
+    // For SUPER users, we only update the User model
+    if (session.user.role === "SUPER") {
+      const userData = {
+        name: `${data.firstName} ${data.lastName}`.trim(),
+        ...(data.profileImage ? { image: data.profileImage } : {})
+      };
+      
+      const updatedUser = await db.user.update({
+        where: { id: session.user.id },
+        data: userData,
+      });
+      
+      return NextResponse.json({
+        message: "Profile updated successfully",
+        user: {
+          id: updatedUser.id,
+          name: updatedUser.name,
+          email: updatedUser.email,
+          image: updatedUser.image,
+          role: "SUPER",
+          isSuperUser: true,
+          firstName: data.firstName,
+          lastName: data.lastName,
+          profileImage: data.profileImage || updatedUser.image,
+        }
+      });
+    }
+    
+    // For TEACHER users, proceed with existing logic
     // Find the teacher ID if not in session
     let teacherId = session.user.teacherId;
     
@@ -111,8 +157,6 @@ export async function PUT(req: Request) {
       
       teacherId = teacher.id;
     }
-    
-    const data = await req.json();
     
     // Update user and teacher profile in a transaction
     const updatedUser = await db.$transaction(async (tx) => {

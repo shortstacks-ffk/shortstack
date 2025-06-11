@@ -78,11 +78,11 @@ export default function UserDropdown({
                 {properInitials}
               </AvatarFallback>
             )}
-            {!imageUrl && (
+            {/* {!imageUrl && (
               <AvatarFallback className="bg-blue-100 text-blue-800">
                 {properInitials}
               </AvatarFallback>
-            )}
+            )} */}
           </Avatar>
           <span className="font-medium text-sm hidden sm:inline text-gray-800">{teacherName}</span>
           <ChevronDown className="h-4 w-4 text-gray-500" />

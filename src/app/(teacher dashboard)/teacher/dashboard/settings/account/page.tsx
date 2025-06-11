@@ -12,6 +12,7 @@ import { Loader2 } from 'lucide-react';
 
 import AccountProfileTab from '@/src/components/settings/AccountProfileTab';
 import AccountSecurityTab from '@/src/components/settings/AccountSecurityTab';
+import SuperUserBadge from "@/src/components/SuperUserBadge";
 
 // Create a separate component that uses useSearchParams
 function TeacherAccountSettings() {
@@ -104,9 +105,22 @@ function TeacherAccountSettings() {
     window.dispatchEvent(event);
   };
 
+  const isSuperUser = session?.user?.role === "SUPER";
+  
   return (
     <div className="w-full h-full">
-      <h1 className="text-xl md:text-2xl font-bold mb-4">Profile</h1>
+      <div className="flex items-center mb-4">
+        <h1 className="text-xl md:text-2xl font-bold">Profile</h1>
+        {isSuperUser && <SuperUserBadge />}
+      </div>
+      
+      {isSuperUser && (
+        <div className="p-4 mb-4 bg-amber-50 border border-amber-200 rounded-lg">
+          <p className="text-amber-800">
+            <strong>Administrator Account</strong> - Changes made here will affect your administrator profile.
+          </p>
+        </div>
+      )}
       
       <div className="bg-white rounded-lg shadow-sm border">
         <Tabs defaultValue={initialTab} className="w-full">

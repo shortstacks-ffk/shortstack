@@ -33,6 +33,13 @@ const studentProfileSchema = z.object({
   schoolEmail: z.string().email('Invalid email format'),
 });
 
+// Super user schema (similar to teacher but without institution/bio requirements)
+const superUserProfileSchema = z.object({
+  firstName: z.string().min(1, 'First name is required'),
+  lastName: z.string().min(1, 'Last name is required'),
+  email: z.string().email('Invalid email format'),
+});
+
 export default function AccountProfileTab({ 
   user, 
   role, 
@@ -43,6 +50,8 @@ export default function AccountProfileTab({
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   
+  const isSuperUser = session?.user?.role === "SUPER";
+
   // Determine if the user is a student based on either prop
   const isStudent = propIsStudent !== undefined ? propIsStudent : role === "student";
   
@@ -59,12 +68,23 @@ export default function AccountProfileTab({
     return user?.profileImage || user?.image || null;
   });
 
-  const validationSchema = isStudent ? studentProfileSchema : teacherProfileSchema;
+  // Select appropriate validation schema based on user type
+  const validationSchema = isSuperUser 
+    ? superUserProfileSchema 
+    : isStudent 
+    ? studentProfileSchema 
+    : teacherProfileSchema;
 
   // Initialize form with correct default values based on role
   const { register, handleSubmit, reset, formState: { errors, isDirty, dirtyFields }, setValue } = useForm({
     resolver: zodResolver(validationSchema),
-    values: isStudent 
+    values: isSuperUser 
+      ? {
+          firstName: user?.firstName || '',
+          lastName: user?.lastName || '',
+          email: user?.email || '',
+        }
+      : isStudent 
       ? {
           firstName: user?.firstName || '',
           lastName: user?.lastName || '',
@@ -83,20 +103,27 @@ export default function AccountProfileTab({
   useEffect(() => {
     if (user) {
       // Reset the form with user data
-      reset(isStudent 
-        ? {
-            firstName: user?.firstName || '',
-            lastName: user?.lastName || '',
-            schoolEmail: user?.schoolEmail || '',
-          }
-        : {
-            firstName: user?.firstName || user?.teacherProfile?.firstName || '',
-            lastName: user?.lastName || user?.teacherProfile?.lastName || '',
-            email: user?.email || '',
-            institution: user?.institution || user?.teacherProfile?.institution || '',
-            bio: user?.bio || user?.teacherProfile?.bio || '',
-          }
-      );
+      if (isSuperUser) {
+        reset({
+          firstName: user?.firstName || '',
+          lastName: user?.lastName || '',
+          email: user?.email || '',
+        });
+      } else if (isStudent) {
+        reset({
+          firstName: user?.firstName || '',
+          lastName: user?.lastName || '',
+          schoolEmail: user?.schoolEmail || '',
+        });
+      } else {
+        reset({
+          firstName: user?.firstName || user?.teacherProfile?.firstName || '',
+          lastName: user?.lastName || user?.teacherProfile?.lastName || '',
+          email: user?.email || '',
+          institution: user?.institution || user?.teacherProfile?.institution || '',
+          bio: user?.bio || user?.teacherProfile?.bio || '',
+        });
+      }
       
       // Reset image preview
       setImagePreview(isStudent
@@ -107,7 +134,7 @@ export default function AccountProfileTab({
       // Clear uploaded image URL when user changes
       setUploadedImageUrl(null);
     }
-  }, [user, reset, isStudent]);
+  }, [user, reset, isStudent, isSuperUser]);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -144,6 +171,7 @@ export default function AccountProfileTab({
       const formData = new FormData();
       formData.append('file', file);
 
+      // Use teacher endpoint for both teachers and super users
       const endpoint = isStudent
         ? '/api/student/profile/image'
         : '/api/teacher/profile/image';
@@ -197,21 +225,34 @@ export default function AccountProfileTab({
     setSaving(true);
     
     try {
+      // Use teacher endpoint for both teachers and super users
       const endpoint = isStudent
         ? '/api/student/profile'
         : '/api/teacher/profile';
         
-      // For teacher profiles, ensure we're sending the institution and bio fields
-      const payload = isStudent 
-        ? data 
-        : {
-            firstName: data.firstName,
-            lastName: data.lastName,
-            institution: data.institution || '',
-            bio: data.bio || '',
-            // Include the uploaded image URL if available
-            profileImage: uploadedImageUrl || undefined,
-          };
+      // Prepare payload based on user type
+      let payload: any;
+      
+      if (isSuperUser) {
+        payload = {
+          firstName: data.firstName,
+          lastName: data.lastName,
+          // Include the uploaded image URL if available
+          profileImage: uploadedImageUrl || undefined,
+        };
+      } else if (isStudent) {
+        payload = data;
+      } else {
+        // Teacher
+        payload = {
+          firstName: data.firstName,
+          lastName: data.lastName,
+          institution: data.institution || '',
+          bio: data.bio || '',
+          // Include the uploaded image URL if available
+          profileImage: uploadedImageUrl || undefined,
+        };
+      }
         
       const res = await fetch(endpoint, {
         method: 'PUT',
@@ -233,7 +274,7 @@ export default function AccountProfileTab({
       });
       
       // If we had an uploaded image and it was successfully saved
-      if (uploadedImageUrl) {
+      if (uploadedImageUrl && updateSession) {
         // Update session with new image
         await updateSession({
           ...session?.user,
@@ -257,7 +298,7 @@ export default function AccountProfileTab({
       }
       
       // Update session name if it changed
-      if (data.firstName && data.lastName) {
+      if (data.firstName && data.lastName && updateSession) {
         await updateSession({
           ...session?.user,
           name: `${data.firstName} ${data.lastName}`
@@ -333,7 +374,7 @@ export default function AccountProfileTab({
             }
           </div>
           
-          {!isStudent && (
+          {!isStudent && !isSuperUser && (
             <>
               <div className="space-y-2">
                 <Label htmlFor="institution" className="text-gray-600">Institution</Label>
@@ -412,7 +453,7 @@ export default function AccountProfileTab({
       <div className="flex justify-end mt-4 pt-4 border-t border-gray-200">
         <Button 
           type="submit" 
-          disabled={saving || (!hasUnsavedChanges) || isStudent}
+          disabled={saving || (!hasUnsavedChanges)}
           className="bg-orange-500 hover:bg-orange-600 text-white"
         >
           {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
