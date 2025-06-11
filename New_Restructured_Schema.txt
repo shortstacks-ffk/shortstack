@@ -18,31 +18,35 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   accounts      Account[]
-  student       Student?  @relation("UserToStudent")
   teacher       Teacher?
+  student       Student?  @relation("UserToStudent")
 }
 
 model Teacher {
-  id             String          @id @default(cuid())
-  userId         String          @unique
-  firstName      String
-  lastName       String
-  profileImage   String?
-  bio            String?
-  institution    String?
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  assignments    Assignment[]
-  createdBills   Bill[]
-  calendarEvents CalendarEvent[]
+  id           String          @id @default(cuid())
+  userId       String          @unique
+  firstName    String
+  lastName     String
+  profileImage  String?
+  bio          String?
+  institution  String?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  
+  // Relations - moved from User
   classes        Class[]
+  students       Student[]     @relation("TeacherToStudents")
+  createdBills   Bill[]
+  lessonPlans    LessonPlan[]  
+  storeItems     StoreItem[]   
+  assignments    Assignment[]  
   files          File[]
-  lessonPlans    LessonPlan[]
-  storeItems     StoreItem[]
-  students       Student[]       @relation("TeacherToStudents")
-  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  calendarEvents CalendarEvent[]
   todos          Todo[]
-
+  
+  // Relation to User account
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
   @@index([userId])
 }
 
@@ -71,21 +75,25 @@ model Class {
   code           String          @unique
   grade          String?
   overview       String?
+  teacherId      String          // Changed from userId to teacherId
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   color          String?
+  teacherName    String?
   endDate        DateTime?
   startDate      DateTime?
-  teacherId      String
-  teacherName    String?
-  calendarEvents CalendarEvent[]
+  
+  // Relations
   teacher        Teacher         @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  calendarEvents CalendarEvent[]
   classSessions  ClassSession[]
   enrollments    Enrollment[]
-  bills          Bill[]          @relation("BillToClass")
+  
+  // Many-to-many relations
   assignments    Assignment[]    @relation("ClassAssignments")
   files          File[]          @relation("ClassFiles")
   lessonPlans    LessonPlan[]    @relation("ClassLessonPlans")
+  bills          Bill[]          @relation("BillToClass")
   storeItems     StoreItem[]     @relation("StoreItemToClass")
 
   @@index([code])
@@ -106,29 +114,31 @@ model ClassSession {
 }
 
 model Student {
-  id                    String                        @id @default(cuid())
-  firstName             String
-  lastName              String
-  schoolEmail           String                        @unique
-  password              String
-  progress              Int                           @default(0)
-  lastLogin             DateTime?
-  profileImage          String?
-  userId                String?                       @unique
-  teacherId             String
-  createdAt             DateTime                      @default(now())
-  updatedAt             DateTime                      @updatedAt
-  teacherName           String?
-  bankAccounts          BankAccount[]
-  bankStatements        BankStatement[]
-  calendarEvents        CalendarEvent[]
-  enrollments           Enrollment[]
-  teacher               Teacher                       @relation("TeacherToStudents", fields: [teacherId], references: [id])
-  user                  User?                         @relation("UserToStudent", fields: [userId], references: [id])
+  id            String    @id @default(cuid())
+  firstName     String
+  lastName      String
+  schoolEmail   String    @unique
+  password      String
+  progress      Int       @default(0)
+  lastLogin     DateTime?
+  profileImage  String?
+  userId        String?   @unique
+  teacherId     String    // Direct ownership by teacher
+  teacherName   String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relations
+  teacher             Teacher              @relation("TeacherToStudents", fields: [teacherId], references: [id])
+  user                User?                @relation("UserToStudent", fields: [userId], references: [id])
+  bankAccounts        BankAccount[]
+  bankStatements      BankStatement[]
+  calendarEvents      CalendarEvent[]
+  enrollments         Enrollment[]
   assignmentSubmissions StudentAssignmentSubmission[]
-  studentBills          StudentBill[]
-  purchases             StudentPurchase[]
-  excludedFromBills     Bill[]                        @relation("ExcludedFromBill")
+  studentBills        StudentBill[]
+  purchases           StudentPurchase[]
+  excludedFromBills   Bill[]               @relation("ExcludedFromBill")
 
   @@index([teacherId])
   @@index([schoolEmail])
@@ -153,15 +163,17 @@ model LessonPlan {
   id                  String             @id @default(cuid())
   name                String
   description         String?
+  teacherId           String              // Changed: teacherId instead of classId
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
   genericLessonPlanId String?
-  teacherId           String
-  genericLessonPlan   GenericLessonPlan? @relation("GenericToUserLessonPlans", fields: [genericLessonPlanId], references: [id])
+  
+  // Relations
   teacher             Teacher            @relation(fields: [teacherId], references: [id], onDelete: Cascade)
-  classes             Class[]            @relation("ClassLessonPlans")
+  genericLessonPlan   GenericLessonPlan? @relation("GenericToUserLessonPlans", fields: [genericLessonPlanId], references: [id])
   assignments         Assignment[]       @relation("LessonPlanAssignments")
   files               File[]             @relation("LessonPlanFiles")
+  classes             Class[]            @relation("ClassLessonPlans") // Many-to-many with classes
 
   @@index([teacherId])
 }
@@ -170,10 +182,9 @@ model GenericLessonPlan {
   id          String       @id @default(cuid())
   name        String       @unique
   description String?
-  gradeLevel  String?      @default("all")
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
-  createdBy   String?
+  createdBy   String?      // Optional reference to Teacher who created it
   lessonPlans LessonPlan[] @relation("GenericToUserLessonPlans")
   assignments Assignment[] @relation("GenericLessonPlanAssignments")
   files       File[]       @relation("GenericLessonPlanFiles")
@@ -186,11 +197,13 @@ model File {
   activity          String?
   size              Int?
   url               String
+  teacherId         String              // Changed: teacherId instead of classId
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
-  teacherId         String
+  
+  // Relations
   teacher           Teacher             @relation(fields: [teacherId], references: [id], onDelete: Cascade)
-  classes           Class[]             @relation("ClassFiles")
+  classes           Class[]             @relation("ClassFiles") // Many-to-many with classes
   GenericLessonPlan GenericLessonPlan[] @relation("GenericLessonPlanFiles")
   lessonPlans       LessonPlan[]        @relation("LessonPlanFiles")
 
@@ -203,18 +216,20 @@ model Assignment {
   fileType           String
   activity           String?
   dueDate            DateTime?
+  textAssignment      String?
+  description        String?
   size               Int?
   url                String?
   rubric             String?
+  teacherId          String                        // Changed: teacherId instead of classId
   createdAt          DateTime                      @default(now())
   updatedAt          DateTime                      @updatedAt
-  description        String?
-  teacherId          String
-  textAssignment     String?
+  
+  // Relations
   teacher            Teacher                       @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  classes            Class[]                       @relation("ClassAssignments") // Many-to-many with classes
   calendarEvents     CalendarEvent[]
   studentSubmissions StudentAssignmentSubmission[]
-  classes            Class[]                       @relation("ClassAssignments")
   GenericLessonPlan  GenericLessonPlan[]           @relation("GenericLessonPlanAssignments")
   lessonPlans        LessonPlan[]                  @relation("LessonPlanAssignments")
 
@@ -251,7 +266,7 @@ model Bill {
   description      String?
   frequency        BillFrequency   @default(ONCE)
   status           BillStatus      @default(ACTIVE)
-  creatorId        String
+  creatorId        String          // Points to Teacher.id
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
   creator          Teacher         @relation(fields: [creatorId], references: [id], onDelete: Cascade)
@@ -303,9 +318,11 @@ model StoreItem {
   description String?
   quantity    Int               @default(0)
   isAvailable Boolean           @default(true)
+  teacherId   String            // Changed: teacherId instead of classId
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
-  teacherId   String
+  
+  // Relations
   teacher     Teacher           @relation(fields: [teacherId], references: [id], onDelete: Cascade)
   purchases   StudentPurchase[]
   classes     Class[]           @relation("StoreItemToClass")
@@ -387,7 +404,7 @@ model CalendarEvent {
   variant            String          @default("primary")
   isRecurring        Boolean         @default(false)
   recurringDays      Int[]
-  createdById        String
+  createdById        String          // Points to Teacher.id
   billId             String?
   assignmentId       String?
   classId            String?
@@ -425,10 +442,10 @@ model Todo {
   completed       Boolean        @default(false)
   dueDate         DateTime
   priority        TodoPriority   @default(UPCOMING)
+  teacherId       String         // Changed from userId to teacherId
   calendarEventId String?
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
-  teacherId       String
   calendarEvent   CalendarEvent? @relation(fields: [calendarEventId], references: [id], onDelete: Cascade)
   teacher         Teacher        @relation(fields: [teacherId], references: [id], onDelete: Cascade)
 

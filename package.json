@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "postinstall": "prisma generate",
-    "deploy-db": "prisma generate && prisma migrate deploy"
+    "deploy-db": "prisma generate && prisma migrate deploy",
+    "create-super-user": "npx tsx scripts/create-super-user.ts"
 
   },
   "dependencies": {
