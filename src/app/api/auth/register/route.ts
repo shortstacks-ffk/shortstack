@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { db } from "@/src/lib/db";
 
-// Update the POST function to include Account creation
 export async function POST(req: Request) {
   try {
     const { email, password, name, firstName, lastName } = await req.json();
@@ -29,50 +28,46 @@ export async function POST(req: Request) {
     // Hash the password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create user and associated records in one transaction
+    // Create user and teacher profile in one transaction
     const result = await db.$transaction(async (tx) => {
       // Create user
       const user = await tx.user.create({
         data: {
           email,
-          name: name || `${firstName || ''} ${lastName || ''}`.trim() || email.split('@')[0],
-          firstName: firstName || name?.split(' ')[0] || '',
-          lastName: lastName || name?.split(' ').slice(1).join(' ') || '',
           password: hashedPassword,
+          name: name || `${firstName || ''} ${lastName || ''}`.trim(),
           role: "TEACHER",
         },
       });
 
-      // Create TeacherProfile
-      await tx.teacherProfile.create({
+      // Create teacher profile
+      const teacher = await tx.teacher.create({
         data: {
           userId: user.id,
-          firstName: user.firstName || '',
-          lastName: user.lastName || '',
+          firstName: firstName || name?.split(' ')[0] || email.split('@')[0],
+          lastName: lastName || name?.split(' ').slice(1).join(' ') || 'Teacher',
+          bio: "",
+          institution: "",
         },
       });
-      
-      // Create a credentials Account entry for this user
-      await tx.account.create({
-        data: {
-          userId: user.id,
-          type: "credentials",
-          provider: "credentials",
-          providerAccountId: user.id, // Using the user ID as provider account ID
-        }
-      });
 
-      return user;
+      return {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        teacherId: teacher.id
+      };
     });
 
     return NextResponse.json({
       message: "Account created successfully",
-      userId: result.id
+      userId: result.id,
+      teacherId: result.teacherId
     });
   } catch (error) {
     console.error("Registration error:", error);
     return NextResponse.json(
-      { error: "Error creating user" },
+      { error: "Failed to create account" },
       { status: 500 }
     );
   }
