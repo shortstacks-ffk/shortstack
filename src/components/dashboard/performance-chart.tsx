@@ -31,11 +31,7 @@ interface ClassData {
   studentsWithGrades: number;
 }
 
-interface PerformanceChartProps {
-  recentClasses: ClassData[];
-}
-
-export function PerformanceChart({ recentClasses }: PerformanceChartProps) {
+export function PerformanceChart() {
   const [classData, setClassData] = useState<ClassData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
