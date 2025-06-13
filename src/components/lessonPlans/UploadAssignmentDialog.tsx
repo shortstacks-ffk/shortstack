@@ -40,6 +40,9 @@ export default function UploadAssignmentDialog({
   const [dueDate, setDueDate] = useState('');
   const [file, setFile] = useState<File | null>(null);
 
+  // Get today's date in YYYY-MM-DD format for min date
+  const today = new Date().toISOString().split('T')[0];
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0]);
@@ -104,12 +107,15 @@ export default function UploadAssignmentDialog({
 
       console.log('Creating assignment with classId:', classId);
       
+      // Pass the date string directly without converting to Date object
+      // The action will handle the timezone conversion properly
+      const dueDateString = dueDate || undefined;
+      
       // Create assignment record using our action
       const res = await createAssignment({
         name,
         activity,
-        dueDate: dueDate ? new Date(dueDate) : undefined,
-        classId,
+        dueDate: dueDateString, // Pass as string, let the action handle conversion
         lessonPlanIds: [lessonPlanId],
         url: assignmentType === 'file' ? url : '',
         fileType: assignmentType === 'file' ? (fileType || '') : 'text',
@@ -239,7 +245,7 @@ export default function UploadAssignmentDialog({
             </div>
           )}
           
-          {/* Activity Type - Only show relevant options based on assignment type */}
+          {/* Activity Type */}
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700">Activity Type</label>
             <select 
@@ -267,13 +273,17 @@ export default function UploadAssignmentDialog({
           </div>
           
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Due Date </label>
+            <label className="text-sm font-medium text-gray-700">Due Date</label>
             <Input 
               type="date" 
               value={dueDate} 
               onChange={(e) => setDueDate(e.target.value)}
-              disabled={isUploading} 
+              disabled={isUploading}
+              min={today} // Prevent selecting past dates
             />
+            {dueDate && new Date(dueDate) < new Date(today) && (
+              <p className="text-red-500 text-xs">Please select a future date</p>
+            )}
           </div>
           
           {error && <div className="text-red-500 text-sm bg-red-50 p-2 rounded">{error}</div>}

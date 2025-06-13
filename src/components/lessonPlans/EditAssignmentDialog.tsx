@@ -53,6 +53,9 @@ export default function EditAssignmentDialog({
   // Determine if this is a text assignment
   const isTextAssignment = assignment.fileType === 'text';
   
+  // Get today's date in YYYY-MM-DD format for min date
+  const today = new Date().toISOString().split('T')[0];
+  
   useEffect(() => {
     if (assignment) {
       setForm({
@@ -70,16 +73,34 @@ export default function EditAssignmentDialog({
     setIsSubmitting(true);
     
     try {
+      // Get the lessonPlanIds from the assignment
+      let lessonPlanIds: string[] = [];
+      
+      // Try to get lessonPlanIds directly if available
+      if (assignment.lessonPlanIds && assignment.lessonPlanIds.length > 0) {
+        lessonPlanIds = assignment.lessonPlanIds;
+      } 
+      // Otherwise try to extract them from the lessonPlans relationship if available
+      else if (assignment.lessonPlans && assignment.lessonPlans.length > 0) {
+        lessonPlanIds = assignment.lessonPlans.map(lp => lp.id);
+      }
+      
+      // Ensure we have at least one lessonPlanId
+      if (lessonPlanIds.length === 0) {
+        throw new Error("No lesson plan found for this assignment");
+      }
+      
       const result = await updateAssignment(assignment.id, {
         name: form.name,
         activity: form.activity,
-        dueDate: form.dueDate ? new Date(form.dueDate) : undefined,
-        classId: assignment.classId || "",
+        dueDate: form.dueDate || undefined, // Pass as string, let action handle conversion
+        lessonPlanIds: lessonPlanIds,
         textAssignment: isTextAssignment ? form.textAssignment : undefined,
         // Include other required fields from the original assignment
-        url: assignment.url,
-        fileType: assignment.fileType,
-        size: assignment.size
+        url: assignment.url || '',
+        fileType: assignment.fileType || '',
+        size: typeof assignment.size === 'string' ? parseInt(assignment.size) || 0 : assignment.size || 0,
+        description: assignment.description
       });
       
       if (result.success) {
@@ -99,6 +120,9 @@ export default function EditAssignmentDialog({
   // Get appropriate activity options based on assignment type
   const activityOptions = isTextAssignment ? textActivityOptions : fileActivityOptions;
   
+  // Check if past date is selected
+  const isPastDate = form.dueDate ? new Date(form.dueDate) < new Date(today) : false;
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-lg">
@@ -165,7 +189,11 @@ export default function EditAssignmentDialog({
               value={form.dueDate}
               onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
               disabled={isSubmitting}
+              min={today} // Prevent selecting past dates
             />
+            {isPastDate && (
+              <p className="text-red-500 text-xs">Please select a future date</p>
+            )}
           </div>
           
           <div className="flex justify-end space-x-2 pt-2">
@@ -179,7 +207,7 @@ export default function EditAssignmentDialog({
             </Button>
             <Button
               type="submit"
-              disabled={isSubmitting || !form.name.trim()}
+              disabled={isSubmitting || !form.name.trim() || isPastDate}
               className="min-w-[100px]"
             >
               {isSubmitting ? (

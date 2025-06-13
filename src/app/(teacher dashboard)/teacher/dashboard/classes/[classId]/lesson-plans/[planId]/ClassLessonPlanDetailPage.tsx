@@ -124,7 +124,7 @@ export default function ClassLessonPlanDetailPage({ classId, planId }: LessonPla
   if (!lessonPlan) return <div className="flex justify-center items-center min-h-[60vh]">Loading...</div>;
 
   return (
-    <div className="w-full h-[100vh] lg:w-5/6 xl:w-3/4 mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
+    <div className="w-full min-h-[100vh] lg:w-5/6 xl:w-3/4 mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
       {/* Breadcrumbs - hidden on mobile */}
       <div className="hidden sm:block">
         <Breadcrumbs

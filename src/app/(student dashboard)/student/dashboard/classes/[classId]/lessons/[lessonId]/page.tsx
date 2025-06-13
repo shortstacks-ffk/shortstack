@@ -36,13 +36,19 @@ export default async function StudentLessonPage(props: PageParams) {
     const lesson = response.data;
     console.log("Lesson loaded:", lesson.name);
 
+    // Add safety checks for lesson.class
+    if (!lesson.classes) {
+      console.error("Lesson class data is missing");
+      notFound();
+    }
+
     return (
       <main className="container mx-auto px-4 pb-20">
         <div className="mb-6 sm:mb-8 pt-4">
           <Link href={`/student/dashboard/classes/${classId}`}>
             <Button variant="ghost" className="group pl-0 sm:pl-2">
               <ArrowLeft className="h-4 w-4 mr-2 transition-transform group-hover:-translate-x-1" />
-              <span className="text-sm sm:text-base">Back to {lesson.class.name}</span>
+              <span className="text-sm sm:text-base">Back to {lesson.classes?.name || 'Class'}</span>
             </Button>
           </Link>
         </div>
@@ -58,7 +64,7 @@ export default async function StudentLessonPage(props: PageParams) {
           </div>
           
           <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-3 sm:mb-4 flex items-center gap-2">
-            <span>{lesson.class.emoji}</span>
+            <span>{lesson.classes?.emoji || '📚'}</span>
             <span>{lesson.name}</span>
           </h1>
           
@@ -197,11 +203,11 @@ export default async function StudentLessonPage(props: PageParams) {
               <div className="p-4 sm:p-6 space-y-4">
                 <div className="flex items-center gap-3">
                   <div className="h-10 w-10 sm:h-12 sm:w-12 bg-primary/10 rounded-full flex items-center justify-center text-lg sm:text-xl">
-                    {lesson.class.emoji || '📚'}
+                    {lesson.classes?.emoji || '📚'}
                   </div>
                   <div>
-                    <h3 className="font-medium">{lesson.class.name}</h3>
-                    <p className="text-xs sm:text-sm text-muted-foreground">Class Code: {lesson.class.code}</p>
+                    <h3 className="font-medium">{lesson.classes?.name || 'Unknown Class'}</h3>
+                    <p className="text-xs sm:text-sm text-muted-foreground">Class Code: {lesson.classes?.code || 'N/A'}</p>
                   </div>
                 </div>
                 
