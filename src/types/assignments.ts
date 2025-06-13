@@ -3,10 +3,14 @@ export interface AssignmentRecord {
   name: string;
   fileType?: string;
   activity?: string;
+  createdAt?: string;
   dueDate?: string;
-  createdAt?: string; // Add this property
-  size?: number;
+  size?: string | number;
+  file?: File;
   url?: string;
-  classId: string; // Make this required
-  textAssignment?: string; // For text-based assignments
+  textAssignment?: string;
+  description?: string;
+  classId?: string; // Add this if it's missing
+  lessonPlans?: Array<{ id: string; name: string; }>;
+  lessonPlanIds?: string[];
 }

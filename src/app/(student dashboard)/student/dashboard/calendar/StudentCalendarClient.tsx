@@ -81,73 +81,127 @@ export default function StudentCalendarClient() {
   const fetchEvents = async () => {
     try {
       setLoading(true);
-      const response = await fetch("/api/calendar");
-      if (!response.ok) throw new Error("Failed to fetch events");
-      const data = await response.json();
-
-      const formatted = data.map((event: any) => {
-        // For bills and assignments, we need special date handling
-        if (event.metadata?.type === "bill" || event.metadata?.type === "assignment") {
-          const date = new Date(event.startDate);
-          
-          // For bills, set to 12:00 PM (noon) for better visibility
-          const startDate = new Date(
-            date.getFullYear(),
-            date.getMonth(),
-            date.getDate(),
-            event.metadata?.type === "bill" ? 12 : 0,
-            0, 0
-          );
-          
-          // End date for bills: 12:59 PM, assignments: 11:59:59 PM
-          const endDate = new Date(
-            date.getFullYear(),
-            date.getMonth(),
-            date.getDate(),
-            event.metadata?.type === "bill" ? 12 : 23,
-            event.metadata?.type === "bill" ? 59 : 59,
-            event.metadata?.type === "bill" ? 0 : 59
-          );
-
-          return {
-            id: event.id,
-            title: event.title,
-            description: event.description || "",
-            startDate: startDate,
-            endDate: endDate,
-            variant: event.variant || "primary",
-            isRecurring: event.isRecurring === true,
-            recurringDays: event.recurringDays || [],
-            metadata: {
-              ...event.metadata,
-              isAllDay: event.metadata?.type === "assignment",
-              originalDueDate: event.metadata.dueDate,
-              isDueAtNoon: event.metadata?.type === "bill"
-            },
-          } as Event;
-        } else {
-          // For regular events, use the normal date processing
-          const startDate = new Date(event.startDate);
-          const endDate = new Date(event.endDate);
-          
-          return {
-            id: event.id,
-            title: event.title,
-            description: event.description || "",
-            startDate: startDate,
-            endDate: endDate,
-            variant: event.variant || "primary",
-            isRecurring: event.isRecurring === true,
-            recurringDays: event.recurringDays || [],
-            metadata: event.metadata,
-          } as Event;
+      const response = await fetch("/api/calendar", {
+        headers: {
+          'Cache-Control': 'no-cache'
         }
       });
+      
+      if (!response.ok) {
+        throw new Error("Failed to fetch events");
+      }
+      
+      const data = await response.json();
+      
+      // Process events with proper formatting
+      const formatted = data
+        // Filter out banking transactions
+        .filter((event: any) => {
+          // Exclude events with ADD_FUNDS or REMOVE_FUNDS transaction types
+          if (event.metadata?.transactionType === "ADD_FUNDS" || 
+              event.metadata?.transactionType === "REMOVE_FUNDS") {
+            return false;
+          }
+          return true;
+        })
+        .map((event: any) => {
+          // For bills, we need special date handling for week view
+          if (event.metadata?.type === "bill") {
+            // Parse the original date but preserve the time set by the server
+            const startDate = new Date(event.startDate);
+            const endDate = new Date(event.endDate);
+            
+            return {
+              id: event.id,
+              title: event.title,
+              description: event.description || "",
+              startDate: startDate, // Keep the server-set time (should be 12:00 PM)
+              endDate: endDate,     // Keep the server-set time (should be 12:59 PM)
+              variant: event.variant || "destructive",
+              isRecurring: event.isRecurring === true,
+              recurringDays: event.recurringDays || [],
+              recurrenceType: event.recurrenceType,
+              recurrenceInterval: event.recurrenceInterval,
+              monthlyDate: event.monthlyDate,
+              yearlyMonth: event.yearlyMonth,
+              yearlyDate: event.yearlyDate,
+              metadata: {
+                ...event.metadata,
+                originalDueDate: event.metadata.dueDate,
+                isDueAtNoon: true // Flag for week view rendering
+              },
+            } as Event;
+          } 
+          // For assignments
+          else if (event.metadata?.type === "assignment") {
+            const date = new Date(event.startDate);
+            
+            // Set assignments to show all day (00:00 to 23:59)
+            const startDate = new Date(
+              date.getFullYear(),
+              date.getMonth(),
+              date.getDate(),
+              0, 0, 0
+            );
+            
+            const endDate = new Date(
+              date.getFullYear(),
+              date.getMonth(),
+              date.getDate(),
+              23, 59, 59
+            );
+
+            return {
+              id: event.id,
+              title: event.title,
+              description: event.description || "",
+              startDate: startDate,
+              endDate: endDate,
+              variant: event.variant || "primary",
+              isRecurring: event.isRecurring === true,
+              recurringDays: event.recurringDays || [],
+              recurrenceType: event.recurrenceType,
+              recurrenceInterval: event.recurrenceInterval,
+              monthlyDate: event.monthlyDate,
+              yearlyMonth: event.yearlyMonth,
+              yearlyDate: event.yearlyDate,
+              metadata: {
+                ...event.metadata,
+                isAllDay: true,
+                originalDueDate: event.metadata.dueDate
+              },
+            } as Event;
+          } 
+          // For regular events (classes, etc.)
+          else {
+            const startDate = new Date(event.startDate);
+            const endDate = new Date(event.endDate);
+            
+            return {
+              id: event.id,
+              title: event.title,
+              description: event.description || "",
+              startDate: startDate,
+              endDate: endDate,
+              variant: event.variant || "primary",
+              isRecurring: event.isRecurring === true,
+              recurringDays: event.recurringDays || [],
+              recurrenceType: event.recurrenceType,
+              recurrenceInterval: event.recurrenceInterval,
+              monthlyDate: event.monthlyDate,
+              yearlyMonth: event.yearlyMonth,
+              yearlyDate: event.yearlyDate,
+              metadata: event.metadata,
+            } as Event;
+          }
+        });
 
       setEvents(formatted);
+      setFetchAttempts(prev => prev + 1);
     } catch (error) {
       console.error("Error fetching calendar:", error);
       toast.error("Failed to load calendar");
+      setFetchAttempts(prev => prev + 1);
     } finally {
       setLoading(false);
     }
@@ -168,42 +222,48 @@ export default function StudentCalendarClient() {
 
   // Custom event view component
   const StudentEventView = ({ event, onClose }: { event: Event, onClose: () => void }) => (
-    <div className="p-4">
-      {/* Make title break into multiple lines if needed instead of overflowing */}
-      <h3 className="text-lg font-semibold mb-2 break-words">{event.title}</h3>
+    <div className="p-4 space-y-4 mb-4">
+      <h2 className="text-lg font-semibold break-words">{event.title || "Untitled Event"}</h2>
       
       {event.description && (
-        <p className="text-sm text-gray-600 mb-4">{event.description}</p>
+        <p className="text-sm text-gray-600">{event.description}</p>
       )}
       
-      <div className="mb-4">
+      <div className="flex flex-col space-y-2 text-sm">
         {event.metadata?.isAllDay ? (
-          <p className="text-sm">
-            <span className="font-medium">Date: </span>
+          <div className="flex items-center">
+            <span className="font-medium mr-2">Date:</span>
             {event.startDate.toLocaleDateString()}
-          </p>
+          </div>
         ) : (
           <>
-            <p className="text-sm">
-              <span className="font-medium">Start: </span>
+            <div className="flex items-center">
+              <span className="font-medium mr-2">Start:</span>
               {event.startDate.toLocaleString()}
-            </p>
-            <p className="text-sm">
-              <span className="font-medium">End: </span>
+            </div>
+            <div className="flex items-center">
+              <span className="font-medium mr-2">End:</span>
               {event.endDate.toLocaleString()}
-            </p>
+            </div>
           </>
         )}
         
         {event.metadata?.type && (
-          <p className="text-sm mt-2">
-            <span className="font-medium">Type: </span>
+          <div className="flex items-center">
+            <span className="font-medium mr-2">Type:</span>
             <span className="capitalize">{event.metadata.type}</span>
-          </p>
+          </div>
+        )}
+        
+        {event.isRecurring === true && (
+          <div>
+            <span className="font-medium mr-2">Recurring:</span>
+            Yes
+          </div>
         )}
       </div>
       
-      <div className="flex justify-end gap-2">
+      <div className="flex justify-end gap-2 pt-2">
         {(event.metadata?.type === "assignment" || event.metadata?.type === "bill") && (
           <Button 
             onClick={() => {
@@ -222,55 +282,220 @@ export default function StudentCalendarClient() {
     </div>
   );
 
-  // Add a custom CSS style block to handle long event titles
+  // Replace the existing useEffect hook for styling with this more comprehensive version
   useEffect(() => {
-    // Add custom styles to handle long event titles in month view
+    // Create a single style element for all calendar fixes
     const styleElement = document.createElement('style');
-    styleElement.innerHTML = `
-      /* Fix for month view cell proportions */
+    styleElement.id = 'calendar-comprehensive-fixes';
+    
+    // Comprehensive styles that address all layout issues
+    styleElement.textContent = `
+      /* Base container fixes */
+      .mina-scheduler-container {
+        width: 100% !important;
+        max-width: 100% !important;
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
+        box-sizing: border-box !important;
+      }
+      
+      /* Month view grid layout with proper cell distribution */
+      .month-grid {
+        display: grid !important;
+        grid-template-columns: repeat(7, 1fr) !important;
+        grid-template-rows: auto repeat(6, minmax(90px, 1fr)) !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+        overflow: visible !important;
+      }
+      
+      /* Month day cell sizing and positioning */
       .month-day-cell {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
         min-height: 90px !important;
         height: auto !important;
         max-height: 160px !important;
-        overflow: hidden;
+        overflow: hidden !important;
+        position: relative !important;
+        box-sizing: border-box !important;
+        padding: 4px !important;
       }
       
-      /* Ensure consistent day number positioning */
-      .calendar-day-number {
-        position: relative;
-        z-index: 5;
-      }
-      
-      /* Fix event styling to prevent stretching cells */
-      .month-day-cell [class*="event-container"] {
+      /* Event item container constraints */
+      .month-day-cell [data-event-item],
+      .week-view-grid [data-event-item] {
         max-width: 100% !important;
         width: 100% !important;
         overflow: hidden !important;
+        margin-bottom: 2px !important;
+        box-sizing: border-box !important;
+        position: relative !important;
       }
       
-      /* Ensure event titles are properly truncated */
-      .month-day-cell [class*="event-container"] div[class*="truncate"] {
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        overflow: hidden;
-        width: 100%;
-        display: block;
+      /* All event content elements must respect container */
+      .month-day-cell [data-event-item] *,
+      .week-view-grid [data-event-item] * {
+        max-width: 100% !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        box-sizing: border-box !important;
       }
       
-      /* Ensure uniform cell sizing in month view */
-      .month-grid {
-        grid-template-rows: auto repeat(6, minmax(90px, auto)) !important;
+      /* Target specific event content elements */
+      .event-item-title,
+      .event-title,
+      .event-content,
+      [data-event-item] .truncate,
+      [data-event-item] [class*="title"],
+      [data-event-item] h3,
+      [data-event-item] h4,
+      [data-event-item] p,
+      [data-event-item] div {
+        max-width: 100% !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        display: block !important;
+        box-sizing: border-box !important;
       }
       
-      /* Make truncated event title show on hover */
-      .month-day-cell [class*="event-container"]:hover {
+      /* Event containers */
+      [class*="event-container"] {
+        max-width: 100% !important;
+        width: 100% !important;
+        position: relative !important;
+        box-sizing: border-box !important;
+        overflow: hidden !important;
+      }
+      
+      /* Nested event elements */
+      [class*="event-container"] > div,
+      [class*="event-content"] > div,
+      [class*="event-title"],
+      [class*="event-text"] {
+        max-width: 100% !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        box-sizing: border-box !important;
+      }
+      
+      /* Main scrollable areas */
+      .calendar-panel {
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
+        height: calc(100vh - 170px) !important;
+        max-width: 100% !important;
+        width: 100% !important;
+      }
+      
+      /* Main calendar container */
+      .sticky-header-calendar {
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        width: 100% !important;
+        max-width: 100% !important;
+      }
+
+      /* Ensure background colors don't cause overflow */
+      [style*="background-color"] {
+        max-width: 100% !important;
+        overflow: hidden !important;
+      }
+      
+      /* Improved hover effect for event titles */
+      .month-day-cell [data-event-item]:hover {
+        position: relative !important;
         z-index: 50 !important;
       }
+      
+      .month-day-cell [data-event-item]:hover [class*="title"],
+      .month-day-cell [data-event-item]:hover [class*="event-text"],
+      .month-day-cell [data-event-item]:hover .truncate {
+        position: absolute !important;
+        background-color: inherit !important;
+        padding: 2px 4px !important;
+        border-radius: 2px !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+        white-space: normal !important;
+        word-break: break-word !important;
+        min-width: 100% !important;
+        max-width: 250px !important;
+        z-index: 51 !important;
+      }
+      
+      /* Week view specific fixes */
+      .week-view-grid {
+        table-layout: fixed !important;
+        width: 100% !important;
+        max-width: 100% !important;
+      }
+      
+      .week-view-grid td {
+        position: relative !important;
+        overflow: hidden !important;
+        width: calc(100% / 7) !important;
+        max-width: calc(100% / 7) !important;
+        box-sizing: border-box !important;
+      }
+      
+      .week-view-hour-cell {
+        box-sizing: border-box !important;
+        position: relative !important;
+        overflow: hidden !important;
+      }
+      
+      /* Fix day column headers */
+      .mina-scheduler-column-header {
+        box-sizing: border-box !important;
+        overflow: hidden !important;
+      }
+      
+      /* Mobile specific adjustments */
+      @media (max-width: 640px) {
+        .month-day-cell {
+          min-height: 60px !important;
+          padding: 2px !important;
+        }
+        
+        .calendar-panel {
+          height: calc(100vh - 150px) !important;
+        }
+        
+        .month-day-cell [data-event-item] {
+          font-size: 0.75rem !important;
+        }
+      }
     `;
+    
+    // Remove any existing style elements to avoid conflicts
+    const existingStyle1 = document.getElementById('calendar-cell-fixes');
+    if (existingStyle1) {
+      document.head.removeChild(existingStyle1);
+    }
+    
+    const existingStyle2 = document.getElementById('calendar-fix-styles');
+    if (existingStyle2) {
+      document.head.removeChild(existingStyle2);
+    }
+    
+    const existingStyle3 = document.getElementById('calendar-comprehensive-fixes');
+    if (existingStyle3) {
+      document.head.removeChild(existingStyle3);
+    }
+    
+    // Add the new comprehensive style element
     document.head.appendChild(styleElement);
     
     return () => {
-      document.head.removeChild(styleElement);
+      // Clean up
+      const styleToRemove = document.getElementById('calendar-comprehensive-fixes');
+      if (styleToRemove) {
+        document.head.removeChild(styleToRemove);
+      }
     };
   }, []);
 

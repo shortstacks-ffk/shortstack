@@ -91,6 +91,7 @@ export async function POST(request: Request) {
               };
             }
 
+            // Check if there's sufficient funds
             if (account.balance < amount) {
               return { 
                 studentId, 
@@ -99,24 +100,31 @@ export async function POST(request: Request) {
               };
             }
 
-            // Remove funds from the account and create transaction record
-            await db.$transaction([
-              // Update account balance
-              db.bankAccount.update({
-                where: { id: account.id },
-                data: { balance: { decrement: amount } },
-              }),
-              
-              // Create transaction record
-              db.transaction.create({
-                data: {
-                  accountId: account.id,
+            // For today's transactions, create a calendar event instead of processing immediately
+            await db.calendarEvent.create({
+              data: {
+                title: `Remove $${amount} from ${accountType} account`,
+                description: description || `Scheduled funds removal by teacher`,
+                startDate: issueDateTime,
+                endDate: issueDateTime,
+                variant: "destructive",
+                isRecurring: false,
+                recurringDays: [],
+                recurrenceType: "NONE",
+                recurrenceInterval: 0,
+                monthlyDate: null,
+                metadata: {
+                  transactionType: "REMOVE_FUNDS",
+                  studentId,
+                  accountType,
                   amount,
-                  description: description || "Funds removed by teacher",
-                  transactionType: "WITHDRAWAL",
+                  scheduledTransaction: true,
+                  processOnDate: true // Flag to indicate this should be processed on the specified date
                 },
-              }),
-            ]);
+                createdById: teacher.id,
+                studentId,
+              }
+            });
 
             return { studentId, success: true };
           })
@@ -135,7 +143,7 @@ export async function POST(request: Request) {
 
         return NextResponse.json({ 
           success: true, 
-          message: `Successfully removed funds from ${results.length} accounts`
+          message: `Successfully scheduled funds removal for ${results.length} accounts on ${issueDateTime.toLocaleDateString()}`
         });
       } else {
         // Create calendar events for future one-time transactions
@@ -205,9 +213,7 @@ export async function POST(request: Request) {
     } 
     // For recurring transactions
     else {
-      // For recurring transactions, we only process the first transaction if it's today
-      // Then create the recurring calendar event starting from the next occurrence
-      
+      // Also modify recurring transactions to not process immediately
       const results = await Promise.all(
         studentIds.map(async (studentId: string) => {
           // Find the student's account
@@ -224,35 +230,6 @@ export async function POST(request: Request) {
               success: false,
               error: `Account not found for student`
             };
-          }
-
-          // If issue date is today, process the first transaction immediately
-          if (isToday) {
-            if (account.balance < amount) {
-              return { 
-                studentId, 
-                success: false, 
-                error: "Insufficient funds" 
-              };
-            }
-
-            await db.$transaction([
-              // Update account balance
-              db.bankAccount.update({
-                where: { id: account.id },
-                data: { balance: { decrement: amount } },
-              }),
-              
-              // Create transaction record
-              db.transaction.create({
-                data: {
-                  accountId: account.id,
-                  amount,
-                  description: description || `Recurring ${recurrence} funds removed by teacher`,
-                  transactionType: "WITHDRAWAL",
-                },
-              }),
-            ]);
           }
 
           // Create a calendar event for the recurring transaction
@@ -280,25 +257,9 @@ export async function POST(request: Request) {
               recurrenceType = "NONE";
           }
 
-          // Calculate the next occurrence date
+          // First occurrence is always the issue date itself
           let nextOccurrence = new Date(issueDateTime);
           
-          if (isToday) {
-            // If we processed today, set next occurrence based on recurrence
-            switch (recurrence) {
-              case "weekly":
-                nextOccurrence.setDate(nextOccurrence.getDate() + 7);
-                break;
-              case "biweekly":
-                nextOccurrence.setDate(nextOccurrence.getDate() + 14);
-                break;
-              case "monthly":
-                nextOccurrence.setMonth(nextOccurrence.getMonth() + 1);
-                break;
-            }
-          }
-          // If issue date is in the future, the first occurrence is the issue date itself
-
           const monthlyDate = recurrenceType === "MONTHLY" ? issueDateTime.getDate() : null;
 
           await db.calendarEvent.create({
@@ -319,7 +280,8 @@ export async function POST(request: Request) {
                 accountType,
                 amount,
                 timezone: timezone || 'UTC',
-                originalIssueDate: issueDate
+                originalIssueDate: issueDate,
+                processOnDate: true // Flag to indicate this should be processed on the specified date
               },
               createdById: teacher.id,
               studentId,
@@ -341,9 +303,7 @@ export async function POST(request: Request) {
         }, { status: 207 });
       }
 
-      const message = isToday 
-        ? `Successfully processed first transaction and scheduled ${recurrence} withdrawals for ${results.length} accounts`
-        : `Successfully scheduled ${recurrence} withdrawals for ${results.length} accounts starting ${issueDateTime.toLocaleDateString()}`;
+      const message = `Successfully scheduled ${recurrence} withdrawals for ${results.length} accounts starting ${issueDateTime.toLocaleDateString()}`;
 
       return NextResponse.json({ 
         success: true, 

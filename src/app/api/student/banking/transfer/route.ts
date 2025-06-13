@@ -66,11 +66,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Insufficient funds" }, { status: 400 });
     }
     
-    // Create descriptive messages based on account types
+    // Get account type names for descriptions - correct casing for display
     const fromAccountType = fromAccount.accountType === "CHECKING" ? "Checking" : "Savings";
     const toAccountType = toAccount.accountType === "CHECKING" ? "Checking" : "Savings";
     
-    const transferDescription = `Transfer from ${fromAccountType} to ${toAccountType}`;
+    // Create descriptive messages
+    const withdrawalDescription = `Transfer from ${fromAccountType}`;
+    const depositDescription = `Transfer to ${toAccountType}`;
     
     // Perform the transfer in a transaction
     const result = await db.$transaction([
@@ -86,25 +88,25 @@ export async function POST(request: Request) {
         data: { balance: { increment: amount } }
       }),
       
-      // Create transaction record for source (TRANSFER_OUT)
+      // Create transaction record for the FROM account - this is a WITHDRAWAL
       db.transaction.create({
         data: {
           amount: Number(amount),
-          description: transferDescription,
-          transactionType: "TRANSFER_OUT",
+          description: withdrawalDescription,
+          transactionType: "WITHDRAWAL",
           accountId: fromAccountId,
-          receivingAccountId: toAccountId
+          createdAt: new Date()
         }
       }),
       
-      // Create transaction record for destination (TRANSFER_IN)
+      // Create transaction record for the TO account - this is a DEPOSIT
       db.transaction.create({
         data: {
           amount: Number(amount),
-          description: transferDescription,
-          transactionType: "TRANSFER_IN",
+          description: depositDescription,
+          transactionType: "DEPOSIT",
           accountId: toAccountId,
-          receivingAccountId: fromAccountId
+          createdAt: new Date()
         }
       })
     ]);

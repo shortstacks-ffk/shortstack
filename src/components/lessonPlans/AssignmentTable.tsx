@@ -18,8 +18,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/src/components/ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/src/components/ui/dialog';
 import Link from 'next/link';
-import { MoreHorizontal, FileEdit, Trash2, Send, Calendar, FileIcon, Clock, FileText } from 'lucide-react';
+import { MoreHorizontal, FileEdit, Trash2, Send, Calendar, FileIcon, Clock, FileText, Eye } from 'lucide-react';
 import { deleteAssignment } from '@/src/app/actions/assignmentActions';
 import EditAssignmentDialog from './EditAssignmentDialog';
 import AssignAssignmentDialog from './AssignAssignmentDialog';
@@ -35,11 +41,20 @@ const formatFileSize = (bytes?: number): string => {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
+// Update the formatDate function
 const formatDate = (dateString?: string) => {
   if (!dateString) return 'N/A';
   
   const date = new Date(dateString);
-  return date.toLocaleDateString();
+  
+  // Format with local timezone
+  return date.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
 };
 
 export default function AssignmentTable({ 
@@ -52,6 +67,7 @@ export default function AssignmentTable({
   const [assignmentToDelete, setAssignmentToDelete] = useState<string | null>(null);
   const [assignmentToEdit, setAssignmentToEdit] = useState<AssignmentRecord | null>(null);
   const [assignmentToAssign, setAssignmentToAssign] = useState<AssignmentRecord | null>(null);
+  const [textAssignmentToView, setTextAssignmentToView] = useState<AssignmentRecord | null>(null);
   
   const handleDelete = async () => {
     if (!assignmentToDelete) return;
@@ -70,13 +86,17 @@ export default function AssignmentTable({
 
   // Function to render assignment name with appropriate link or text display
   const renderAssignmentName = (assignment: AssignmentRecord) => {
-    // If it's a text assignment, show text content in a modal/preview
+    // If it's a text assignment, make it clickable to view content
     if (assignment.fileType === 'text' && assignment.textAssignment) {
       return (
         <div>
-          <span className="font-medium cursor-pointer hover:text-blue-600" title="Click to view text assignment">
+          <button
+            onClick={() => setTextAssignmentToView(assignment)}
+            className="font-medium text-blue-600 hover:text-blue-800 hover:underline cursor-pointer text-left"
+            title="Click to view text assignment"
+          >
             {assignment.name}
-          </span>
+          </button>
           <div className="text-xs text-gray-500 mt-1 line-clamp-2">
             {assignment.textAssignment.substring(0, 100)}...
           </div>
@@ -156,7 +176,7 @@ export default function AssignmentTable({
                     <div className="h-2 w-2 rounded-full bg-blue-500 mr-1"></div>
                     {assignment.fileType === 'text' ? 
                       `${(assignment.textAssignment?.length || assignment.size || 0)} chars` : 
-                      formatFileSize(assignment.size)
+                      formatFileSize(typeof assignment.size === 'string' ? parseInt(assignment.size) || 0 : assignment.size)
                     }
                   </div>
                   <DropdownMenu>
@@ -167,6 +187,12 @@ export default function AssignmentTable({
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
+                      {assignment.fileType === 'text' && assignment.textAssignment && (
+                        <DropdownMenuItem onClick={() => setTextAssignmentToView(assignment)}>
+                          <Eye className="mr-2 h-4 w-4" />
+                          View Text
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuItem onClick={() => setAssignmentToEdit(assignment)}>
                         <FileEdit className="mr-2 h-4 w-4" />
                         Edit
@@ -209,6 +235,12 @@ export default function AssignmentTable({
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
+                      {assignment.fileType === 'text' && assignment.textAssignment && (
+                        <DropdownMenuItem onClick={() => setTextAssignmentToView(assignment)}>
+                          <Eye className="mr-2 h-4 w-4" />
+                          View Text
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuItem onClick={() => setAssignmentToEdit(assignment)}>
                         <FileEdit className="mr-2 h-4 w-4" />
                         Edit
@@ -259,7 +291,7 @@ export default function AssignmentTable({
                     <div className="h-2 w-2 rounded-full bg-blue-500 mr-1"></div>
                     {assignment.fileType === 'text' ? 
                       `${(assignment.textAssignment?.length || assignment.size || 0)} chars` : 
-                      formatFileSize(assignment.size)
+                      formatFileSize(typeof assignment.size === 'string' ? parseInt(assignment.size) || 0 : assignment.size)
                     }
                   </div>
                 </div>
@@ -268,6 +300,45 @@ export default function AssignmentTable({
           </div>
         )}
       </div>
+
+      {/* Text Assignment Viewer Dialog */}
+      <Dialog 
+        open={!!textAssignmentToView} 
+        onOpenChange={(isOpen) => !isOpen && setTextAssignmentToView(null)}
+      >
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              {textAssignmentToView?.name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {textAssignmentToView?.activity && (
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <span className="font-medium">Activity:</span>
+                <span>{textAssignmentToView.activity}</span>
+              </div>
+            )}
+            {textAssignmentToView?.dueDate && (
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <Calendar className="h-4 w-4" />
+                <span className="font-medium">Due:</span>
+                <span>{formatDate(textAssignmentToView.dueDate)}</span>
+              </div>
+            )}
+            <div className="border-t pt-4">
+              <h3 className="font-medium mb-2">Assignment Instructions:</h3>
+              <div className="p-4 bg-gray-50 rounded-lg whitespace-pre-wrap">
+                {textAssignmentToView?.textAssignment}
+              </div>
+            </div>
+            <div className="text-xs text-gray-500 text-right">
+              {textAssignmentToView?.textAssignment?.length || 0} characters
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog 
@@ -296,12 +367,7 @@ export default function AssignmentTable({
       {/* Edit Assignment Dialog */}
       {assignmentToEdit && (
         <EditAssignmentDialog
-          assignment={{
-            ...assignmentToEdit,
-            id: assignmentToEdit?.id || "",
-            name: assignmentToEdit?.name || "",
-            classId: assignmentToEdit?.classId || ""
-          }}
+          assignment={assignmentToEdit}
           isOpen={!!assignmentToEdit}
           onClose={() => setAssignmentToEdit(null)}
           onUpdate={() => {
@@ -314,7 +380,10 @@ export default function AssignmentTable({
       {/* Assign Assignment Dialog */}
       {assignmentToAssign && (
         <AssignAssignmentDialog
-          assignment={assignmentToAssign}
+          assignment={{
+            ...assignmentToAssign,
+            size: typeof assignmentToAssign.size === 'string' ? parseInt(assignmentToAssign.size) || 0 : assignmentToAssign.size
+          }}
           isOpen={!!assignmentToAssign}
           onClose={() => setAssignmentToAssign(null)}
           onUpdate={() => {

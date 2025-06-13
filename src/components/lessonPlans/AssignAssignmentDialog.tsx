@@ -119,11 +119,11 @@ export default function AssignAssignmentDialog({
 
     try {
       // Create a copy of the assignment for each selected lesson plan
+      // Remove targetClassId as it doesn't exist in the interface
       const promises = selectedLessonPlans.map(lessonPlanId => 
         copyAssignmentToLessonPlan({
           sourceAssignmentId: assignment.id,
-          targetLessonPlanId: lessonPlanId,
-          targetClassId: selectedClass
+          targetLessonPlanId: lessonPlanId
         })
       );
       
@@ -142,8 +142,8 @@ export default function AssignAssignmentDialog({
       }
     } catch (error: any) {
       console.error('Error assigning assignment:', error);
-      setError(error.message || 'An unexpected error occurred');
-      toast.error(error.message || 'An unexpected error occurred');
+      setError(error.message || 'Failed to assign assignment');
+      toast.error('Failed to assign assignment');
     } finally {
       setIsUpdating(false);
     }

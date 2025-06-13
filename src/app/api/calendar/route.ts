@@ -128,47 +128,59 @@ export async function GET(request: Request) {
       }
     });
 
-    // Format events with proper timezone handling
-    const formattedEvents = events.map(event => {
-      // For bills, ensure they show at 12:00 PM - 12:59 PM
-      if (event.metadata && typeof event.metadata === 'object' && 
-          'type' in event.metadata && event.metadata.type === 'bill') {
-        
-        const eventDate = new Date(event.startDate);
-        
-        // Set bill to 12:00 PM - 12:59 PM for visibility in week view
-        const startDate = new Date(
-          eventDate.getFullYear(),
-          eventDate.getMonth(),
-          eventDate.getDate(),
-          12, 0, 0, 0
-        );
-        
-        const endDate = new Date(
-          eventDate.getFullYear(),
-          eventDate.getMonth(),
-          eventDate.getDate(),
-          12, 59, 0, 0
-        );
+    // Format events and filter out banking transactions
+    const formattedEvents = events
+      .filter(event => {
+        // Filter out ADD_FUNDS and REMOVE_FUNDS transactions
+        if (event.metadata && 
+            typeof event.metadata === 'object' && 
+            'transactionType' in event.metadata &&
+            (event.metadata.transactionType === 'ADD_FUNDS' || 
+             event.metadata.transactionType === 'REMOVE_FUNDS')) {
+          return false;
+        }
+        return true;
+      })
+      .map(event => {
+        // For bills, ensure they show at 12:00 PM - 12:59 PM
+        if (event.metadata && typeof event.metadata === 'object' && 
+            'type' in event.metadata && event.metadata.type === 'bill') {
+          
+          const eventDate = new Date(event.startDate);
+          
+          // Set bill to 12:00 PM - 12:59 PM for visibility in week view
+          const startDate = new Date(
+            eventDate.getFullYear(),
+            eventDate.getMonth(),
+            eventDate.getDate(),
+            12, 0, 0, 0
+          );
+          
+          const endDate = new Date(
+            eventDate.getFullYear(),
+            eventDate.getMonth(),
+            eventDate.getDate(),
+            12, 59, 0, 0
+          );
 
+          return {
+            ...event,
+            startDate: startDate.toISOString(),
+            endDate: endDate.toISOString(),
+            metadata: {
+              ...event.metadata,
+              isDueAtNoon: true
+            }
+          };
+        }
+        
+        // For other events, use their original times
         return {
           ...event,
-          startDate: startDate.toISOString(),
-          endDate: endDate.toISOString(),
-          metadata: {
-            ...event.metadata,
-            isDueAtNoon: true
-          }
+          startDate: event.startDate.toISOString(),
+          endDate: event.endDate.toISOString()
         };
-      }
-      
-      // For other events, use their original times
-      return {
-        ...event,
-        startDate: event.startDate.toISOString(),
-        endDate: event.endDate.toISOString()
-      };
-    });
+      });
 
     return NextResponse.json(formattedEvents);
   } catch (error) {
