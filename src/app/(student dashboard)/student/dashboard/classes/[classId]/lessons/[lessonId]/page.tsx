@@ -34,7 +34,17 @@ export default async function StudentLessonPage(props: PageParams) {
     }
     
     const lesson = response.data;
-    console.log("Lesson loaded:", lesson.name);
+    
+    // Fix: Find the specific class from the classes array that matches our classId
+    const currentClass = lesson.classes?.find((cls: any) => cls.code === classId) || 
+                        lesson.classes?.[0] || // Fallback to first class if no match
+                        { 
+                          name: "Unknown Class", 
+                          emoji: "📚", 
+                          code: classId 
+                        };
+    
+    console.log("Lesson loaded:", lesson.name, "Class:", currentClass.name);
 
     // Add safety checks for lesson.class
     if (!lesson.classes) {
@@ -138,11 +148,8 @@ export default async function StudentLessonPage(props: PageParams) {
                                   Due: {formatDate(new Date(assignment.dueDate))}
                                 </div>
                               )}
-                              
                             </div>
                           </div>
-                          
-                          
                         </div>
                       </Link>
                     </div>

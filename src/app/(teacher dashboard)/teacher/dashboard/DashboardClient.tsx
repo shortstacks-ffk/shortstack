@@ -90,9 +90,7 @@ const DashboardClient = ({ classes }: DashboardClientProps) => {
           <h2 className="text-xl md:text-2xl font-semibold mb-3 md:mb-4 px-1">Performance Overview</h2>
           <div className="w-full">
             <div className="rounded-xl p-2 sm:p-3 md:p-5 bg-card border shadow-sm">
-              <PerformanceChart 
-                recentClasses={classesWithCounts.slice(0, Math.min(3, classesWithCounts.length))}
-              />
+              <PerformanceChart />
             </div>
           </div>
         </section>

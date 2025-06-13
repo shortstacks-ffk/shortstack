@@ -188,7 +188,7 @@ export default function StudentGrades({ classCode, studentId }: StudentGradesPro
                           <div className="flex items-center justify-center space-x-1">
                             <Calendar className="w-4 h-4 text-muted-foreground" />
                             <span className={overdue ? 'text-red-600 font-medium' : ''}>
-                              {new Date(assignment.dueDate).toLocaleDateString()}
+                              {new Date(assignment.dueDate).toLocaleDateString('en-US')}
                             </span>
                           </div>
                         </TableCell>
@@ -210,7 +210,7 @@ export default function StudentGrades({ classCode, studentId }: StudentGradesPro
                         <TableCell className="text-center">
                           {submission?.createdAt ? (
                             <span className="text-sm text-muted-foreground">
-                              {new Date(submission.createdAt).toLocaleDateString()}
+                              {new Date(submission.createdAt).toLocaleDateString('en-US')}
                             </span>
                           ) : (
                             <span className="text-gray-400">—</span>

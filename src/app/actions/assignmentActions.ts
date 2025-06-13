@@ -843,17 +843,20 @@ export async function getStudentAssignment(assignmentId: string): Promise<Assign
         }
       });
 
-      // Return assignment data with submission details
+      // Return assignment data with submission details - include ALL fields
       return { 
         success: true, 
         data: {
           id: assignment.id,
           name: assignment.name,
-          description: assignment.description || '',
+          description: assignment.description, // Make sure this is included
+          textAssignment: assignment.textAssignment, // Make sure this is included
+          rubric: assignment.rubric, // Make sure this is included
           dueDate: assignment.dueDate,
           activity: assignment.activity || "Assignment",
           fileType: assignment.fileType,
           url: assignment.url,
+          size: assignment.size
           textAssignment: assignment.textAssignment,
           submission: submission || null,
           grade: submission?.grade || null,
@@ -892,17 +895,20 @@ export async function getStudentAssignment(assignmentId: string): Promise<Assign
         orderBy: { updatedAt: 'desc' }
       });
 
-      // Return assignment data with all submissions
+      // Return assignment data with all submissions - include ALL fields
       return { 
         success: true, 
         data: {
           id: assignment.id,
           name: assignment.name,
-          description: assignment.description || '',
+          description: assignment.description, // Make sure this is included
+          textAssignment: assignment.textAssignment, // Make sure this is included
+          rubric: assignment.rubric, // Make sure this is included
           dueDate: assignment.dueDate,
           activity: assignment.activity || "Assignment",
           fileType: assignment.fileType,
           url: assignment.url,
+          size: assignment.size,
           textAssignment: assignment.textAssignment,
           submissions: submissions
         } 
