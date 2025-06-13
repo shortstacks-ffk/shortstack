@@ -6,13 +6,9 @@ import { Card } from "@/src/components/ui/card";
 import { formatCurrency } from "@/src/lib/utils";
 import { Button } from "@/src/components/ui/button";
 import { EditStoreItemForm } from "./EditStoreItemForm";
-import { deleteStoreItem } from "@/src/app/actions/storeFrontActions";
-import { toast } from "react-toastify";
 import {
-  Copy,
   Pencil,
   Trash2,
-  MoreVertical,
   MoreHorizontal,
 } from "lucide-react";
 import {
@@ -22,8 +18,8 @@ import {
   DropdownMenuTrigger,
 } from "@/src/components/ui/dropdown-menu";
 import DeleteStoreItemDialog from "./DeleteStoreItemDialog";
-import AssignStoreItemDialog from "./AssignStoreItemDialog";
 
+// Make sure the interface is defined correctly
 interface StoreItemCardProps {
   id: string;
   name: string;
@@ -33,7 +29,12 @@ interface StoreItemCardProps {
   quantity: number;
   isAvailable: boolean;
   backgroundColor: string;
-  classes?: Array<{ id: string; name: string }>;
+  classes?: Array<{ 
+    id: string; 
+    name: string;
+    emoji?: string; 
+    code?: string;
+  }>;
 }
 
 export function StoreItemCard({
@@ -50,7 +51,6 @@ export function StoreItemCard({
   const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [showAssignDialog, setShowAssignDialog] = useState(false);
 
   const navigateToStoreItem = () => {
     router.push(`/teacher/dashboard/storefront/${id}`);
@@ -77,10 +77,7 @@ export function StoreItemCard({
                 <Pencil className="mr-2 h-4 w-4" />
                 Edit Store Item
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setShowAssignDialog(true)}>
-                <Copy className="mr-2 h-4 w-4" />
-                Assign to More Classes
-              </DropdownMenuItem>
+              {/* Removed the "Assign to More Classes" option */}
               <DropdownMenuItem
                 className="text-red-600"
                 onClick={() => setShowDeleteDialog(true)}
@@ -149,13 +146,6 @@ export function StoreItemCard({
           quantity,
           isAvailable,
         }}
-      />
-      <AssignStoreItemDialog
-        isOpen={showAssignDialog}
-        onClose={() => setShowAssignDialog(false)} // FIXED
-        assignedClasses={classes}
-        storeItemId={id}
-        storeItemTitle={name}
       />
 
       <DeleteStoreItemDialog

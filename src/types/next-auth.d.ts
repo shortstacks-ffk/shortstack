@@ -1,22 +1,53 @@
-import NextAuth from "next-auth";
-import { User as NextAuthUser } from "next-auth";
+import NextAuth, { DefaultSession, DefaultUser } from "next-auth";
+import { Role } from "@prisma/client";
 
 declare module "next-auth" {
-  interface User extends NextAuthUser {
-    id: string;
-    firstName?: string;
-    lastName?: string;
-    role: "TEACHER" | "STUDENT" | "SUPER";
+  /**
+   * Returned by `useSession`, `getSession` and received as a prop on the `SessionProvider` React Context
+   */
+  interface Session {
+    user: {
+      id: string;
+      role: Role;
+      teacherId?: string | null;
+      studentId?: string | null;
+      firstName?: string | null;
+      lastName?: string | null;
+      email?: string | null;
+      image?: string | null;
+      name?: string | null;
+      isSuperUser?: boolean;
+    } & DefaultSession["user"];
   }
 
-  interface Session {
-    user: User & {
-      id: string;
-      role: "TEACHER" | "STUDENT" | "SUPER";
-    };
+  /**
+   * The shape of the user object returned in the OAuth providers' `profile` callback,
+   * or the second parameter of the `session` callback, when using a database.
+   */
+  interface User extends DefaultUser {
+    id: string;
+    role: Role;
+    teacherId?: string | null;
+    studentId?: string | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    email?: string | null;
+    image?: string | null;
+    name?: string | null;
   }
-  
+}
+
+declare module "next-auth/jwt" {
+  /** Returned by the `jwt` callback and `getToken`, when using JWT sessions */
   interface JWT {
-    role?: "TEACHER" | "STUDENT" | "SUPER";
+    sub: string;
+    role?: Role;
+    teacherId?: string | null;
+    studentId?: string | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    email?: string | null;
+    image?: string | null;
+    name?: string | null;
   }
 }

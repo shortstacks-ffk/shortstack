@@ -29,7 +29,16 @@ export async function GET(request: Request) {
       statement = await db.bankStatement.findUnique({
         where: { id: statementId },
         include: {
-          student: { include: { class: true } },
+          student: { 
+            include: { 
+              teacher: true, // Include teacher through the relationship
+              enrollments: {
+                include: {
+                  class: true
+                }
+              }
+            } 
+          },
           account: true
         }
       });
@@ -43,7 +52,16 @@ export async function GET(request: Request) {
           year
         },
         include: {
-          student: { include: { class: true } },
+          student: { 
+            include: { 
+              teacher: true,
+              enrollments: {
+                include: {
+                  class: true
+                }
+              }
+            } 
+          },
           account: true
         }
       });
@@ -90,14 +108,18 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: "Access denied" }, { status: 403 });
       }
     } 
-    else if (session.user.role === "TEACHER") {
-      // Teachers can only access statements for students in their classes
-      const teacherHasAccess = await db.class.findFirst({
-        where: {
-          userId: session.user.id,
-          code: statement.student.classId
-        }
+    else if (session.user.role === "TEACHER" || session.user.role === "SUPER") {
+      // Teachers can only access statements for students they teach
+      const teacher = await db.teacher.findUnique({
+        where: { userId: session.user.id }
       });
+
+      if (!teacher) {
+        return NextResponse.json({ error: "Teacher profile not found" }, { status: 404 });
+      }
+
+      // Check if teacher has access to this student
+      const teacherHasAccess = statement.student.teacherId === teacher.id;
 
       if (!teacherHasAccess) {
         return NextResponse.json({ error: "Access denied" }, { status: 403 });
@@ -140,7 +162,14 @@ async function generateStatementOnDemand(accountId: string, month: string, year:
       where: { id: accountId },
       include: {
         student: {
-          include: { class: true }
+          include: { 
+            teacher: true,
+            enrollments: {
+              include: {
+                class: true
+              }
+            }
+          }
         }
       }
     });
@@ -181,10 +210,14 @@ async function generateStatementOnDemand(accountId: string, month: string, year:
       return null;
     }
     
+    // Get the class name through enrollments
+    const activeEnrollment = student.enrollments.find(e => e.enrolled);
+    const className = activeEnrollment?.class?.name || 'N/A';
+    
     // Format transaction data for the statement with all required columns
     const statementData = transactions.map(transaction => ({
       'Student Name': `${student.firstName} ${student.lastName}`,
-      'Class': student.class?.name || 'N/A',
+      'Class': className,
       'Date': format(new Date(transaction.createdAt), 'MM/dd/yyyy'),
       'Time': format(new Date(transaction.createdAt), 'HH:mm:ss'),
       'Description': transaction.description,
@@ -243,7 +276,14 @@ async function generateStatementOnDemand(accountId: string, month: string, year:
       },
       include: {
         student: {
-          include: { class: true }
+          include: { 
+            teacher: true,
+            enrollments: {
+              include: {
+                class: true
+              }
+            }
+          }
         },
         account: true
       }

@@ -3,15 +3,12 @@
 import { useState, useEffect, useRef } from "react";
 import { createBill } from "@/src/app/actions/billActions";
 import { useRouter } from "next/navigation";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/src/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/src/components/ui/dialog";
 import { Input } from "@/src/components/ui/input";
-import { Button } from "@/src/components/ui/button";
 import { Label } from "@/src/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/src/components/ui/popover";
-import { toast } from "sonner";
+import { Button } from "@/src/components/ui/button";
 import { Loader2 } from "lucide-react";
-import EmojiPicker, { EmojiClickData } from "emoji-picker-react";
-import { Checkbox } from "@/src/components/ui/checkbox";
+import { toast } from "sonner";
 import { EmojiPickerButton } from "@/src/components/ui/emoji-picker-button";
 
 type AddBillProps = {
@@ -20,72 +17,19 @@ type AddBillProps = {
   onSuccess?: () => void;
 };
 
-// Class interface
-interface ClassItem {
-  id: string;
-  name: string;
-  code: string;
-  emoji: string;
-  studentCount: number;
-}
-
 const AddBill = ({ isOpen = false, onClose, onSuccess }: AddBillProps) => {
   const formRef = useRef<HTMLFormElement>(null);
   const [selectedEmoji, setSelectedEmoji] = useState("💰");
-  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  // State for classes
-  const [classes, setClasses] = useState<ClassItem[]>([]);
-  const [isLoadingClasses, setIsLoadingClasses] = useState(true);
-  const [selectedClassIds, setSelectedClassIds] = useState<string[]>([]);
-
-  useEffect(() => {
-    // Only fetch classes when dialog is open
-    if (isOpen) {
-      const fetchClasses = async () => {
-        setIsLoadingClasses(true);
-        try {
-          const response = await fetch("/api/classes");
-          if (response.ok) {
-            const data = await response.json();
-            setClasses(data.classes || []);
-          } else {
-            toast.error("Failed to fetch classes");
-          }
-        } catch (error) {
-          console.error("Error fetching classes:", error);
-        } finally {
-          setIsLoadingClasses(false);
-        }
-      };
-
-      fetchClasses();
-    }
-  }, [isOpen]);
 
   // Reset form when dialog closes
   useEffect(() => {
     if (!isOpen) {
       setSelectedEmoji("💰");
-      setSelectedClassIds([]);
       formRef.current?.reset();
     }
   }, [isOpen]);
-
-  const handleEmojiClick = (emojiData: EmojiClickData) => {
-    setSelectedEmoji(emojiData.emoji);
-    setEmojiPickerOpen(false); // Close the emoji picker when an emoji is selected
-  };
-
-  const toggleClassSelection = (classId: string) => {
-    setSelectedClassIds(prev => 
-      prev.includes(classId) 
-        ? prev.filter(id => id !== classId)
-        : [...prev, classId]
-    );
-  };
 
   const handleDialogChange = (open: boolean) => {
     if (!open && !isSubmitting && onClose) {
@@ -93,20 +37,34 @@ const AddBill = ({ isOpen = false, onClose, onSuccess }: AddBillProps) => {
     }
   };
 
+  // Timezone-safe date formatting helper
+  const formatDateForInput = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+  
+  // Get today's date in YYYY-MM-DD format in local timezone
+  const getTodayDateString = () => {
+    const today = new Date();
+    return formatDateForInput(today);
+  };
+
   const clientAction = async (formData: FormData) => {
     try {
-      // Validate that at least one class is selected
-      if (selectedClassIds.length === 0) {
-        toast.error("Please select at least one class");
-        return;
-      }
-      
       setIsSubmitting(true);
       
-      // Add selected class IDs to the form data
-      selectedClassIds.forEach(classId => {
-        formData.append("classIds", classId);
-      });
+      // Better timezone handling for the due date
+      const dueDateString = formData.get("dueDate") as string;
+      if (dueDateString) {
+        // Create a date using the components to avoid timezone shifts
+        const [year, month, day] = dueDateString.split('-').map(Number);
+        const localDate = new Date(year, month - 1, day, 12, 0, 0); // Setting to noon for better visibility
+        
+        // Update the formData with the proper ISO string
+        formData.set("dueDate", localDate.toISOString());
+      }
       
       const result = await createBill(formData);
 
@@ -116,7 +74,6 @@ const AddBill = ({ isOpen = false, onClose, onSuccess }: AddBillProps) => {
         toast.success("Bill created successfully!");
         formRef.current?.reset();
         setSelectedEmoji("💰");
-        setSelectedClassIds([]);
         
         // Force a router refresh
         router.refresh();
@@ -133,24 +90,21 @@ const AddBill = ({ isOpen = false, onClose, onSuccess }: AddBillProps) => {
     }
   };
 
+  const todayString = getTodayDateString();
+
   return (
-    <Dialog open={isOpen} onOpenChange={handleDialogChange}>
-      <DialogContent className="max-w-md">
+    <Dialog 
+      open={isOpen} 
+      onOpenChange={handleDialogChange}
+    >
+      <DialogContent className="max-w-md bg-background">
         <DialogHeader>
-          <DialogTitle>Create New Bill</DialogTitle>
+          <DialogTitle>Create A New Bill</DialogTitle>
         </DialogHeader>
         
         <form ref={formRef} action={clientAction} className="space-y-4">
+          {/* Updated layout with emoji picker on the right correctly aligned */}
           <div className="flex items-center gap-3">
-            <EmojiPickerButton 
-              value={selectedEmoji}
-              onChange={(emoji) => {
-                setSelectedEmoji(emoji);
-                setEmojiPickerOpen(false);
-              }}
-              className="text-2xl h-14 w-14"
-            />
-            
             <Input
               name="title"
               placeholder="Bill title"
@@ -158,6 +112,16 @@ const AddBill = ({ isOpen = false, onClose, onSuccess }: AddBillProps) => {
               required
               disabled={isSubmitting}
             />
+            
+            <div className="shrink-0">
+              <EmojiPickerButton 
+                value={selectedEmoji}
+                onChange={(emoji) => {
+                  setSelectedEmoji(emoji);
+                }}
+                className="text-2xl h-14 w-14"
+              />
+            </div>
             
             <input type="hidden" name="emoji" value={selectedEmoji} />
           </div>
@@ -182,6 +146,7 @@ const AddBill = ({ isOpen = false, onClose, onSuccess }: AddBillProps) => {
                 id="dueDate"
                 name="dueDate"
                 type="date"
+                min={todayString}
                 required
                 disabled={isSubmitting}
               />
@@ -217,57 +182,15 @@ const AddBill = ({ isOpen = false, onClose, onSuccess }: AddBillProps) => {
             />
           </div>
 
-          {/* Class selection section - FIXED to match RemoveBillFromClassesDialog */}
-          <div>
-            <Label className="mb-2 block">Select Classes</Label>
-            {isLoadingClasses ? (
-              <div className="flex items-center justify-center py-4">
-                <Loader2 className="h-5 w-5 animate-spin text-gray-500" />
-              </div>
-            ) : classes.length === 0 ? (
-              <div className="text-center py-2 text-gray-500">
-                No classes available. Create a class first.
-              </div>
-            ) : (
-              <div className="max-h-48 overflow-y-auto border rounded p-2">
-                {classes.map(cls => (
-                  <div
-                    key={cls.id}
-                    className={`flex items-center gap-2 p-2 rounded cursor-pointer mb-1 ${
-                      selectedClassIds.includes(cls.id) ? "bg-gray-100" : "hover:bg-gray-50"
-                    }`}
-                  >
-                    <Checkbox
-                      id={`class-${cls.id}`}
-                      checked={selectedClassIds.includes(cls.id)}
-                      onCheckedChange={() => toggleClassSelection(cls.id)}
-                    />
-                    <Label
-                      htmlFor={`class-${cls.id}`}
-                      className="flex items-center cursor-pointer flex-1"
-                      onClick={() => toggleClassSelection(cls.id)}
-                    >
-                      <span className="text-xl mr-2">{cls.emoji}</span>
-                      <span>{cls.name}</span>
-                      <span className="text-xs text-gray-500 ml-auto">
-                        {cls.studentCount} students
-                      </span>
-                    </Label>
-                  </div>
-                ))}
-              </div>
-            )}
-            {selectedClassIds.length === 0 && (
-              <p className="text-xs text-red-500 mt-1">
-                Please select at least one class
-              </p>
-            )}
+          <div className="py-2 text-gray-600 text-sm">
+            <p>This bill will be created without assigning to any class or student.</p>
+            <p className="mt-1">You can assign it to classes or students later from the bill details page.</p>
           </div>
 
-          <div className="flex justify-end gap-2 pt-2">
+          <DialogFooter className="pt-2 border-t">
             <Button 
               type="button" 
-              variant="secondary" 
+              variant="outline"
               onClick={onClose}
               disabled={isSubmitting}
             >
@@ -275,7 +198,7 @@ const AddBill = ({ isOpen = false, onClose, onSuccess }: AddBillProps) => {
             </Button>
             <Button 
               type="submit" 
-              disabled={isSubmitting || selectedClassIds.length === 0}
+              disabled={isSubmitting}
             >
               {isSubmitting ? (
                 <>
@@ -284,7 +207,7 @@ const AddBill = ({ isOpen = false, onClose, onSuccess }: AddBillProps) => {
                 </>
               ) : "Create Bill"}
             </Button>
-          </div>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

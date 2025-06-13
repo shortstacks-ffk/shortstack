@@ -11,21 +11,23 @@ import Link from "next/link";
 import { useState, useEffect, useMemo } from "react";
 
 interface UserDropdownProps {
-  teacherImage: string;
+  teacherImage: string | null | undefined;
   teacherInitial: string;
   teacherName: string;
   onLogout: () => void;
+  profileVersion?: number;
 }
 
 export default function UserDropdown({ 
   teacherImage, 
   teacherInitial, 
-  teacherName, 
-  onLogout 
+  teacherName,
+  onLogout,
+  profileVersion = 0
 }: UserDropdownProps) {
   // State to track image loading errors
   const [imageError, setImageError] = useState(false);
-  // State to ensure we're using the latest image URL - matching StudentUserDropdown's type definition
+  // State to ensure we're using the latest image URL
   const [imageUrl, setImageUrl] = useState<string | null | undefined>(teacherImage);
   
   // Generate proper initials from the teacher's name
@@ -40,47 +42,23 @@ export default function UserDropdown({
     return (nameParts[0].charAt(0) + nameParts[nameParts.length - 1].charAt(0)).toUpperCase();
   }, [teacherName, teacherInitial]);
   
-  // Update image URL when prop changes - simplified like StudentUserDropdown
+  // Update image URL when prop changes or version changes
   useEffect(() => {
-    console.log("Teacher image prop received:", teacherImage);
-    setImageUrl(teacherImage);
-    setImageError(false);
-  }, [teacherImage]);
+    if (teacherImage) {
+      // Add a cache-busting parameter
+      const cacheBuster = `?v=${profileVersion}-${Date.now()}`;
+      setImageUrl(`${teacherImage}${cacheBuster}`);
+      setImageError(false);
+    } else {
+      setImageUrl(null);
+    }
+  }, [teacherImage, profileVersion]);
 
-  // Handle image load error with enhanced debugging
+  // Handle image load error
   const handleImageError = () => {
-    console.error("Image load error for URL:", imageUrl);
-    console.error("Original teacher image prop:", teacherImage);
+    console.log("Failed to load image:", imageUrl);
     setImageError(true);
   };
-
-  // Fetch latest image from database
-  useEffect(() => {
-    const fetchLatestTeacherImage = async () => {
-      try {
-        // Add a timestamp to prevent caching
-        const response = await fetch('/api/teacher/profile?t=' + Date.now(), {
-          headers: {
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
-          }
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          if (data.image) {
-            console.log("Retrieved fresh image from API:", data.image);
-            setImageUrl(data.image);
-            setImageError(false);
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching latest teacher image:", error);
-      }
-    };
-    
-    fetchLatestTeacherImage();
-  }, []);
 
   return (
     <DropdownMenu modal={false}>
@@ -93,11 +71,18 @@ export default function UserDropdown({
                 alt={teacherName || "User avatar"}
                 onError={handleImageError}
                 className="object-cover"
+                key={`avatar-${profileVersion}-${Date.now()}`} // Force remount
               />
-            ) : null}
-            <AvatarFallback className="bg-blue-100 text-blue-800">
-              {properInitials}
-            </AvatarFallback>
+            ) : (
+              <AvatarFallback className="bg-blue-100 text-blue-800">
+                {properInitials}
+              </AvatarFallback>
+            )}
+            {/* {!imageUrl && (
+              <AvatarFallback className="bg-blue-100 text-blue-800">
+                {properInitials}
+              </AvatarFallback>
+            )} */}
           </Avatar>
           <span className="font-medium text-sm hidden sm:inline text-gray-800">{teacherName}</span>
           <ChevronDown className="h-4 w-4 text-gray-500" />

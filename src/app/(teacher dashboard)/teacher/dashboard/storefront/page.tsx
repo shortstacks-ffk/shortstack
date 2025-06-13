@@ -1,6 +1,5 @@
 export const dynamic = 'force-dynamic';
 
-// import DashboardAddStoreItemCard from "@/src/components/storefront/dashboardAddStoreItemCard";
 import { getAllStoreItems } from "@/src/app/actions/storeFrontActions";
 import { StoreItemCard } from "@/src/components/storefront/StoreItemCard";
 import AddAnything from "@/src/components/AddAnything";
@@ -10,6 +9,8 @@ import { Suspense } from "react";
 interface ItemClass {
   id: string;
   name: string;
+  emoji?: string;
+  code?: string;
 }
 
 // StoreItems content component to handle data fetching
@@ -22,26 +23,28 @@ async function StoreItemsContent() {
       default: return "bg-blue-100";
     }
   };
-  const response = await getAllStoreItems();
+  
+  const response = await getAllStoreItems({ includeUnassigned: true });
   if (!response.success || !response.data) {
     return <div>Failed to load storeItems</div>;
   }
 
-  // Reverse the array so newest items are at the end
+  // Reverse the array so newest items are at the beginning
   const sortedStoreItems = [...response.data].reverse();
 
+  console.log("Store items:", sortedStoreItems.length); // Debug
+
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
       {sortedStoreItems.map((storeItem, index) => (
         <StoreItemCard
           key={storeItem.id}
-          isAvailable={storeItem.isAvailable}
-          classes={storeItem.class || []}
           {...storeItem}
+          isAvailable={storeItem.isAvailable}
+          classes={storeItem.classes || []} // Fix: Changed from storeItem.class to storeItem.classes
           backgroundColor={getColumnColor(index)}
         />
       ))}
-      {/* <DashboardAddStoreItemCard /> */}
       <AddAnything title="Add Store Item" FormComponent={AddStoreItem} />
     </div>
   );
@@ -49,7 +52,7 @@ async function StoreItemsContent() {
 
 export default async function StoreFrontPage() {
   return (
-    <div className="w-full">
+    <div className="w-full p-4">
       <Suspense
         fallback={
           <div className="text-center py-8">Loading store items...</div>

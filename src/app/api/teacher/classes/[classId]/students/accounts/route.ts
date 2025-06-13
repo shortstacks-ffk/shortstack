@@ -3,6 +3,8 @@ import { db } from "@/src/lib/db";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/src/lib/auth/config";
 
+// Add more logging to help diagnose the issue
+
 export async function GET(
   req: Request,
   context: { params: Promise<{ classId: string }> } 
@@ -14,15 +16,29 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { classId } = await context.params; 
+    const { classId } = await context.params;
+    console.log("API: Fetching students for class ID:", classId);
 
-    // Verify teacher owns the class
+    // Get the teacher record first
+    const teacher = await db.teacher.findUnique({
+      where: { userId: session.user.id }
+    });
+    
+    if (!teacher) {
+      return NextResponse.json({ error: "Teacher profile not found" }, { status: 404 });
+    }
+
+    console.log("API: Teacher ID:", teacher.id);
+
+    // Verify teacher owns the class using teacherId
     const classExists = await db.class.findFirst({
       where: {
         id: classId,
-        userId: session.user.id,
+        teacherId: teacher.id,
       },
     });
+
+    console.log("API: Class exists check:", !!classExists);
 
     if (!classExists) {
       return NextResponse.json({ error: "Class not found or access denied" }, { status: 403 });
@@ -44,6 +60,7 @@ export async function GET(
         lastName: true,
         schoolEmail: true,
         userId: true,
+        lastLogin: true, // Include lastLogin here
         bankAccounts: {
           select: {
             id: true,
@@ -55,26 +72,6 @@ export async function GET(
       },
     });
 
-    // Get last login information from User model for each student that has a userId
-    const studentIds = students.map(student => student.userId).filter(Boolean);
-    
-    const userLoginInfo = studentIds.length > 0 
-      ? await db.user.findMany({
-          where: { 
-            id: { in: studentIds as string[] }
-          },
-          select: {
-            id: true,
-            createdAt: true // Use createdAt instead of lastLogin
-          }
-        })
-      : [];
-
-    // Create a map of userId -> createdAt for quick lookup
-    const userLoginMap = Object.fromEntries(
-      userLoginInfo.map(user => [user.id, user.createdAt]) // Fix the user.lastLogin access
-    );
-
     // Format the student data for the frontend
     const formattedStudents = students.map((student) => {
       const checkingAccount = student.bankAccounts.find(
@@ -85,8 +82,9 @@ export async function GET(
         (acc) => acc.accountType === "SAVINGS"
       ) || { id: "", accountNumber: "", balance: 0 };
 
-      const lastLogin = student.userId && userLoginMap[student.userId]
-        ? new Date(userLoginMap[student.userId]).toLocaleDateString()
+      // Use the actual lastLogin field from the student model instead of trying to get it from User
+      const lastLogin = student.lastLogin 
+        ? new Date(student.lastLogin).toLocaleDateString() 
         : "Never";
 
       return {

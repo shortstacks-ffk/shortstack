@@ -11,9 +11,18 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     
-    // Get all classes for this teacher
+    // Get teacher profile first 
+    const teacher = await db.teacher.findUnique({
+      where: { userId: session.user.id }
+    });
+    
+    if (!teacher) {
+      return NextResponse.json({ error: "Teacher profile not found" }, { status: 404 });
+    }
+    
+    // Get all classes for this teacher using teacherId
     const classes = await db.class.findMany({
-      where: { userId: session.user.id },
+      where: { teacherId: teacher.id },
       select: {
         id: true,
         name: true,
@@ -21,7 +30,7 @@ export async function GET() {
         emoji: true,
         _count: {
           select: {
-            students: true
+            enrollments: true
           }
         }
       },
@@ -34,7 +43,7 @@ export async function GET() {
       name: cls.name,
       code: cls.code,
       emoji: cls.emoji,
-      studentCount: cls._count.students
+      studentCount: cls._count.enrollments
     })));
   } catch (error) {
     console.error("Error fetching teacher classes:", error);

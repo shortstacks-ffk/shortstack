@@ -24,6 +24,7 @@ import { Input } from "@/src/components/ui/input"
 import { Loader2, AlertCircle } from "lucide-react"
 import { Alert, AlertDescription } from "@/src/components/ui/alert"
 import { RadioGroup, RadioGroupItem } from "@/src/components/ui/radio-group"
+import { useRouter } from "next/navigation"
 
 interface Bill {
   id: string
@@ -63,6 +64,8 @@ export default function PayBillDialog({
   const [paymentMode, setPaymentMode] = useState<PaymentMode>("full")
   const [customAmount, setCustomAmount] = useState("")
   const [paymentStep, setPaymentStep] = useState<'select' | 'payment'>('select')
+  
+  const router = useRouter()
   
   const selectedAccount = accounts.find(acc => acc.id === selectedAccountId)
   
@@ -138,10 +141,9 @@ export default function PayBillDialog({
   }
   
   const handleSelectBill = (bill: Bill) => {
-    setSelectedBill(bill)
-    setPaymentStep('payment')
-    setPaymentMode("full")
-    setCustomAmount("")
+    // Instead of navigating to a bill detail page, select the bill for payment
+    setSelectedBill(bill);
+    setPaymentStep('payment');
   }
   
   const handlePayBill = async () => {
@@ -216,11 +218,16 @@ export default function PayBillDialog({
   }
   
   const formatDate = (date: Date | string) => {
-    return new Date(date).toLocaleDateString('en-US', {
+    // Create a date object if string is provided
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    
+    // Format the date using the browser's locale and timezone
+    return dateObj.toLocaleDateString(undefined, {
       year: 'numeric',
       month: 'short',
-      day: 'numeric'
-    })
+      day: 'numeric',
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone // Explicitly use browser's timezone
+    });
   }
   
   return (
@@ -275,17 +282,27 @@ export default function PayBillDialog({
                           <p className="text-sm text-gray-500 mt-1">
                             {bill.className} • Due: {formatDate(bill.dueDate)}
                           </p>
-                          {bill.paidAmount && bill.paidAmount > 0 && (
+                          {bill.paidAmount && bill.paidAmount > 0 ? (
                             <p className="text-xs text-amber-600 mt-1">
                               Partially paid: {formatCurrency(bill.paidAmount)} of {formatCurrency(bill.amount)}
+                            </p>
+                          ) : (
+                            <p className="text-xs text-gray-500 mt-1">
+                              No payments yet
                             </p>
                           )}
                         </div>
                         <div>
-                          <p className="font-medium text-right">
-                            {formatCurrency(remainingAmount)}
-                          </p>
-                          <p className="text-xs text-gray-500">remaining</p>
+                          {remainingAmount > 0 ? (
+                            <>
+                              <p className="font-medium text-right">
+                                {formatCurrency(remainingAmount)}
+                              </p>
+                              <p className="text-xs text-gray-500">remaining</p>
+                            </>
+                          ) : (
+                            <p className="font-medium text-right text-green-600">Paid in Full</p>
+                          )}
                         </div>
                       </div>
                     );

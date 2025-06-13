@@ -12,7 +12,6 @@ import { Loader2, Upload, ImageIcon } from 'lucide-react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 
-
 interface AccountProfileTabProps {
   user: any;
   role?: "student" | "teacher";
@@ -34,6 +33,13 @@ const studentProfileSchema = z.object({
   schoolEmail: z.string().email('Invalid email format'),
 });
 
+// Super user schema (similar to teacher but without institution/bio requirements)
+const superUserProfileSchema = z.object({
+  firstName: z.string().min(1, 'First name is required'),
+  lastName: z.string().min(1, 'Last name is required'),
+  email: z.string().email('Invalid email format'),
+});
+
 export default function AccountProfileTab({ 
   user, 
   role, 
@@ -44,8 +50,13 @@ export default function AccountProfileTab({
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   
+  const isSuperUser = session?.user?.role === "SUPER";
+
   // Determine if the user is a student based on either prop
   const isStudent = propIsStudent !== undefined ? propIsStudent : role === "student";
+  
+  // Store temporary uploaded image URL
+  const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
   
   // Ensure we're properly prioritizing profile images
   const [imagePreview, setImagePreview] = useState<string | null>(() => {
@@ -57,12 +68,23 @@ export default function AccountProfileTab({
     return user?.profileImage || user?.image || null;
   });
 
-  const validationSchema = isStudent ? studentProfileSchema : teacherProfileSchema;
+  // Select appropriate validation schema based on user type
+  const validationSchema = isSuperUser 
+    ? superUserProfileSchema 
+    : isStudent 
+    ? studentProfileSchema 
+    : teacherProfileSchema;
 
   // Initialize form with correct default values based on role
-  const { register, handleSubmit, reset, formState: { errors, isDirty } } = useForm({
+  const { register, handleSubmit, reset, formState: { errors, isDirty, dirtyFields }, setValue } = useForm({
     resolver: zodResolver(validationSchema),
-    values: isStudent 
+    values: isSuperUser 
+      ? {
+          firstName: user?.firstName || '',
+          lastName: user?.lastName || '',
+          email: user?.email || '',
+        }
+      : isStudent 
       ? {
           firstName: user?.firstName || '',
           lastName: user?.lastName || '',
@@ -75,28 +97,44 @@ export default function AccountProfileTab({
           institution: user?.institution || user?.teacherProfile?.institution || '',
           bio: user?.bio || user?.teacherProfile?.bio || '',
         },
-    // Use values instead of defaultValues to ensure form updates when user data changes
   });
   
   // Add useEffect to reset form when user data changes
   useEffect(() => {
     if (user) {
-      reset(isStudent 
-        ? {
-            firstName: user?.firstName || '',
-            lastName: user?.lastName || '',
-            schoolEmail: user?.schoolEmail || '',
-          }
-        : {
-            firstName: user?.firstName || user?.teacherProfile?.firstName || '',
-            lastName: user?.lastName || user?.teacherProfile?.lastName || '',
-            email: user?.email || '',
-            institution: user?.institution || user?.teacherProfile?.institution || '',
-            bio: user?.bio || user?.teacherProfile?.bio || '',
-          }
+      // Reset the form with user data
+      if (isSuperUser) {
+        reset({
+          firstName: user?.firstName || '',
+          lastName: user?.lastName || '',
+          email: user?.email || '',
+        });
+      } else if (isStudent) {
+        reset({
+          firstName: user?.firstName || '',
+          lastName: user?.lastName || '',
+          schoolEmail: user?.schoolEmail || '',
+        });
+      } else {
+        reset({
+          firstName: user?.firstName || user?.teacherProfile?.firstName || '',
+          lastName: user?.lastName || user?.teacherProfile?.lastName || '',
+          email: user?.email || '',
+          institution: user?.institution || user?.teacherProfile?.institution || '',
+          bio: user?.bio || user?.teacherProfile?.bio || '',
+        });
+      }
+      
+      // Reset image preview
+      setImagePreview(isStudent
+        ? user?.profileImage
+        : user?.profileImage || user?.image || null
       );
+      
+      // Clear uploaded image URL when user changes
+      setUploadedImageUrl(null);
     }
-  }, [user, reset, isStudent]);
+  }, [user, reset, isStudent, isSuperUser]);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -133,6 +171,7 @@ export default function AccountProfileTab({
       const formData = new FormData();
       formData.append('file', file);
 
+      // Use teacher endpoint for both teachers and super users
       const endpoint = isStudent
         ? '/api/student/profile/image'
         : '/api/teacher/profile/image';
@@ -143,26 +182,33 @@ export default function AccountProfileTab({
       });
 
       if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || 'Failed to upload image');
+        const errorText = await res.text();
+        try {
+          // Try to parse as JSON
+          const errorData = JSON.parse(errorText);
+          throw new Error(errorData.error || 'Failed to upload image');
+        } catch (jsonError) {
+          // If not valid JSON, use text response
+          throw new Error(`Upload failed: ${errorText || 'Unknown error'}`);
+        }
       }
 
       const data = await res.json();
       
-      // Update local state to ensure UI reflects change
+      if (!data.success || !data.imageUrl) {
+        throw new Error('Invalid response from server');
+      }
+      
+      // Store the uploaded image URL to be included in form submission
+      setUploadedImageUrl(data.imageUrl);
+      
+      // Update preview with the actual URL from the server
       setImagePreview(data.imageUrl);
       
-      // Force a session refresh to update the avatar
-      await updateSession({ 
-        image: data.imageUrl,
-        // Keep other session data
-        ...session?.user
+      toast.success("Image uploaded", {
+        description: "Click 'Save Changes' to update your profile with this image"
       });
       
-      // Update this toast call to use method syntax
-      toast.success("Profile image updated", {
-        description: "Image uploaded successfully"
-      });
     } catch (error) {
       console.error('Error uploading image:', error);
       toast.error("Upload failed", {
@@ -179,19 +225,34 @@ export default function AccountProfileTab({
     setSaving(true);
     
     try {
+      // Use teacher endpoint for both teachers and super users
       const endpoint = isStudent
         ? '/api/student/profile'
         : '/api/teacher/profile';
         
-      // For teacher profiles, ensure we're sending the institution and bio fields
-      const payload = isStudent 
-        ? data 
-        : {
-            firstName: data.firstName,
-            lastName: data.lastName,
-            institution: data.institution,
-            bio: data.bio,
-          };
+      // Prepare payload based on user type
+      let payload: any;
+      
+      if (isSuperUser) {
+        payload = {
+          firstName: data.firstName,
+          lastName: data.lastName,
+          // Include the uploaded image URL if available
+          profileImage: uploadedImageUrl || undefined,
+        };
+      } else if (isStudent) {
+        payload = data;
+      } else {
+        // Teacher
+        payload = {
+          firstName: data.firstName,
+          lastName: data.lastName,
+          institution: data.institution || '',
+          bio: data.bio || '',
+          // Include the uploaded image URL if available
+          profileImage: uploadedImageUrl || undefined,
+        };
+      }
         
       const res = await fetch(endpoint, {
         method: 'PUT',
@@ -206,21 +267,52 @@ export default function AccountProfileTab({
         throw new Error(errorData.error || 'Failed to update profile');
       }
       
+      const responseData = await res.json();
+      
       toast.success("Profile updated", {
         description: "Your profile information has been saved successfully"
       });
       
-      // Update session context if name changed
-      if (data.firstName && data.lastName) {
+      // If we had an uploaded image and it was successfully saved
+      if (uploadedImageUrl && updateSession) {
+        // Update session with new image
         await updateSession({
+          ...session?.user,
+          image: uploadedImageUrl,
+        });
+        
+        // Create a custom event to notify other components
+        const event = new CustomEvent('profileUpdated', { 
+          detail: { 
+            image: uploadedImageUrl,
+            timestamp: Date.now() 
+          } 
+        });
+        window.dispatchEvent(event);
+        
+        // Store in localStorage to persist across page navigations
+        localStorage.setItem('profileUpdated', String(Date.now()));
+        
+        // Clear the uploaded image URL since it's now saved
+        setUploadedImageUrl(null);
+      }
+      
+      // Update session name if it changed
+      if (data.firstName && data.lastName && updateSession) {
+        await updateSession({
+          ...session?.user,
           name: `${data.firstName} ${data.lastName}`
         });
       }
 
-      // Notify parent component about the update
-      if (onUpdate && res.ok) {
-        onUpdate(payload);
+      // Notify parent component about the update with response data
+      if (onUpdate) {
+        onUpdate(responseData.user || {
+          ...payload,
+          profileImage: uploadedImageUrl || user?.profileImage || user?.image
+        });
       }
+      
     } catch (error) {
       console.error('Error updating profile:', error);
       toast.error("Update failed", {
@@ -230,6 +322,9 @@ export default function AccountProfileTab({
       setSaving(false);
     }
   };
+
+  // Check if profile has unsaved changes (either dirty fields or uploaded image)
+  const hasUnsavedChanges = isDirty || uploadedImageUrl !== null;
 
   return (
     <form onSubmit={handleSubmit(onSubmit)}>
@@ -279,7 +374,7 @@ export default function AccountProfileTab({
             }
           </div>
           
-          {!isStudent && (
+          {!isStudent && !isSuperUser && (
             <>
               <div className="space-y-2">
                 <Label htmlFor="institution" className="text-gray-600">Institution</Label>
@@ -306,16 +401,24 @@ export default function AccountProfileTab({
         
         {/* Right side - Photo upload */}
         <div className="flex flex-col items-center">
-          <div className="border border-gray-300 shadow-sm rounded-lg p-1 w-full max-w-[180px] h-[180px] mb-2 flex items-center justify-center overflow-hidden">
+          {/* Image preview container with proper sizing */}
+          <div className="border border-gray-300 shadow-sm rounded-lg p-1 w-full max-w-[180px] h-[180px] mb-2 flex items-center justify-center overflow-hidden relative">
             {imagePreview ? (
               <img 
                 src={imagePreview} 
                 alt="Profile" 
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover" 
               />
             ) : (
               <div className="flex flex-col items-center justify-center text-gray-400">
                 <ImageIcon size={40} />
+              </div>
+            )}
+            
+            {/* Show indicator when image has been uploaded but not saved */}
+            {uploadedImageUrl && (
+              <div className="absolute bottom-0 right-0 left-0 bg-orange-500 text-white text-xs py-1 px-2 text-center">
+                Unsaved
               </div>
             )}
           </div>
@@ -338,13 +441,19 @@ export default function AccountProfileTab({
               disabled={uploading}
             />
           </Label>
+          
+          {uploadedImageUrl && (
+            <p className="text-xs text-center mt-2 text-amber-600">
+              Click "Save Changes" to apply the new profile image
+            </p>
+          )}
         </div>
       </div>
       
       <div className="flex justify-end mt-4 pt-4 border-t border-gray-200">
         <Button 
           type="submit" 
-          disabled={saving || !isDirty || isStudent}
+          disabled={saving || (!hasUnsavedChanges)}
           className="bg-orange-500 hover:bg-orange-600 text-white"
         >
           {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

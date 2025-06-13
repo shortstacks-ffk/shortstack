@@ -20,6 +20,16 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Get teacher record
+    const teacher = await db.teacher.findUnique({
+      where: { userId: session.user.id },
+      select: { id: true }
+    });
+
+    if (!teacher) {
+      return NextResponse.json({ error: "Teacher profile not found" }, { status: 404 });
+    }
+
     // Get required parameters
     const url = new URL(request.url);
     const studentId = url.searchParams.get('studentId');
@@ -49,7 +59,11 @@ export async function GET(request: Request) {
         id: studentId
       },
       include: {
-        class: true
+        enrollments: {
+          include: {
+            class: true
+          }
+        }
       }
     });
 
@@ -57,15 +71,12 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Student not found" }, { status: 404 });
     }
 
-    // Check if teacher has access to this student's class
-    const teacherClass = await db.class.findFirst({
-      where: {
-        userId: session.user.id,
-        code: student.classId
-      }
-    });
+    // Check if teacher has access to this student through enrollment
+    const teacherHasAccess = student.enrollments.some(enrollment => 
+      enrollment.class.teacherId === teacher.id && enrollment.enrolled
+    );
 
-    if (!teacherClass) {
+    if (!teacherHasAccess) {
       return NextResponse.json({ 
         error: "You do not have permission to access this student's records" 
       }, { status: 403 });
@@ -135,10 +146,14 @@ export async function GET(request: Request) {
       });
     }
     
+    // Get class name from enrollments
+    const activeEnrollment = student.enrollments.find(e => e.enrolled);
+    const className = activeEnrollment?.class?.name || 'N/A';
+    
     // Format transaction data for the statement with all required columns
     const statementData = transactions.map(transaction => ({
       'Student Name': `${student.firstName} ${student.lastName}`,
-      'Class': student.class?.name || 'N/A',
+      'Class': className,
       'Date': format(new Date(transaction.createdAt), 'MM/dd/yyyy'),
       'Time': format(new Date(transaction.createdAt), 'HH:mm:ss'),
       'Description': transaction.description,

@@ -1,30 +1,19 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/src/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/src/components/ui/dialog";
 import { Button } from "@/src/components/ui/button";
-import { Label } from "@/src/components/ui/label";
-import { copyStoreItemToClasses } from "../../app/actions/storeFrontActions";
-import { toast } from "react-hot-toast";
-import { useRouter } from "next/navigation";
+import { Checkbox } from "@/src/components/ui/checkbox";
+import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
+import { copyStoreItemToClasses } from "@/src/app/actions/storeFrontActions";
+import { useRouter } from "next/navigation";
 
 interface ClassItem {
   id: string;
   name: string;
   code: string;
   emoji: string;
-  isAssigned?: boolean;
-}
-
-interface ItemClass {
-  id: string;
-  name: string;
 }
 
 interface AssignStoreItemDialogProps {
@@ -32,7 +21,7 @@ interface AssignStoreItemDialogProps {
   onClose: () => void;
   storeItemId: string;
   storeItemTitle: string;
-  assignedClasses: ItemClass[];
+  assignedClasses: Array<{ id: string; name: string; emoji?: string; code?: string }>;
 }
 
 export default function AssignStoreItemDialog({
@@ -40,68 +29,78 @@ export default function AssignStoreItemDialog({
   onClose,
   storeItemId,
   storeItemTitle,
-  assignedClasses,
+  assignedClasses = []
 }: AssignStoreItemDialogProps) {
-  // Add local dialog open state
-  const [dialogOpen, setDialogOpen] = useState(isOpen);
-  const [classes, setClasses] = useState<ClassItem[]>([]);
+  const router = useRouter();
   const [selectedClassIds, setSelectedClassIds] = useState<string[]>([]);
+  const [allClasses, setAllClasses] = useState<ClassItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const router = useRouter();
+  
+  // Use useRef instead of state for mounted tracking
+  const isMountedRef = useRef(false);
 
-  // Sync with parent's isOpen prop
+  // Get the IDs of already assigned classes for filtering
+  const assignedClassIds = assignedClasses.map(cls => cls.id);
+  
+  // Set mounted ref on mount
   useEffect(() => {
-    setDialogOpen(isOpen);
-  }, [isOpen]);
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
-  // Get the IDs of classes this bill is already assigned to
-  const assignedClassIds = assignedClasses.map((c) => c.id);
-  // Add this ref to track whether we've already fetched classes
-  const hasFetchedRef = useRef(false);
-
+  // Only fetch classes when dialog opens
   useEffect(() => {
-    const fetchClasses = async () => {
-      if (!isOpen || hasFetchedRef.current) return;
-
+    if (!isOpen) {
+      // Reset state when dialog closes
+      setSelectedClassIds([]);
+      setAllClasses([]);
       setIsLoading(true);
+      return;
+    }
+    
+    const fetchClasses = async () => {
+      if (!isMountedRef.current) return;
+      
+      setIsLoading(true);
+      setSelectedClassIds([]);
+      
       try {
-        hasFetchedRef.current = true;
-
         const response = await fetch("/api/classes");
-        if (response.ok) {
-          const data = await response.json();
-          const processedClasses = data.classes.map((cls: ClassItem) => ({
-            ...cls,
-            isAssigned: assignedClassIds.includes(cls.id),
-          }));
-
-          setClasses(processedClasses);
-        } else {
-          toast.error("Failed to load classes");
+        if (!response.ok) {
+          throw new Error("Failed to fetch classes");
         }
+        const data = await response.json();
+        
+        if (!isMountedRef.current) return;
+        
+        // Filter out classes that already have this store item
+        const availableClasses = data.classes.filter(
+          (cls: ClassItem) => !assignedClassIds.includes(cls.id)
+        );
+        
+        setAllClasses(availableClasses);
       } catch (error) {
         console.error("Error fetching classes:", error);
-        toast.error("Could not load classes");
+        if (isMountedRef.current) {
+          toast.error("Failed to load classes");
+        }
       } finally {
-        setIsLoading(false);
+        if (isMountedRef.current) {
+          setIsLoading(false);
+        }
       }
     };
-
+    
     fetchClasses();
+  }, [isOpen, assignedClassIds.join(',')]);
 
-    return () => {
-      if (!isOpen) {
-        hasFetchedRef.current = false;
-        setSelectedClassIds([]);
-      }
-    };
-  }, [isOpen]);
-
-  const toggleClassSelection = (classId: string) => {
-    setSelectedClassIds((prev) =>
+  const handleToggleClass = (classId: string) => {
+    setSelectedClassIds(prev => 
       prev.includes(classId)
-        ? prev.filter((id) => id !== classId)
+        ? prev.filter(id => id !== classId)
         : [...prev, classId]
     );
   };
@@ -111,17 +110,18 @@ export default function AssignStoreItemDialog({
       toast.error("Please select at least one class");
       return;
     }
-
+    
     setIsSubmitting(true);
+    
     try {
       const result = await copyStoreItemToClasses({
         storeItemId,
-        targetClassIds: selectedClassIds,
+        targetClassIds: selectedClassIds
       });
-
+      
       if (result.success) {
         toast.success(result.message || "Store item assigned to classes");
-        router.refresh();
+        router.refresh(); // This will trigger a server-side re-fetch
         onClose();
       } else {
         toast.error(result.error || "Failed to assign store item to classes");
@@ -135,91 +135,58 @@ export default function AssignStoreItemDialog({
   };
 
   const handleClose = () => {
-    setDialogOpen(false);
-    onClose();
-    hasFetchedRef.current = false;
-    setSelectedClassIds([]);
+    if (!isSubmitting) {
+      onClose();
+    }
   };
 
   return (
-    <Dialog
-      open={dialogOpen}
-      onOpenChange={(open) => {
-        if (!open && !isSubmitting) {
-          handleClose();
-        }
-      }}
-    >
+    <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Assign Store Item to Classes</DialogTitle>
         </DialogHeader>
-
-        <div className="py-2">
+        
+        <div className="py-4">
           <p className="text-sm text-gray-600 mb-4">
-            Assign "{storeItemTitle}" to specific classes.
+            Assign "{storeItemTitle}" to these classes:
           </p>
-
-          <div>
-            <Label className="mb-2 block">Select Classes</Label>
-            {isLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-gray-500" />
-              </div>
-            ) : classes.length === 0 ? (
-              <div className="text-center py-4 text-gray-500">
-                You don't have any classes yet.
-              </div>
-            ) : (
-              <div className="max-h-60 overflow-y-auto border rounded p-2">
-                {classes.map((cls) => (
-                  <div
-                    key={cls.id}
-                    className={`flex items-center gap-2 p-2 rounded cursor-pointer mb-1 ${
-                      cls.isAssigned
-                        ? "bg-gray-100 text-gray-500"
-                        : selectedClassIds.includes(cls.id)
-                        ? "bg-blue-100"
-                        : "hover:bg-gray-50"
-                    }`}
-                    onClick={() =>
-                      !cls.isAssigned && toggleClassSelection(cls.id)
-                    }
-                  >
-                    <input
-                      type="checkbox"
-                      checked={
-                        selectedClassIds.includes(cls.id) || cls.isAssigned
-                      }
-                      disabled={cls.isAssigned}
-                      onChange={() =>
-                        !cls.isAssigned && toggleClassSelection(cls.id)
-                      }
-                      className="h-4 w-4"
-                    />
-                    <span className="text-xl mr-1">{cls.emoji}</span>
-                    <span>{cls.name}</span>
-                    <span className="text-xs text-gray-500 ml-auto">
-                      {cls.code}
-                    </span>
-                    {cls.isAssigned && (
-                      <span className="text-xs bg-gray-200 px-2 py-1 rounded">
-                        Already assigned
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-            {!isLoading &&
-              classes.length > 0 &&
-              selectedClassIds.length === 0 && (
-                <p className="text-xs text-red-500 mt-1">
-                  Please select at least one class
-                </p>
-              )}
-          </div>
-
+          
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-gray-500" />
+            </div>
+          ) : allClasses.length === 0 ? (
+            <div className="text-center py-4 text-gray-500">
+              {assignedClassIds.length > 0 
+                ? "This store item is already assigned to all your classes." 
+                : "You don't have any classes yet."}
+            </div>
+          ) : (
+            <div className="max-h-60 overflow-y-auto border rounded p-2">
+              {allClasses.map(cls => (
+                <div
+                  key={cls.id}
+                  className={`flex items-center gap-2 p-2 rounded cursor-pointer mb-1 ${
+                    selectedClassIds.includes(cls.id) ? "bg-blue-100" : "hover:bg-gray-50"
+                  }`}
+                  onClick={() => handleToggleClass(cls.id)}
+                >
+                  <Checkbox
+                    checked={selectedClassIds.includes(cls.id)}
+                    onCheckedChange={() => handleToggleClass(cls.id)}
+                    className="h-4 w-4"
+                  />
+                  <span className="text-xl mr-1">{cls.emoji}</span>
+                  <span>{cls.name}</span>
+                  <span className="text-xs text-gray-500 ml-auto">
+                    {cls.code}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+          
           <div className="flex justify-end gap-2 mt-6">
             <Button
               type="button"
@@ -231,7 +198,7 @@ export default function AssignStoreItemDialog({
             </Button>
             <Button
               onClick={handleSubmit}
-              disabled={isSubmitting || selectedClassIds.length === 0}
+              disabled={isSubmitting || selectedClassIds.length === 0 || allClasses.length === 0}
               className="min-w-[100px]"
             >
               {isSubmitting ? (
@@ -240,7 +207,7 @@ export default function AssignStoreItemDialog({
                   Assigning...
                 </>
               ) : (
-                "Assign Store Item"
+                "Assign"
               )}
             </Button>
           </div>

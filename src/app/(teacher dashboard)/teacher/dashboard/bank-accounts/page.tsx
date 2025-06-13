@@ -1,44 +1,25 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { Eye, ArrowRight, Download, Plus, Search, RefreshCw } from "lucide-react";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbList,
-  BreadcrumbPage,
-} from "@/src/components/ui/breadcrumb";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { Eye, RefreshCw, Search, Calendar } from "lucide-react";
 
 import { Button } from "@/src/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
 } from "@/src/components/ui/card";
 
-import { Separator } from "@/src/components/ui/separator";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/src/components/ui/tabs";
 import { Input } from "@/src/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/src/components/ui/select";
 import { Checkbox } from "@/src/components/ui/checkbox";
 import type { CheckedState } from "@radix-ui/react-checkbox";
 import { formatCurrency } from "@/src/lib/utils";
 import { toast } from "sonner";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/src/components/ui/dialog";
 
 import AddFundsDialog from "./AddFundsDialog";
 import RemoveFundsDialog from "./RemoveFundsDialog";
+import RecurringTransactionsDialog from "./RecurringTransactionsDialog";
 
 interface Student {
   id: string;
@@ -58,8 +39,10 @@ interface Student {
   };
 }
 
-export default function BankAccountsPage() {
+// Create a component that uses useSearchParams
+function BankAccountsContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [classes, setClasses] = useState<{ id: string; name: string }[]>([]);
   const [selectedClass, setSelectedClass] = useState<string>("");
   const [students, setStudents] = useState<Student[]>([]);
@@ -68,6 +51,7 @@ export default function BankAccountsPage() {
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
   const [isAddFundsOpen, setIsAddFundsOpen] = useState(false);
   const [isRemoveFundsOpen, setIsRemoveFundsOpen] = useState(false);
+  const [isRecurringTransactionsOpen, setIsRecurringTransactionsOpen] = useState(false);
 
   // Fetch teacher's classes
   useEffect(() => {
@@ -78,9 +62,18 @@ export default function BankAccountsPage() {
         if (response.ok) {
           const data = await response.json();
           setClasses(data);
-          // Auto-select the first class if available
-          if (data.length > 0) {
-            setSelectedClass(data[0].id);
+          
+          // First check if saved class ID exists in current classes
+          const savedClassId = localStorage.getItem('selectedClass');
+            const classExists: boolean = savedClassId && data.some((cls: { id: string; name: string }) => cls.id === savedClassId);
+          
+          if (classExists) {
+            setSelectedClass(savedClassId!);
+          } else if (data.length > 0) {
+            // If not, select the first available class
+            const classToSelect = data[0].id;
+            setSelectedClass(classToSelect);
+            localStorage.setItem('selectedClass', classToSelect);
           }
         } else {
           console.error("Failed to fetch classes:", await response.text());
@@ -97,6 +90,13 @@ export default function BankAccountsPage() {
     fetchClasses();
   }, []);
 
+  // Update localStorage when class changes
+  useEffect(() => {
+    if (selectedClass) {
+      localStorage.setItem('selectedClass', selectedClass);
+    }
+  }, [selectedClass]);
+
   // Fetch students when class is selected
   useEffect(() => {
     async function fetchStudents() {
@@ -104,14 +104,40 @@ export default function BankAccountsPage() {
       
       setIsLoading(true);
       try {
+        console.log("Fetching students for class:", selectedClass);
         const response = await fetch(`/api/teacher/classes/${selectedClass}/students/accounts`);
-        if (response.ok) {
-          const data = await response.json();
-          setStudents(data);
-        } else {
-          console.error("Failed to fetch students:", await response.text());
-          toast.error("Failed to load student accounts");
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error("Failed to fetch students:", errorText);
+          
+          // If the class doesn't exist or access is denied, reset the class selection
+          if (errorText.includes("Class not found") || errorText.includes("access denied")) {
+            // Clear invalid class from localStorage
+            localStorage.removeItem('selectedClass');
+            
+            // Refetch classes to get a valid selection
+            const classesResponse = await fetch("/api/teacher/classes");
+            if (classesResponse.ok) {
+              const classes = await classesResponse.json();
+              if (classes.length > 0) {
+                const newClassId = classes[0].id;
+                setSelectedClass(newClassId);
+                localStorage.setItem('selectedClass', newClassId);
+                toast.info("Switched to another available class");
+              } else {
+                setSelectedClass("");
+                toast.error("No classes available");
+              }
+            }
+          } else {
+            toast.error("Failed to load student accounts");
+          }
+          return;
         }
+        
+        const data = await response.json();
+        setStudents(data);
       } catch (error) {
         console.error("Error fetching students:", error);
         toast.error("Error loading student accounts");
@@ -245,6 +271,13 @@ export default function BankAccountsPage() {
               >
                 Remove Funds
               </Button>
+              <Button
+                variant="outline"
+                onClick={() => setIsRecurringTransactionsOpen(true)}
+              >
+                <Calendar className="h-4 w-4 mr-2" />
+                Recurring
+              </Button>
             </div>
           </div>
           
@@ -266,17 +299,19 @@ export default function BankAccountsPage() {
                       </th>
                       <th className="p-1 md:p-2 text-left">Name</th>
                       <th className="hidden sm:table-cell p-1 md:p-2 text-left">E-mail</th>
-                      {/* <th className="hidden md:table-cell p-2 md:p-3 text-left">Last Login</th> */}
+                      <th className="hidden md:table-cell p-2 md:p-3 text-left">Last Login</th>
                       <th className="p-1 md:p-2 text-center">Checking</th>
                       <th className="p-1 md:p-2 text-center">Savings</th>
-                      <th className="p-1 md:p-2 text-center">Action</th>
+                      <th className="p-1 md:p-2 text-center">View Account</th>
                     </tr>
                   </thead>
                   <tbody>
                     {isLoading ? (
                       <tr>
-                        <td colSpan={7} className="p-4 text-center">
-                          Loading student accounts...
+                        <td colSpan={7} className="p-8 text-center">
+                          <div className="flex justify-center">
+                            <div className="animate-spin h-10 w-10 rounded-full border-4 border-orange-500 border-t-transparent"></div>
+                          </div>
                         </td>
                       </tr>
                     ) : filteredStudents.length === 0 ? (
@@ -312,13 +347,13 @@ export default function BankAccountsPage() {
                           <td className="hidden sm:table-cell p-2 md:p-3 text-sm">
                             {student.email}
                           </td>
-                          {/* <td className="hidden md:table-cell p-2 md:p-3 text-sm">
+                          <td className="hidden md:table-cell p-2 md:p-3 text-sm">
                             {student.lastLogin}
-                          </td> */}
-                          <td className="p-2 md:p-3 text-right text-sm">
+                          </td>
+                          <td className="p-2 md:p-3 text-center text-sm">
                             {formatCurrency(student.checking.balance)}
                           </td>
-                          <td className="p-2 md:p-3 text-right text-sm">
+                          <td className="p-2 md:p-3 text-center text-sm">
                             {formatCurrency(student.savings.balance)}
                           </td>
                           <td className="p-2 md:p-3">
@@ -328,18 +363,9 @@ export default function BankAccountsPage() {
                                 size="icon"
                                 onClick={() => viewStudentTransactions(student.id)}
                                 title="View account details"
-                                className="h-7 w-7 sm:h-8 sm:w-8"
+                                className="h-10 w-10 sm:h-8 sm:w-8"
                               >
-                                <Eye className="h-3 w-3 sm:h-4 sm:w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => router.push(`/teacher/dashboard/bank-accounts/statement/${student.id}`)}
-                                title="Download statement"
-                                className="h-7 w-7 sm:h-8 sm:w-8"
-                              >
-                                <Download className="h-3 w-3 sm:h-4 sm:w-4" />
+                                <Eye className="h-6 w-6 sm:h-4 sm:w-4" />
                               </Button>
                             </div>
                           </td>
@@ -367,6 +393,32 @@ export default function BankAccountsPage() {
         selectedStudents={students.filter(s => selectedStudents.includes(s.id))}
         onComplete={refreshAccounts}
       />
+
+      <RecurringTransactionsDialog
+        open={isRecurringTransactionsOpen}
+        onClose={() => setIsRecurringTransactionsOpen(false)}
+        students={students}
+        onComplete={refreshAccounts}
+      />
     </div>
+  );
+}
+
+// Loading fallback component
+function LoadingBankAccounts() {
+  return (
+    <div className="flex flex-col h-full items-center justify-center">
+      <div className="animate-spin h-10 w-10 rounded-full border-4 border-orange-500 border-t-transparent"></div>
+      <p className="mt-4 text-gray-500">Loading bank accounts...</p>
+    </div>
+  );
+}
+
+// Main component that wraps content with Suspense
+export default function BankAccountsPage() {
+  return (
+    <Suspense fallback={<LoadingBankAccounts />}>
+      <BankAccountsContent />
+    </Suspense>
   );
 }

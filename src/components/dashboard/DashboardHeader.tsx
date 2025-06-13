@@ -9,6 +9,7 @@ interface DashboardHeaderProps {
   teacherName: string;
   onLogout: () => void;
   onMobileMenuToggle: () => void;
+  profileVersion?: number; // Add this prop
 }
 
 export default function DashboardHeader({
@@ -17,7 +18,8 @@ export default function DashboardHeader({
   teacherInitial,
   teacherName,
   onLogout,
-  onMobileMenuToggle
+  onMobileMenuToggle,
+  profileVersion = 0 // Default value
 }: DashboardHeaderProps) {
   return (
     <header className="bg-white border-b sticky top-0 z-20 px-4 py-3 flex items-center justify-between shadow-sm">
@@ -41,6 +43,7 @@ export default function DashboardHeader({
           teacherInitial={teacherInitial}
           teacherName={teacherName}
           onLogout={onLogout}
+          profileVersion={profileVersion} // Pass the version
         />
       </div>
     </header>

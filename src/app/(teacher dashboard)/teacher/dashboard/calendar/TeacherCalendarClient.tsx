@@ -281,7 +281,7 @@ export default function TeacherCalendarClient() {
     };
   }, []);
 
-  // Function to fetch events
+  // Update the fetchEvents function to handle bill timing correctly
   const fetchEvents = async () => {
     setLoading(true);
     try {
@@ -299,63 +299,109 @@ export default function TeacherCalendarClient() {
       
       const data = await response.json();
       
-      // Process events with time zone adjustment
-      const formatted = data.map((event: any) => {
-        // For bills and assignments, we need special date handling
-        if (event.metadata?.type === "bill" || event.metadata?.type === "assignment") {
-          // Parse the date from the API response
-          const date = new Date(event.startDate);
-          
-          // Create start date at midnight local time
-          const startDate = new Date(
-            date.getFullYear(),
-            date.getMonth(),
-            date.getDate(),
-            0, 0, 0
-          );
-          
-          // Create end date at 11:59:59 PM local time
-          const endDate = new Date(
-            date.getFullYear(),
-            date.getMonth(),
-            date.getDate(),
-            23, 59, 59
-          );
-      
-          return {
-            id: event.id,
-            title: event.title,
-            description: event.description || "",
-            startDate: startDate,
-            endDate: endDate,
-            variant: event.variant || "primary",
-            isRecurring: event.isRecurring === true,
-            recurringDays: event.recurringDays || [],
-            metadata: {
-              ...event.metadata,
-              isAllDay: true, // Mark as all-day event
-              originalDueDate: event.metadata.dueDate // Preserve original
-            },
-          } as Event;
-        } else {
-          // For regular events, use the normal date processing
-          const startDate = new Date(event.startDate);
-          const endDate = new Date(event.endDate);
-          
-          return {
-            id: event.id,
-            title: event.title,
-            description: event.description || "",
-            startDate: startDate,
-            endDate: endDate,
-            variant: event.variant || "primary",
-            isRecurring: event.isRecurring === true,
-            recurringDays: event.recurringDays || [],
-            metadata: event.metadata,
-          } as Event;
-        }
-      });
+      // Process events and filter out banking transactions
+      const formatted = data
+        .filter((event: any) => {
+          // Exclude events with ADD_FUNDS or REMOVE_FUNDS transaction types
+          if (event.metadata?.transactionType === "ADD_FUNDS" || 
+              event.metadata?.transactionType === "REMOVE_FUNDS") {
+            return false;
+          }
+          return true;
+        })
+        .map((event: any) => {
+          // For bills, we need special date handling for week view
+          if (event.metadata?.type === "bill") {
+            // Parse the original date but preserve the time set by the server
+            const startDate = new Date(event.startDate);
+            const endDate = new Date(event.endDate);
+            
+            return {
+              id: event.id,
+              title: event.title,
+              description: event.description || "",
+              startDate: startDate, // Keep the server-set time (should be 12:00 PM)
+              endDate: endDate,     // Keep the server-set time (should be 12:59 PM)
+              variant: event.variant || "destructive",
+              isRecurring: event.isRecurring === true,
+              recurringDays: event.recurringDays || [],
+              recurrenceType: event.recurrenceType,
+              recurrenceInterval: event.recurrenceInterval,
+              monthlyDate: event.monthlyDate,
+              yearlyMonth: event.yearlyMonth,
+              yearlyDate: event.yearlyDate,
+              metadata: {
+                ...event.metadata,
+                originalDueDate: event.metadata.dueDate,
+                isDueAtNoon: true // Flag for week view rendering
+              },
+            } as Event;
+          } 
+          // For assignments
+          else if (event.metadata?.type === "assignment") {
+            const date = new Date(event.startDate);
+            
+            // Set assignments to show all day (00:00 to 23:59)
+            const startDate = new Date(
+              date.getFullYear(),
+              date.getMonth(),
+              date.getDate(),
+              0, 0, 0
+            );
+            
+            const endDate = new Date(
+              date.getFullYear(),
+              date.getMonth(),
+              date.getDate(),
+              23, 59, 59
+            );
 
+            return {
+              id: event.id,
+              title: event.title,
+              description: event.description || "",
+              startDate: startDate,
+              endDate: endDate,
+              variant: event.variant || "primary",
+              isRecurring: event.isRecurring === true,
+              recurringDays: event.recurringDays || [],
+              recurrenceType: event.recurrenceType,
+              recurrenceInterval: event.recurrenceInterval,
+              monthlyDate: event.monthlyDate,
+              yearlyMonth: event.yearlyMonth,
+              yearlyDate: event.yearlyDate,
+              metadata: {
+                ...event.metadata,
+                isAllDay: true,
+                originalDueDate: event.metadata.dueDate
+              },
+            } as Event;
+          } 
+          // For regular events (classes, etc.)
+          else {
+            const startDate = new Date(event.startDate);
+            const endDate = new Date(event.endDate);
+            
+            return {
+              id: event.id,
+              title: event.title,
+              description: event.description || "",
+              startDate: startDate,
+              endDate: endDate,
+              variant: event.variant || "primary",
+              isRecurring: event.isRecurring === true,
+              recurringDays: event.recurringDays || [],
+              recurrenceType: event.recurrenceType,
+              recurrenceInterval: event.recurrenceInterval,
+              monthlyDate: event.monthlyDate,
+              yearlyMonth: event.yearlyMonth,
+              yearlyDate: event.yearlyDate,
+              metadata: event.metadata,
+            } as Event;
+          }
+        });
+
+      console.log("Formatted events:", formatted); // Debug log
       setEvents(formatted);
     } catch (error) {
       console.error("Error fetching calendar:", error);

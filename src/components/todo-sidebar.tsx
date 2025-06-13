@@ -63,8 +63,14 @@ const TodoSidebarInner = ({ showCollapseButton = true }: TodoSidebarInnerProps) 
         createEvent: createAsEvent
       });
       
-      // Always refresh events to ensure calendar updates immediately
+      // Call the refreshEvents function directly
       await refreshEvents();
+      
+      // Force a re-render of the calendar component
+      if (typeof window !== 'undefined') {
+        // Dispatch a custom event that the calendar can listen for
+        window.dispatchEvent(new CustomEvent('calendar-refresh-needed'));
+      }
       
       resetForm();
       setDialogOpen(false);
@@ -76,9 +82,22 @@ const TodoSidebarInner = ({ showCollapseButton = true }: TodoSidebarInnerProps) 
   };
 
   const handleDeleteTodo = async (id: string) => {
-    await deleteTodo(id);
-    // Always refresh calendar regardless of event status
-    await refreshEvents();
+    try {
+      await deleteTodo(id);
+      
+      // Always refresh calendar regardless of event status
+      await refreshEvents();
+      
+      // Dispatch custom event for better synchronization
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('calendar-refresh-needed'));
+      }
+      
+      toast.success("Task deleted");
+    } catch (error) {
+      console.error("Error deleting task:", error);
+      toast.error("Failed to delete task");
+    }
   };
 
   const handleToggleCompletion = async (id: string) => {

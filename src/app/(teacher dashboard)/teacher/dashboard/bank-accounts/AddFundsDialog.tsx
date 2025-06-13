@@ -10,6 +10,7 @@ import { Label } from "@/src/components/ui/label";
 import { Textarea } from "@/src/components/ui/textarea";
 import { toast } from "sonner";
 import { formatCurrency } from "@/src/lib/utils";
+import { format } from "date-fns";
 
 interface Student {
   id: string;
@@ -35,18 +36,26 @@ export default function AddFundsDialog({
   const [amount, setAmount] = useState("");
   const [accountType, setAccountType] = useState("checking");
   const [description, setDescription] = useState("");
+  const [issueDate, setIssueDate] = useState<Date>(new Date());
+  const [recurrence, setRecurrence] = useState("once");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const resetForm = () => {
     setAmount("");
     setAccountType("checking");
     setDescription("");
+    setIssueDate(new Date());
+    setRecurrence("once");
   };
 
   const handleClose = () => {
     resetForm();
     onClose();
   };
+
+  // Get today's date for minimum date constraint
+  const today = new Date();
+  const todayStr = format(today, 'yyyy-MM-dd');
 
   const handleSubmit = async () => {
     if (!amount || parseFloat(amount) <= 0) {
@@ -56,9 +65,30 @@ export default function AddFundsDialog({
       return;
     }
 
+    // Validate issue date is not in the past
+    const selectedDate = new Date(issueDate);
+    const todayDate = new Date();
+    todayDate.setHours(0, 0, 0, 0); // Reset time for comparison
+    selectedDate.setHours(0, 0, 0, 0);
+
+    if (selectedDate < todayDate) {
+      toast.error("Invalid date", {
+        description: "Issue date cannot be in the past."
+      });
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
+      // Get user's timezone
+      const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      
+      // Create a proper date object for the selected issue date
+      const submitDate = new Date(issueDate);
+      // Set to noon for better calendar visibility
+      submitDate.setHours(12, 0, 0, 0);
+
       const response = await fetch('/api/teacher/banking/add-funds', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -66,7 +96,10 @@ export default function AddFundsDialog({
           studentIds: selectedStudents.map(s => s.id),
           accountType,
           amount: parseFloat(amount),
-          description: description || `Funds added by teacher`
+          description: description || `Funds added by teacher`,
+          issueDate: submitDate.toISOString(),
+          recurrence: recurrence,
+          timezone: userTimezone, // Send user's timezone
         })
       });
 
@@ -75,8 +108,9 @@ export default function AddFundsDialog({
         throw new Error(error.error || "Failed to add funds");
       }
 
-      toast.success("Funds added successfully", {
-        description: `Added ${formatCurrency(parseFloat(amount))} to ${selectedStudents.length} student(s).`
+      const result = await response.json();
+      toast.success("Funds operation scheduled successfully", {
+        description: result.message
       });
       
       handleClose();
@@ -127,25 +161,61 @@ export default function AddFundsDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="amount">Amount</Label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 transform -translate-y-1/2">$</span>
-              <Input
-                id="amount"
-                type="number"
-                min="0.01"
-                step="0.01"
-                placeholder="0.00"
-                className="pl-8"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-              />
+            <Label htmlFor="issue-date">Issue on</Label>
+            <Input
+              id="issue-date"
+              type="date"
+              min={todayStr} // Prevent selecting past dates
+              value={format(issueDate, 'yyyy-MM-dd')}
+              onChange={(e) => {
+                if (e.target.value) {
+                  // Create date from the input value (which is in YYYY-MM-DD format)
+                  // Use local timezone interpretation
+                  const newDate = new Date(e.target.value + 'T12:00:00');
+                  setIssueDate(newDate);
+                }
+              }}
+            />
+          </div>
+
+          <div className="flex flex-col space-y-2">
+            <Label htmlFor="recurrence">Set</Label>
+            <div className="flex items-center gap-2">
+              <Select value={recurrence} onValueChange={setRecurrence}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Select recurrence" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="once">one time</SelectItem>
+                  <SelectItem value="weekly">weekly</SelectItem>
+                  <SelectItem value="biweekly">bi-weekly</SelectItem>
+                  <SelectItem value="monthly">monthly</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              <span className="text-sm">fee of</span>
+              
+              <div className="relative flex-1">
+                <span className="absolute left-3 top-1/2 transform -translate-y-1/2">$</span>
+                <Input
+                  id="amount"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  placeholder="0.00"
+                  className="pl-8"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                />
+              </div>
             </div>
           </div>
 
           <div>
             <p className="text-sm text-gray-500 mt-4">
-              This will add {formatCurrency(parseFloat(amount) || 0)} to the {accountType} account of each selected student.
+              This will add {formatCurrency(parseFloat(amount) || 0)} to the {accountType} account of each selected student
+              {recurrence !== 'once' ? ` on a ${recurrence} basis starting ` : ' on '}
+              {format(issueDate, 'PPP')}.
             </p>
           </div>
         </div>

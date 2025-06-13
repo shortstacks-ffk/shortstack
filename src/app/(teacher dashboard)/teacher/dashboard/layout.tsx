@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { SidebarLeft } from "@/src/components/sidebar-left";
 import { SidebarProvider, SidebarInset } from "@/src/components/ui/sidebar";
 import { Toaster } from "@/src/components/ui/sonner";
@@ -12,42 +12,75 @@ import { X, LogOut } from "lucide-react";
 import { NavMain } from "@/src/components/nav-main";
 import { NavLogo } from "@/src/components/nav-logo";
 import { dashboardData } from "@/src/lib/constants/nav-data";
+import SuperUserBadge from "@/src/components/SuperUserBadge";
+
+// Define a more specific type for session user to avoid TypeScript errors
+type UserWithExtendedProfile = {
+  id: string;
+  name?: string | null;
+  email?: string | null;
+  image?: string | null;
+  role: string;
+  teacherId?: string | null;
+  studentId?: string | null;
+  firstName?: string | null; 
+  lastName?: string | null;
+};
 
 const getFilteredNavItems = (role: string, originalItems: any[]) => {
   if (role === "SUPER") {
-    // Only show lesson plans for SUPER users
     return originalItems.filter(item => 
       item.title === "Lesson Plans" || 
       item.url?.includes("lesson-plans")
     );
   }
-  // Return all items for TEACHER role
   return originalItems;
 };
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  // ALL HOOKS MUST BE AT THE TOP - BEFORE ANY CONDITIONAL LOGIC
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [pageTitle, setPageTitle] = useState("Dashboard");
+  const [profileVersion, setProfileVersion] = useState(0);
+  const [userData, setUserData] = useState<UserWithExtendedProfile | null>(null);
   const pathname = usePathname();
   
-  const { data: session } = useSession({
+  const { data: session, status } = useSession({
     required: true,
   });
-  
-  // Get filtered navigation items based on user role
-  const filteredNavItems = getFilteredNavItems(
-    session?.user?.role || "TEACHER", 
-    dashboardData.navMain
-  );
-  
-  // Get teacher info for avatar
-  const teacherName =
-    session?.user?.name ||
-    `${session?.user?.firstName || ""} ${session?.user?.lastName || ""}`.trim() ||
-    "Teacher";
-  const teacherInitial = teacherName.charAt(0);
-  const teacherImage = session?.user?.image;
-  
+
+  // Fetch the teacher profile to get complete user data
+  useEffect(() => {
+    const fetchTeacherProfile = async () => {
+      if (!session?.user?.id) return;
+      
+      try {
+        const response = await fetch(`/api/teacher/profile?t=${Date.now()}`, {
+          headers: { 'Cache-Control': 'no-cache' }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          setUserData({
+            ...session.user,
+            firstName: data.firstName,
+            lastName: data.lastName,
+            image: data.image || data.profileImage || (session.user as any)?.image || null
+          });
+        } else {
+          setUserData(session.user as UserWithExtendedProfile);
+        }
+      } catch (error) {
+        console.error('Error fetching teacher profile:', error);
+        setUserData(session.user as UserWithExtendedProfile);
+      }
+    };
+    
+    if (session?.user) {
+      fetchTeacherProfile();
+    }
+  }, [session, profileVersion]);
+
   // Update page title based on current path
   useEffect(() => {
     if (pathname.includes("/calendar")) setPageTitle("Calendar");
@@ -59,38 +92,101 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     else setPageTitle("Dashboard");
   }, [pathname]);
 
-  const handleLogout = async () => {
-    await signOut({ redirect: true, callbackUrl: "/teacher" });
-  };
-
   // Close mobile sidebar when clicking outside or navigating
   useEffect(() => {
     setIsMobileSidebarOpen(false);
   }, [pathname]);
 
-  // Close sidebar function
+  // Listen for profile updates
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'profileUpdated') {
+        setProfileVersion(v => v + 1);
+      }
+    };
+    
+    const handleProfileUpdated = () => {
+      setProfileVersion(v => v + 1);
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('profileUpdated', handleProfileUpdated);
+    
+    const lastUpdate = localStorage.getItem('profileUpdated');
+    if (lastUpdate) {
+      setProfileVersion(v => v + 1);
+    }
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('profileUpdated', handleProfileUpdated);
+    };
+  }, []);
+
+  // Prepare user display name from profile or session data
+  const getUserDisplayName = () => {
+    if (userData?.firstName && userData?.lastName) {
+      return `${userData.firstName} ${userData.lastName}`;
+    }
+    
+    if (session?.user && (session.user as any)?.name) {
+      return (session.user as any).name;
+    }
+    
+    return "Teacher";
+  };
+  
+  // Get teacher info for avatar
+  const teacherName = getUserDisplayName() || "Teacher";
+  const userInitials = useMemo(() => {
+    const name = teacherName;
+    const parts = (name || '').split(' ').filter((p: string) => p.length > 0);
+    
+    if (parts.length === 0) return 'T';
+    if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+    
+    return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+  }, [teacherName]);
+  
+  // Safe image access with fallback
+  const teacherImage = userData?.image || (session?.user as any)?.image || null;
+  
+  // Get filtered navigation items based on user role
+  const filteredNavItems = getFilteredNavItems(
+    session?.user?.role || "TEACHER", 
+    dashboardData.navMain
+  );
+
+  const isCalendarPage = pathname.includes("/calendar");
+
+  const handleLogout = async () => {
+    await signOut({ redirect: true, callbackUrl: "/teacher" });
+  };
+
   const closeMobileSidebar = () => {
     setIsMobileSidebarOpen(false);
   };
-  
-  // Find the main content area div and update it for calendar pages:
-  const isCalendarPage = pathname.includes("/calendar");
-  
-  // Add this improved function to detect active state
-  const isNavItemActive = (href: string) => {
-    // Exact match for dashboard home
-    if (href === '/teacher/dashboard' && pathname === '/teacher/dashboard') {
-      return true;
-    }
-    
-    // For other routes, check if pathname starts with the href
-    // but make sure we're not matching partial segments
-    if (href !== '/teacher/dashboard') {
-      return pathname.startsWith(href + '/') || pathname === href;
-    }
-    
-    return false;
-  };
+
+  // NOW HANDLE CONDITIONAL RENDERING AFTER ALL HOOKS
+  // Add loading check to prevent prerender errors
+  if (status === "loading") {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  // Add session check to prevent undefined access
+  if (!session?.user) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <p>Please sign in to continue</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <SidebarProvider>
@@ -110,7 +206,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         }`}
       >
         <div className="h-full overflow-y-auto">
-          {/* X close button - positioned with higher z-index and better separation */}
           <button
             onClick={closeMobileSidebar}
             className="absolute top-4 right-4 p-2 rounded-full hover:bg-gray-100 transition-colors z-50"
@@ -120,21 +215,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <X className="h-6 w-6 text-gray-600" />
           </button>
           
-          {/* Mobile NavLogo with padding to avoid overlap with close button */}
           <div className="px-4 pt-4 pb-2 border-b flex justify-center mt-10">
             <NavLogo items={dashboardData.dashLogo} />
           </div>
           
-    
-          
-          {/* Mobile Navigation */}
           <div className="px-2 py-4 space-y-1">
             <NavMain items={dashboardData.navMain} />
           </div>
         </div>
       </div>
       
-      {/* Desktop Sidebar - Pass filtered items */}
+      {/* Desktop Sidebar */}
       <div className="hidden md:block">
         <SidebarLeft filteredNavItems={filteredNavItems} />
       </div>
@@ -144,19 +235,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <DashboardHeader
           pageTitle={pageTitle}
           teacherImage={teacherImage || ""}
-          teacherInitial={teacherInitial}
+          teacherInitial={userInitials}
           teacherName={teacherName}
           onLogout={handleLogout}
           onMobileMenuToggle={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+          profileVersion={profileVersion}
         />
         
         {/* Main content area */}
         <div 
-          className={`bg-gray-50 flex-1 overflow-hidden`} // Change overflow-y-auto to overflow-hidden for calendar pages
+          className={`flex-1 bg-gray-50`}
           style={{ height: `calc(100vh - ${HEADER_HEIGHT}px)` }}
         >
-          {/* Apply different styles based on page type */}
-          <div className={`mx-auto w-full overflow-hidden ${isCalendarPage ? 'p-0 max-w-none' : 'max-w-7xl px-2 sm:px-4 md:px-6 py-2 md:py-4'}`}>
+          <div className={`mx-auto min-h-screen min-w-screen ${isCalendarPage ? 'p-0 max-w-none bg-gray-50' : 'max-w-7xl px-2 sm:px-4 md:px-4s py-2 md:py-4 bg-gray-50'}`}>
             {children}
           </div>
         </div>

@@ -12,6 +12,7 @@ import { formatCurrency } from "@/src/lib/utils";
 import { Alert, AlertDescription } from "@/src/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import { toast } from "sonner";
+import { format } from "date-fns";
 
 interface Student {
   id: string;
@@ -37,6 +38,8 @@ export default function RemoveFundsDialog({
   const [amount, setAmount] = useState("");
   const [accountType, setAccountType] = useState("checking");
   const [description, setDescription] = useState("");
+  const [issueDate, setIssueDate] = useState<Date>(new Date());
+  const [recurrence, setRecurrence] = useState("once");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [insufficientFunds, setInsufficientFunds] = useState<string[]>([]);
 
@@ -44,6 +47,8 @@ export default function RemoveFundsDialog({
     setAmount("");
     setAccountType("checking");
     setDescription("");
+    setIssueDate(new Date());
+    setRecurrence("once");
     setInsufficientFunds([]);
   };
 
@@ -51,6 +56,10 @@ export default function RemoveFundsDialog({
     resetForm();
     onClose();
   };
+
+  // Get today's date for minimum date constraint
+  const today = new Date();
+  const todayStr = format(today, 'yyyy-MM-dd');
 
   // Check which students have insufficient funds
   const checkInsufficientFunds = () => {
@@ -95,18 +104,42 @@ export default function RemoveFundsDialog({
       return;
     }
 
-    // Check for insufficient funds
-    const insufficientList = checkInsufficientFunds();
-    if (insufficientList.length > 0) {
-      toast.error("Insufficient funds", {
-        description: "Some students have insufficient funds for this operation."
+    // Validate issue date is not in the past
+    const selectedDate = new Date(issueDate);
+    const todayDate = new Date();
+    todayDate.setHours(0, 0, 0, 0); // Reset time for comparison
+    selectedDate.setHours(0, 0, 0, 0);
+
+    if (selectedDate < todayDate) {
+      toast.error("Invalid date", {
+        description: "Issue date cannot be in the past."
       });
       return;
+    }
+
+    // Check for insufficient funds only if the transaction is today
+    const isToday = selectedDate.getTime() === todayDate.getTime();
+    if (isToday) {
+      const insufficientList = checkInsufficientFunds();
+      if (insufficientList.length > 0) {
+        toast.error("Insufficient funds", {
+          description: "Some students have insufficient funds for this operation."
+        });
+        return;
+      }
     }
 
     setIsSubmitting(true);
 
     try {
+      // Get user's timezone
+      const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      
+      // Create a proper date object for the selected issue date
+      const submitDate = new Date(issueDate);
+      // Set to noon for better calendar visibility
+      submitDate.setHours(12, 0, 0, 0);
+
       const response = await fetch('/api/teacher/banking/remove-funds', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -114,7 +147,10 @@ export default function RemoveFundsDialog({
           studentIds: selectedStudents.map(s => s.id),
           accountType,
           amount: parseFloat(amount),
-          description: description || `Funds removed by teacher`
+          description: description || `Funds removed by teacher`,
+          issueDate: submitDate.toISOString(),
+          recurrence: recurrence,
+          timezone: userTimezone, // Send user's timezone
         })
       });
 
@@ -123,8 +159,9 @@ export default function RemoveFundsDialog({
         throw new Error(error.error || "Failed to remove funds");
       }
 
-      toast.success("Funds removed successfully", {
-        description: `Removed ${formatCurrency(parseFloat(amount))} from ${selectedStudents.length} student(s).`
+      const result = await response.json();
+      toast.success("Funds operation scheduled successfully", {
+        description: result.message
       });
       
       handleClose();
@@ -179,19 +216,53 @@ export default function RemoveFundsDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="amount">Amount</Label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 transform -translate-y-1/2">$</span>
-              <Input
-                id="amount"
-                type="number"
-                min="0.01"
-                step="0.01"
-                placeholder="0.00"
-                className="pl-8"
-                value={amount}
-                onChange={(e) => handleAmountChange(e.target.value)}
-              />
+            <Label htmlFor="issue-date">Issue on</Label>
+            <Input
+              id="issue-date"
+              type="date"
+              min={todayStr} // Prevent selecting past dates
+              value={format(issueDate, 'yyyy-MM-dd')}
+              onChange={(e) => {
+                if (e.target.value) {
+                  // Create date from the input value (which is in YYYY-MM-DD format)
+                  // Use local timezone interpretation
+                  const newDate = new Date(e.target.value + 'T12:00:00');
+                  setIssueDate(newDate);
+                }
+              }}
+            />
+          </div>
+
+          <div className="flex flex-col space-y-2">
+            <Label htmlFor="recurrence">Set</Label>
+            <div className="flex items-center gap-2">
+              <Select value={recurrence} onValueChange={setRecurrence}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Select recurrence" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="once">one time</SelectItem>
+                  <SelectItem value="weekly">weekly</SelectItem>
+                  <SelectItem value="biweekly">bi-weekly</SelectItem>
+                  <SelectItem value="monthly">monthly</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              <span className="text-sm">fee of</span>
+              
+              <div className="relative flex-1">
+                <span className="absolute left-3 top-1/2 transform -translate-y-1/2">$</span>
+                <Input
+                  id="amount"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  placeholder="0.00"
+                  className="pl-8"
+                  value={amount}
+                  onChange={(e) => handleAmountChange(e.target.value)}
+                />
+              </div>
             </div>
           </div>
 
@@ -207,7 +278,9 @@ export default function RemoveFundsDialog({
 
           <div>
             <p className="text-sm text-gray-500 mt-4">
-              This will remove {formatCurrency(parseFloat(amount) || 0)} from the {accountType} account of each selected student.
+              This will remove {formatCurrency(parseFloat(amount) || 0)} from the {accountType} account of each selected student
+              {recurrence !== 'once' ? ` on a ${recurrence} basis starting ` : ' on '}
+              {format(issueDate, 'PPP')}.
             </p>
           </div>
         </div>
@@ -217,7 +290,7 @@ export default function RemoveFundsDialog({
           <Button 
             variant="default" 
             onClick={handleSubmit} 
-            disabled={isSubmitting || insufficientFunds.length > 0}
+            disabled={isSubmitting || (insufficientFunds.length > 0 && issueDate.toDateString() === today.toDateString())}
           >
             {isSubmitting ? "Processing..." : "Remove Funds"}
           </Button>

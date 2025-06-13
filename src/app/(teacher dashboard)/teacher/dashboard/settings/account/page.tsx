@@ -12,59 +12,115 @@ import { Loader2 } from 'lucide-react';
 
 import AccountProfileTab from '@/src/components/settings/AccountProfileTab';
 import AccountSecurityTab from '@/src/components/settings/AccountSecurityTab';
+import SuperUserBadge from "@/src/components/SuperUserBadge";
 
 // Create a separate component that uses useSearchParams
 function TeacherAccountSettings() {
   const searchParams = useSearchParams();
   const initialTab = searchParams.get('tab') || 'profile';
   
-  const { data: session, status } = useSession();
+  const { data: session, status, update: updateSession } = useSession();
   const { toast } = useToast();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  // Add state to track profile updates
+  const [profileUpdatedCount, setProfileUpdatedCount] = useState(0);
   
-  useEffect(() => {
-    const fetchUserProfile = async () => {
-      if (!session?.user) return;
+  // Function to fetch user profile
+  const fetchUserProfile = async () => {
+    if (!session?.user) return;
 
-      try {
+    try {
+      // Use the correct API endpoint for teacher profiles with cache-busting
+      const response = await fetch(`/api/teacher/profile?t=${new Date().getTime()}`, {
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache',
+        },
+      });
 
-        // Use the correct API endpoint for teacher profiles
-        const response = await fetch('/api/teacher/profile?t=' + new Date().getTime(), {
-          headers: {
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache',
-          },
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch profile');
-        }
-
-        const data = await response.json();
-        setUser(data);
-      } catch (error) {
-        console.error('Error fetching profile:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to load your profile information',
-          variant: 'destructive',
-        });
-      } finally {
-        setLoading(false);
+      if (!response.ok) {
+        throw new Error('Failed to fetch profile');
       }
-    };
 
+      const data = await response.json();
+      setUser(data);
+      return data;
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load your profile information',
+        variant: 'destructive',
+      });
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch profile on session change
+  useEffect(() => {
     if (status === 'authenticated') {
       fetchUserProfile();
     }
+  }, [status, profileUpdatedCount]); // Add profileUpdatedCount to trigger re-fetch
 
+  // Handle profile updates
+  const handleProfileUpdate = async (updatedUser: any) => {
+    // Update the local state
+    interface User {
+      profileImage?: string;
+      firstName?: string;
+      lastName?: string;
+      [key: string]: any; // For other potential properties
+    }
+
+    // Update the local state
+    setUser((prev: User | null): User => ({...(prev || {}), ...updatedUser}));
+    
+    // Increment the counter to trigger re-fetch
+    setProfileUpdatedCount(count => count + 1);
+    
+    // Update the session
+    if (updatedUser.profileImage || updatedUser.firstName || updatedUser.lastName) {
+      await updateSession({
+        ...session?.user,
+        name: `${updatedUser.firstName} ${updatedUser.lastName}`,
+        image: updatedUser.profileImage || (session?.user as any).image
+      });
+    }
+    
+    // Also notify the parent layout to update the dropdown
+    // We'll use localStorage to communicate with the layout
+    localStorage.setItem('profileUpdated', String(Date.now()));
+    
+    // Create and dispatch a custom event
+    const event = new CustomEvent('profileUpdated', { 
+      detail: { 
+        timestamp: Date.now(),
+        image: updatedUser.profileImage
+      } 
+    });
+    window.dispatchEvent(event);
+  };
+
+  const isSuperUser = session?.user?.role === "SUPER";
   
-  }, [session, status, toast]);
-
   return (
     <div className="w-full h-full">
-      <h1 className="text-2xl md:text-3xl font-bold mb-4">Profile</h1>
+      <div className="flex items-center mb-4">
+        <h1 className="text-xl md:text-2xl font-bold">Profile</h1>
+        {isSuperUser && <SuperUserBadge />}
+      </div>
+      
+      {isSuperUser && (
+        <div className="p-4 mb-4 bg-amber-50 border border-amber-200 rounded-lg">
+          <p className="text-amber-800">
+            <strong>Administrator Account</strong> - Changes made here will affect your administrator profile.
+          </p>
+        </div>
+      )}
       
       <div className="bg-white rounded-lg shadow-sm border">
         <Tabs defaultValue={initialTab} className="w-full">
@@ -95,7 +151,7 @@ function TeacherAccountSettings() {
                     user={user} 
                     role="teacher" 
                     isStudent={false}
-                    onUpdate={(updatedUser) => setUser({...user, ...updatedUser})}
+                    onUpdate={handleProfileUpdate}
                   />
                 </TabsContent>
                 

@@ -18,33 +18,45 @@ import { NavLogo } from "@/src/components/nav-logo";
 import { studentDashboardData } from "@/src/lib/constants/nav-data";
 
 export default function StudentDashboardLayout({ children }: { children: React.ReactNode }) {
+  // ALL HOOKS MUST BE AT THE TOP
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] = useState(false);
   const [pageTitle, setPageTitle] = useState("Dashboard");
+  const [studentData, setStudentData] = useState<any>(null);
   const pathname = usePathname();
   
-  const { data: session } = useSession({
+  const { data: session, status } = useSession({
     required: true,
   });
-  
-  // Get student info for avatar
-  const studentName =
-    session?.user?.name ||
-    `${session?.user?.firstName || ""} ${session?.user?.lastName || ""}`.trim() ||
-    "Student";
-  const studentInitials = studentName.charAt(0) + (studentName.split(" ")[1]?.[0] || "");
-  const studentImage = session?.user?.image;
-  const studentEmail = session?.user?.email || "";
 
-  // Navigation items
-  const navItems = [
-    { href: "/student/dashboard", icon: Home, label: "Dashboard", exact: true },
-    { href: "/student/dashboard/classes", icon: SquarePen, label: "Classes" },
-    { href: "/student/dashboard/calendar", icon: Calendar, label: "Calendar" },
-    { href: "/student/dashboard/bank", icon: Wallet, label: "Bank" },
-    { href: "/student/dashboard/storefront", icon: ShoppingBag, label: "Storefront" },
-  ];
-  
+  // Fetch student profile data
+  useEffect(() => {
+    const fetchStudentProfile = async () => {
+      if (session?.user && session.user.role === "STUDENT") {
+        try {
+          const response = await fetch('/api/student/profile?t=' + new Date().getTime(), {
+            headers: {
+              'Cache-Control': 'no-cache',
+              'Pragma': 'no-cache'
+            }
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            console.log("Student profile data:", data);
+            setStudentData(data);
+          } else {
+            console.error("Failed to fetch student profile:", await response.text());
+          }
+        } catch (error) {
+          console.error("Failed to fetch student profile:", error);
+        }
+      }
+    };
+    
+    fetchStudentProfile();
+  }, [session]);
+
   // Update page title based on current path
   useEffect(() => {
     if (pathname.includes("/classes")) setPageTitle("Classes");
@@ -56,16 +68,40 @@ export default function StudentDashboardLayout({ children }: { children: React.R
     else setPageTitle("Dashboard");
   }, [pathname]);
 
-  const handleLogout = async () => {
-    await signOut({ redirect: true, callbackUrl: "/student" });
-  };
-
   // Close mobile sidebar when clicking outside or navigating
   useEffect(() => {
     setIsMobileSidebarOpen(false);
   }, [pathname]);
 
-  // Close sidebar function
+  // Navigation items
+  const navItems = [
+    { href: "/student/dashboard", icon: Home, label: "Dashboard", exact: true },
+    { href: "/student/dashboard/classes", icon: SquarePen, label: "Classes" },
+    { href: "/student/dashboard/calendar", icon: Calendar, label: "Calendar" },
+    { href: "/student/dashboard/bank", icon: Wallet, label: "Bank" },
+    { href: "/student/dashboard/storefront", icon: ShoppingBag, label: "Storefront" },
+  ];
+
+  // Helper functions
+  const getStudentInitials = (student: any) => {
+    if (!student) return 'ST';
+    const firstName = student.firstName || '';
+    const lastName = student.lastName || '';
+    return `${firstName.charAt(0)}${lastName.charAt(0)}`;
+  };
+
+  const getStudentName = (student: any) => {
+    if (!student) return 'Student';
+    if (student.firstName && student.lastName) {
+      return `${student.firstName} ${student.lastName}`;
+    }
+    return 'Student';
+  };
+
+  const handleLogout = async () => {
+    await signOut({ redirect: true, callbackUrl: "/student" });
+  };
+
   const closeMobileSidebar = () => {
     setIsMobileSidebarOpen(false);
   };
@@ -80,52 +116,29 @@ export default function StudentDashboardLayout({ children }: { children: React.R
   
   const isCalendarPage = pathname.includes("/calendar");
 
-  // Student data state
-  const [studentData, setStudentData] = useState<any>(null);
+  // Get student info for header
+  const studentName = getStudentName(studentData || session?.user);
+  const studentInitials = getStudentInitials(studentData || session?.user);
+  const studentEmail = studentData?.schoolEmail || session?.user?.email || '';
 
-  // Fetch student profile data
-  useEffect(() => {
-    const fetchStudentProfile = async () => {
-      if (session?.user) {
-        // Only fetch student profile if the current user is a student
-        if (session.user.role === "STUDENT") {
-          try {
-            const response = await fetch('/api/student/profile?t=' + new Date().getTime(), {
-              headers: {
-                'Cache-Control': 'no-cache',
-                'Pragma': 'no-cache'
-              }
-            });
-            
-            if (response.ok) {
-              const data = await response.json();
-              setStudentData(data);
-            }
-          } catch (error) {
-            console.error("Failed to fetch student profile:", error);
-          }
-        }
-      }
-    };
-    
-    fetchStudentProfile();
-  }, [session]);
+  // Loading check after all hooks
+  if (status === "loading") {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-green-600"></div>
+      </div>
+    );
+  }
 
-  // Helper functions
-  const getStudentInitials = (student: any) => {
-    if (!student) return '';
-    const firstName = student.firstName || student.name?.split(' ')[0] || '';
-    const lastName = student.lastName || student.name?.split(' ')[1] || '';
-    return `${firstName.charAt(0)}${lastName.charAt(0)}`;
-  };
-
-  const getStudentName = (student: any) => {
-    if (!student) return '';
-    if (student.firstName && student.lastName) {
-      return `${student.firstName} ${student.lastName}`;
-    }
-    return student.name || '';
-  };
+  if (!session?.user) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <p>Please sign in to continue</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <SidebarProvider>
@@ -182,17 +195,6 @@ export default function StudentDashboardLayout({ children }: { children: React.R
               ))}
             </ul>
           </nav>
-
-          {/* Logout button */}
-          {/* <div className="absolute bottom-4 left-0 right-0 px-3">
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-3 px-3 py-2 w-full text-left text-red-600 rounded-md hover:bg-red-50"
-            >
-              <LogOut className="h-5 w-5" />
-              <span>Logout</span>
-            </button>
-          </div> */}
         </div>
       </div>
       
@@ -256,21 +258,6 @@ export default function StudentDashboardLayout({ children }: { children: React.R
               ))}
             </ul>
           </nav>
-
-          {/* Logout */}
-          {/* <div className="px-3 py-4 border-t">
-            <button
-              onClick={handleLogout}
-              className={cn(
-                "flex items-center gap-3 px-3 py-2 w-full text-left rounded-md hover:bg-red-50",
-                isDesktopSidebarCollapsed ? "justify-center" : ""
-              )}
-              title={isDesktopSidebarCollapsed ? "Logout" : undefined}
-            >
-              <LogOut className="h-5 w-5 text-red-600" />
-              {!isDesktopSidebarCollapsed && <span className="text-red-600">Logout</span>}
-            </button>
-          </div> */}
         </div>
       </aside>
       
@@ -281,10 +268,10 @@ export default function StudentDashboardLayout({ children }: { children: React.R
         {/* Header Component */}
         <StudentDashboardHeader
           pageTitle={pageTitle}
-          studentImage={studentData?.profileImage || session?.user?.image || null}
-          studentInitials={getStudentInitials(studentData || session?.user)}
-          studentName={getStudentName(studentData || session?.user)}
-          studentEmail={studentData?.schoolEmail || session?.user?.email || ''}
+          studentImage={studentData?.profileImage || null}
+          studentInitials={studentInitials}
+          studentName={studentName}
+          studentEmail={studentEmail}
           onLogout={handleLogout}
           onMobileMenuToggle={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
         />

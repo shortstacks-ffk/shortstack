@@ -10,8 +10,8 @@ import { formatLocalTimeToUTC, formatUTCToLocalTime } from "@/src/lib/time-utils
 // Types
 interface ClassSchedule {
   days: number[]; // 0-6 for days of week
-  startTime: string; // e.g., "09:00" - format needed for ClassSession
-  endTime: string; // e.g., "11:00" - format needed for ClassSession
+  startTime: string;
+  endTime: string; 
 }
 
 interface ClassData {
@@ -31,7 +31,7 @@ interface ClassResponse {
 }
 
 // Helper function to generate a unique class code
-async function generateUniqueClassCode(userId: string): Promise<string> {
+async function generateUniqueClassCode(teacherId: string): Promise<string> {
   const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   const codeLength = 6;
 
@@ -42,12 +42,12 @@ async function generateUniqueClassCode(userId: string): Promise<string> {
       code += characters[randomIndex];
     }
     
-    // Check uniqueness only for the current user's classes
+    // Check uniqueness only for the current teacher's classes
     const existingClass = await db.class.findFirst({
       where: { 
         AND: [
           { code },
-          { userId }
+          { teacherId }
         ]
       }
     });
@@ -62,8 +62,8 @@ async function generateUniqueClassCode(userId: string): Promise<string> {
 async function createClassScheduleEvents(classData: any, schedules: any[], timeZone: string = 'UTC') {
   try {
     const session = await getAuthSession();
-    if (!session?.user?.id) {
-      console.log("No session for calendar event creation");
+    if (!session?.user?.id || !session.user.teacherId) {
+      console.log("No valid teacher session for calendar event creation");
       return;
     }
     
@@ -105,7 +105,7 @@ async function createClassScheduleEvents(classData: any, schedules: any[], timeZ
           variant: classData.color || "primary",
           isRecurring: true,
           recurringDays: days,
-          createdById: session.user.id,
+          createdById: session.user.teacherId, // Use teacherId instead of userId
           classId: classData.id,
           metadata: {
             timeZone: timeZone,
@@ -114,7 +114,7 @@ async function createClassScheduleEvents(classData: any, schedules: any[], timeZ
         }
       });
       
-      // Create class session records - ensure dayOfWeek is a number
+      // Create class session records
       for (const day of days) {
         await db.classSession.create({
           data: {
@@ -137,7 +137,7 @@ async function createClassScheduleEvents(classData: any, schedules: any[], timeZ
 export async function createClass(formData: FormData) {
   try {
     const session = await getAuthSession();
-    if (!session?.user?.id || session.user.role !== "TEACHER") {
+    if (!session?.user?.id || !session.user.teacherId || session.user.role !== "TEACHER") {
       return { success: false, error: "Unauthorized" };
     }
 
@@ -153,17 +153,16 @@ export async function createClass(formData: FormData) {
     // Parse schedules from JSON string
     let schedules = [];
     try {
-      const schedulesStr = formData.get('schedules') as string;
+      const schedulesStr = formData.get('schedules');
       if (schedulesStr) {
-        schedules = JSON.parse(schedulesStr);
+        schedules = JSON.parse(schedulesStr as string);
       }
     } catch (e) {
       console.error("Failed to parse schedules:", e);
-      schedules = [];
     }
 
     // Generate unique class code
-    const code = await generateUniqueClassCode(session.user.id);
+    const code = await generateUniqueClassCode(session.user.teacherId);
     
     // Parse dates if present
     const startDate = startDateStr ? new Date(startDateStr) : undefined;
@@ -183,7 +182,7 @@ export async function createClass(formData: FormData) {
         grade: grade || undefined,
         startDate,
         endDate,
-        userId: session.user.id
+        teacherId: session.user.teacherId  // Use teacherId instead of userId
       },
       include: {
         classSessions: true,
@@ -193,7 +192,19 @@ export async function createClass(formData: FormData) {
 
     // Create class sessions and calendar events
     if (schedules && schedules.length > 0) {
-      await createClassScheduleEvents(newClass, schedules, timeZone);
+      // Create class sessions for each day of the week in the schedule
+      for (const schedule of schedules) {
+        for (const day of schedule.days) {
+          await db.classSession.create({
+            data: {
+              dayOfWeek: day,
+              startTime: schedule.startTime,
+              endTime: schedule.endTime,
+              classId: newClass.id
+            }
+          });
+        }
+      }
     }
 
     // Update revalidation paths
@@ -201,41 +212,48 @@ export async function createClass(formData: FormData) {
     revalidatePath('/teacher/dashboard', 'page');
 
     // After creating the class, create calendar events
-    if (newClass.classSessions && newClass.classSessions.length > 0 && newClass.startDate) {
-      const calendarEvents = createCalendarEventsFromClassSessions(
-        {
-          id: newClass.id,
-          name: newClass.name,
-          emoji: newClass.emoji,
-          code: newClass.code,
-          color: newClass.color || "primary",
-          grade: newClass.grade ?? undefined,
-          startDate: new Date(newClass.startDate),
-          endDate: newClass.endDate ? new Date(newClass.endDate) : undefined,
-          classSessions: newClass.classSessions,
-        },
-        session.user.id,
-        timeZone
-      );
-
-      // Batch create calendar events
-      for (const event of calendarEvents) {
-        await db.calendarEvent.create({
-          data: {
-            title: event.title,
-            description: event.description,
-            startDate: event.startDate,
-            endDate: event.endDate,
-            variant: event.variant,
-            isRecurring: event.isRecurring,
-            createdBy: { connect: { id: session.user.id } },
-            class: { connect: { id: newClass.id } },
-            metadata: {
-              ...event.metadata,
-              timeZone: timeZone
-            }
+    if (newClass.id && startDate) {
+      // First ensure we have the updated class with session data
+      const classWithSessions = await db.class.findUnique({
+        where: { id: newClass.id },
+        include: {
+          classSessions: true
+        }
+      });
+      
+      if (classWithSessions) {
+        // Use the createCalendarEventsFromClassSessions utility
+        const events = createCalendarEventsFromClassSessions(
+          {
+            id: classWithSessions.id,
+            name: classWithSessions.name,
+            emoji: classWithSessions.emoji,
+            code: classWithSessions.code,
+            color: classWithSessions.color || undefined,
+            grade: classWithSessions.grade || undefined,
+            startDate: classWithSessions.startDate || undefined,
+            endDate: classWithSessions.endDate || undefined,
+            classSessions: classWithSessions.classSessions.map(cs => ({
+              dayOfWeek: cs.dayOfWeek,
+              startTime: cs.startTime,
+              endTime: cs.endTime
+            }))
           },
-        });
+          session.user.teacherId,
+          timeZone
+        );
+        
+        // Create each event
+        for (const eventData of events) {
+          await db.calendarEvent.create({
+            data: {
+              ...eventData,
+              createdById: session.user.teacherId
+            }
+          });
+        }
+        
+        console.log(`Created ${events.length} calendar events for class ${newClass.name}`);
       }
     }
 
@@ -263,25 +281,34 @@ export async function getClasses(): Promise<ClassResponse> {
   try {
     const session = await getAuthSession();
     if (!session?.user?.id) {
+      console.error("No authenticated user session found");
       return { success: false, error: "Unauthorized" };
     }
 
     let classes;
-    if (session.user.role === "TEACHER") {
+    if (session.user.role === "TEACHER" && session.user.teacherId) {
+      console.log(`Fetching classes for teacher ${session.user.teacherId}`);
       classes = await db.class.findMany({
-        where: { userId: session.user.id },
+        where: { teacherId: session.user.teacherId },
         orderBy: { createdAt: 'desc' },
         include: {
           classSessions: true, // Include class sessions to access schedule info
-          _count: { select: { enrollments: { where: { enrolled: true } } } } // Count enrolled students
+          _count: { 
+            select: { 
+              enrollments: true 
+            } 
+          } 
         }
       });
-    } else if (session.user.role === "STUDENT") {
+      console.log(`Found ${classes.length} classes for teacher ${session.user.teacherId}`);
+    } else if (session.user.role === "STUDENT" && session.user.studentId) {
+      // Student view stays the same since they should only see classes they're enrolled in
+      console.log(`Fetching classes for student ${session.user.studentId}`);
       classes = await db.class.findMany({
         where: {
           enrollments: {
             some: {
-              student: { userId: session.user.id },
+              studentId: session.user.studentId,
               enrolled: true,
             },
           },
@@ -289,17 +316,23 @@ export async function getClasses(): Promise<ClassResponse> {
         orderBy: { name: 'asc' },
         include: {
           classSessions: true, // Include class sessions to access schedule info
-          user: { select: { name: true, firstName: true, lastName: true } } // Include teacher name
+          teacher: { select: { firstName: true, lastName: true } } // Include teacher name
         }
       });
+      console.log(`Found ${classes.length} classes for student ${session.user.studentId}`);
     } else {
-      return { success: false, error: "Invalid user role" };
+      console.error("Invalid user role or missing profile ID", { 
+        role: session.user.role,
+        teacherId: session.user.teacherId,
+        studentId: session.user.studentId
+      });
+      return { success: false, error: "Invalid user role or missing profile ID" };
     }
 
     return { success: true, data: classes };
   } catch (error: any) {
     console.error("Get classes error:", error);
-    return { success: false, error: "Failed to fetch classes" };
+    return { success: false, error: "Failed to fetch classes: " + (error.message || "Unknown error") };
   }
 }
 
@@ -315,7 +348,7 @@ export const getClassByID = async (id: string): Promise<ClassResponse> => {
       where: { id },
       include: {
         classSessions: true, // Include class sessions
-        user: { select: { id: true, name: true, firstName: true, lastName: true, email: true } },
+        teacher: { select: { id: true, firstName: true, lastName: true, userId: true } },
         enrollments: {
           where: { enrolled: true },
           include: {
@@ -336,13 +369,15 @@ export const getClassByID = async (id: string): Promise<ClassResponse> => {
     }
 
     // Authorization check
-    if (session.user.role === "TEACHER" && classData.userId !== session.user.id) {
-      return { success: false, error: "Forbidden: You do not own this class" };
-    } else if (session.user.role === "STUDENT") {
+    if (session.user.role === "TEACHER" && session.user.teacherId) {
+      if (classData.teacherId !== session.user.teacherId) {
+        return { success: false, error: "Forbidden: You do not own this class" };
+      }
+    } else if (session.user.role === "STUDENT" && session.user.studentId) {
       const isEnrolled = await db.enrollment.findFirst({
         where: {
           classId: id,
-          student: { userId: session.user.id },
+          studentId: session.user.studentId,
           enrolled: true
         }
       });
@@ -350,6 +385,8 @@ export const getClassByID = async (id: string): Promise<ClassResponse> => {
       if (!isEnrolled) {
         return { success: false, error: "Forbidden: Not enrolled in this class" };
       }
+    } else {
+      return { success: false, error: "Invalid user role or missing profile ID" };
     }
 
     return { success: true, data: classData };
@@ -359,21 +396,20 @@ export const getClassByID = async (id: string): Promise<ClassResponse> => {
   }
 }
 
-
 // Update class (only teacher owner)
 export async function updateClass(id: string, data: any): Promise<ClassResponse> {
   try {
     const session = await getAuthSession();
-    if (!session?.user?.id || session.user.role !== "TEACHER") {
+    if (!session?.user?.id || !session.user.teacherId || session.user.role !== "TEACHER") {
       return { success: false, error: "Unauthorized" };
     }
 
     const existingClass = await db.class.findUnique({
       where: { id },
-      select: { userId: true }
+      select: { teacherId: true }
     });
 
-    if (!existingClass || existingClass.userId !== session.user.id) {
+    if (!existingClass || existingClass.teacherId !== session.user.teacherId) {
       return { success: false, error: "Class not found or you don't have permission to update it" };
     }
 
@@ -453,66 +489,62 @@ export async function updateClass(id: string, data: any): Promise<ClassResponse>
             variant: validColor,
             isRecurring: true,
             recurringDays: dayNumbers,
-            createdById: session.user.id,
+            createdById: session.user.teacherId, // Use teacherId
             classId: id
           }
         });
       }
     }
 
-    // After updating the class, update calendar events
-    if (data.classSessions?.length && data.startDate) {
-      // Delete existing calendar events for this class
-      const existingEvents = await db.calendarEvent.findMany({
-        where: { classId: id },
+    // Recreate calendar events with the utility
+    if (data.startDate) {
+      // Get the updated class with new sessions
+      const updatedClassWithSessions = await db.class.findUnique({
+        where: { id },
+        include: {
+          classSessions: true
+        }
       });
-
-      // Delete calendar events related to this class
-      await db.calendarEvent.deleteMany({
-        where: {
-          OR: [
-            { classId: id },
-            { parentEventId: { in: existingEvents.map((e) => e.id) } },
-          ],
-        },
-      });
-
-      // Create new calendar events
-      const calendarEvents = createCalendarEventsFromClassSessions(
-        {
-          id: updatedClass.id,
-          name: updatedClass.name,
-          emoji: updatedClass.emoji,
-          code: updatedClass.code,
-          color: updatedClass.color || "primary",
-          grade: updatedClass.grade ?? undefined,
-          startDate: new Date(data.startDate),
-          endDate: data.endDate ? new Date(data.endDate) : undefined,
-          classSessions: data.classSessions,
-        },
-        session.user.id
-      );
-
-      // Batch create calendar events
-      for (const event of calendarEvents) {
-        await db.calendarEvent.create({
-          data: {
-            title: event.title,
-            description: event.description,
-            startDate: event.startDate,
-            endDate: event.endDate,
-            variant: event.variant,
-            isRecurring: event.isRecurring,
-            createdBy: { connect: { id: session.user.id } },
-            class: { connect: { id: updatedClass.id } }
+      
+      if (updatedClassWithSessions) {
+        const events = createCalendarEventsFromClassSessions(
+          {
+            id: updatedClassWithSessions.id,
+            name: updatedClassWithSessions.name,
+            emoji: updatedClassWithSessions.emoji,
+            code: updatedClassWithSessions.code,
+            color: updatedClassWithSessions.color || undefined,
+            grade: updatedClassWithSessions.grade || undefined,
+            startDate: updatedClassWithSessions.startDate || undefined,
+            endDate: updatedClassWithSessions.endDate || undefined,
+            classSessions: updatedClassWithSessions.classSessions.map(cs => ({
+              dayOfWeek: cs.dayOfWeek,
+              startTime: cs.startTime,
+              endTime: cs.endTime
+            }))
           },
-        });
+          session.user.teacherId,
+          data.timeZone || 'UTC'
+        );
+        
+        // Create each event
+        for (const eventData of events) {
+          await db.calendarEvent.create({
+            data: {
+              ...eventData,
+              createdById: session.user.teacherId
+            }
+          });
+        }
+        
+        console.log(`Created ${events.length} calendar events for updated class ${updatedClassWithSessions.name}`);
       }
     }
 
     // Ensure revalidation is immediate and covers all necessary paths
-    revalidatePath('/teacher/dashboard/classes', 'layout');
-    revalidatePath('/teacher/dashboard', 'layout');
+    revalidatePath('/teacher/dashboard/classes', 'page');
+    revalidatePath(`/teacher/dashboard/classes/${id}`, 'page');
+    revalidatePath('/teacher/dashboard', 'page');
     
     return { 
       success: true, 
@@ -543,17 +575,17 @@ export async function updateClass(id: string, data: any): Promise<ClassResponse>
 export async function deleteClass(id: string): Promise<ClassResponse> {
   try {
     const session = await getAuthSession();
-    if (!session?.user?.id || session.user.role !== "TEACHER") {
+    if (!session?.user?.id || !session.user.teacherId || session.user.role !== "TEACHER") {
       return { success: false, error: "Unauthorized" };
     }
 
     // Verify teacher owns the class
     const classToDelete = await db.class.findUnique({
       where: { id },
-      select: { userId: true, code: true }
+      select: { teacherId: true, code: true }
     });
 
-    if (!classToDelete || classToDelete.userId !== session.user.id) {
+    if (!classToDelete || classToDelete.teacherId !== session.user.teacherId) {
       return { success: false, error: "Class not found or access denied" };
     }
 
@@ -567,14 +599,20 @@ export async function deleteClass(id: string): Promise<ClassResponse> {
       where: { id }
     });
 
+    // Make sure revalidation happens
     revalidatePath("/teacher/dashboard/classes");
+    
     return { success: true };
   } catch (error: any) {
     console.error("Delete class error:", error);
     
+    // Handle constraints errors properly
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (error.code === 'P2003') {
-        return { success: false, error: "Cannot delete class: It has related records that couldn't be automatically deleted. Please remove them first." };
+        return { 
+          success: false, 
+          error: "Cannot delete class: It has related records that couldn't be automatically deleted. Please remove them first." 
+        };
       }
       if (error.code === 'P2025') {
         return { success: false, error: "Class not found" };
@@ -596,16 +634,10 @@ export async function getClassData(classCode: string): Promise<ClassResponse> {
       return { success: false, error: "Unauthorized" };
     }
     
-    const userId = session.user.id;
-    const isStudent = session.user.role === "STUDENT";
-    const isTeacher = session.user.role === "TEACHER";
-    
-    console.log(`User role: ${session.user.role}, User ID: ${userId}`);
-
     // Find the class first
     const classExists = await db.class.findUnique({
       where: { code: classCode },
-      select: { id: true, userId: true }
+      select: { id: true, teacherId: true }
     });
 
     if (!classExists) {
@@ -616,15 +648,15 @@ export async function getClassData(classCode: string): Promise<ClassResponse> {
     // Determine if the user has access to this class
     let hasAccess = false;
 
-    if (isTeacher && classExists.userId === userId) {
+    if (session.user.role === "TEACHER" && session.user.teacherId) {
       // Teacher owns the class
-      hasAccess = true;
-    } else if (isStudent) {
+      hasAccess = classExists.teacherId === session.user.teacherId;
+    } else if (session.user.role === "STUDENT" && session.user.studentId) {
       // Check enrollment for student
       const enrollment = await db.enrollment.findFirst({
         where: {
           classId: classExists.id,
-          studentId: userId,
+          studentId: session.user.studentId,
           enrolled: true
         }
       });
@@ -642,14 +674,17 @@ export async function getClassData(classCode: string): Promise<ClassResponse> {
       where: { id: classExists.id },
       include: {
         classSessions: true, // Include class sessions
-        user: { 
+        teacher: { 
           select: { 
             id: true, 
-            name: true, 
             firstName: true, 
-            lastName: true, 
-            email: true,
-            image: true 
+            lastName: true,
+            profileImage: true,
+            user: {
+              select: {
+                email: true
+              }
+            }
           } 
         },
         _count: { 
@@ -661,41 +696,16 @@ export async function getClassData(classCode: string): Promise<ClassResponse> {
           orderBy: { createdAt: 'asc' },
           include: {
             files: true,
-            assignmentRelations: true,
+            assignments: true,
           }
         }
       }
     });
-
-    // For backwards compatibility, map assignmentRelations to assignments
-    if (classData && classData.lessonPlans) {
-      classData.lessonPlans = classData.lessonPlans.map(plan => ({
-        ...plan,
-        assignments: plan.assignmentRelations
-      }));
-    }
 
     console.log("Successfully retrieved class data");
     return { success: true, data: classData };
   } catch (error: any) {
     console.error("Get class data by code error:", error);
     return { success: false, error: "Failed to fetch class data: " + error.message };
-  }
-}
-
-// Test database connection - for debugging
-export async function testDbConnection(): Promise<ClassResponse> {
-  try {
-    const count = await db.class.count();
-    return { 
-      success: true, 
-      data: { message: "Database connection successful", count } 
-    };
-  } catch (error: any) {
-    console.error("Database connection error:", error);
-    return { 
-      success: false, 
-      error: `Database connection failed: ${error.message}` 
-    };
   }
 }

@@ -1,13 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/src/components/ui/dialog';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Textarea } from '@/src/components/ui/textarea';
-import { updateLessonPlan } from '@/src/app/actions/lessonPlansActions';
+import { updateLessonPlan, updateGenericLessonPlan } from '@/src/app/actions/lessonPlansActions';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 
 interface EditLessonPlanDialogProps {
   isOpen: boolean;
@@ -17,6 +18,7 @@ interface EditLessonPlanDialogProps {
     id: string;
     name: string;
     description?: string;
+    genericLessonPlanId?: string;
   };
 }
 
@@ -27,12 +29,26 @@ export default function EditLessonPlanDialog({
   lessonPlan,
 }: EditLessonPlanDialogProps) {
   const router = useRouter();
+  const { data: session } = useSession();
   const [form, setForm] = useState({
-    name: lessonPlan.name,
-    description: lessonPlan.description || '',
+    name: '',
+    description: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  const isTemplate = !!lessonPlan.genericLessonPlanId;
+  const isSuperUser = session?.user?.role === 'SUPER';
+
+  // Set form data when dialog opens or lesson plan changes
+  useEffect(() => {
+    if (isOpen && lessonPlan) {
+      setForm({
+        name: lessonPlan.name,
+        description: lessonPlan.description || '',
+      });
+    }
+  }, [isOpen, lessonPlan]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -40,10 +56,21 @@ export default function EditLessonPlanDialog({
     setError(null);
     
     try {
-      const response = await updateLessonPlan(lessonPlan.id, {
-        name: form.name,
-        description: form.description,
-      });
+      let response;
+      
+      // If super user is editing a template, use updateGenericLessonPlan
+      if (isSuperUser && isTemplate) {
+        response = await updateGenericLessonPlan(lessonPlan.id, {
+          name: form.name,
+          description: form.description,
+        });
+      } else {
+        // Otherwise use regular updateLessonPlan
+        response = await updateLessonPlan(lessonPlan.id, {
+          name: form.name,
+          description: form.description,
+        });
+      }
       
       if (response.success) {
         toast.success('Lesson plan updated successfully');
@@ -66,7 +93,7 @@ export default function EditLessonPlanDialog({
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Edit Lesson Plan</DialogTitle>
+          <DialogTitle>{isTemplate ? 'Edit Template' : 'Edit Lesson Plan'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
@@ -107,6 +134,7 @@ export default function EditLessonPlanDialog({
             <Button
               type="submit"
               disabled={isSubmitting}
+              className="bg-orange-500 hover:bg-orange-600"
             >
               {isSubmitting ? 'Saving...' : 'Save Changes'}
             </Button>

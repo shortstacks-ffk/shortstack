@@ -44,32 +44,56 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "File too large (max 50MB)" }, { status: 400 });
     }
 
-    // Verify the assignment exists and student has access to it
-    const assignment = await db.assignment.findUnique({
-      where: { id: assignmentId },
-      include: {
-        class: {
-          include: {
-            students: {
-              where: { id: student.id }
+    // Verify the assignment exists and student has access through lesson plans
+    const assignment = await db.assignment.findFirst({
+      where: {
+        id: assignmentId,
+        lessonPlans: {
+          some: {
+            classes: {
+              some: {
+                enrollments: {
+                  some: {
+                    studentId: student.id,
+                    enrolled: true
+                  }
+                }
+              }
             }
+          }
+        }
+      },
+      include: {
+        lessonPlans: {
+          include: {
+            classes: true
           }
         }
       }
     });
 
     if (!assignment) {
-      return NextResponse.json({ error: "Assignment not found" }, { status: 404 });
+      return NextResponse.json({ error: "Assignment not found or you don't have access" }, { status: 404 });
     }
     
-    if (assignment.class?.students.length === 0) {
+    // Double check access through lesson plan classes
+    const allClasses = assignment.lessonPlans.flatMap(lp => lp.classes);
+    const hasAccess = await db.enrollment.findFirst({
+      where: {
+        studentId: student.id,
+        classId: { in: allClasses.map(c => c.id) },
+        enrolled: true
+      }
+    });
+
+    if (!hasAccess) {
       return NextResponse.json({ error: "You don't have access to this assignment" }, { status: 403 });
     }
 
     console.log("Student assignment submission - starting process");
     
     // Create a unique, sanitized filename
-    const sanitizedFileName = file.name.replace(/\s/g, '-');
+    const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '-');
     const uniqueFileName = `submissions/${student.id}/${assignmentId}/${Date.now()}-${sanitizedFileName}`;
     
     // Upload to Vercel Blob

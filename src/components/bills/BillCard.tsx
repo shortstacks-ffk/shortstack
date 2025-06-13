@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { Card } from "../ui/card";
 import { formatCurrency } from "@/src/lib/utils";
+import { getBillStatus } from "@/src/lib/bill-utils";
 import { useRouter } from "next/navigation";
-import { Copy, MoreHorizontal, Trash, Pen } from "lucide-react";
+import { MoreHorizontal, Trash, Pen, Ban } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,10 +13,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from "../ui/dropdown-menu";
-import AssignBillDialog from "./AssignBillDialog";
 import DeleteBillDialog from "./DeleteBillDialog";
 import EditBillForm from "./EditBillForm";
-import Link from "next/link";
+import CancelBillDialog from "./CancelBillDialog";
 
 interface BillCardProps {
   id: string;
@@ -43,12 +43,30 @@ export const BillCard = ({
   classes = [],
 }: BillCardProps) => {
   const router = useRouter();
-  const [showAssignDialog, setShowAssignDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
 
-  // Format the due date
-  const formattedDueDate = new Date(dueDate).toLocaleDateString();
+  // Get the current accurate status using client-side function
+  const currentStatus = getBillStatus({ 
+    dueDate, 
+    frequency, 
+    status,
+  });
+
+  // Format the due date in the user's local timezone
+  const formatDueDateForDisplay = (date: Date | string) => {
+    const dateObj = new Date(date);
+    
+    return dateObj.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+    });
+  };
+
+  const formattedDueDate = formatDueDateForDisplay(dueDate);
 
   // Format the frequency for display
   const getFrequencyDisplay = (freq: string) => {
@@ -67,10 +85,13 @@ export const BillCard = ({
     router.push(`/teacher/dashboard/bills/${id}`);
   };
 
+  // Check if bill can be cancelled (not already cancelled or fully paid)
+  const canCancel = currentStatus !== "CANCELLED" && currentStatus !== "PAID";
+
   return (
     <>
       <Card
-        className={`overflow-hidden w-[250px] h-[250px] relative cursor-pointer hover:shadow-md transition-shadow ${backgroundColor}`}
+        className={`overflow-hidden w-[250px] h-[250px] relative cursor-pointer hover:shadow-md transition-shadow ${backgroundColor} ${currentStatus === "CANCELLED" ? "opacity-60" : ""}`}
         onClick={navigateToBill}
       >
         <div className="absolute right-2 top-2 z-10" onClick={e => e.stopPropagation()}>
@@ -81,16 +102,26 @@ export const BillCard = ({
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setShowAssignDialog(true)}>
-                <Copy className="mr-2 h-4 w-4" />
-                Assign to More Classes
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setShowEditDialog(true)}>
+              <DropdownMenuItem 
+                onClick={() => setShowEditDialog(true)}
+                disabled={currentStatus === "CANCELLED"}
+              >
                 <Pen className="mr-2 h-4 w-4" />
                 Update Bill
               </DropdownMenuItem>
               <DropdownMenuSeparator />
+              {canCancel && (
+                <>
+                  <DropdownMenuItem
+                    onClick={() => setShowCancelDialog(true)}
+                    className="text-orange-600 focus:text-orange-600"
+                  >
+                    <Ban className="mr-2 h-4 w-4" />
+                    Cancel Bill
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
               <DropdownMenuItem
                 onClick={() => setShowDeleteDialog(true)}
                 className="text-red-600 focus:text-red-600"
@@ -114,6 +145,9 @@ export const BillCard = ({
           <div className="space-y-1 text-sm">
             <p><span className="font-medium">Due:</span> {formattedDueDate}</p>
             <p><span className="font-medium">Frequency:</span> {getFrequencyDisplay(frequency)}</p>
+            {currentStatus === "CANCELLED" && (
+              <p className="text-red-600 font-medium">CANCELLED</p>
+            )}
 
             <div className="mt-3 flex flex-wrap gap-1.5">
               {classes && classes.length > 0 ? (
@@ -140,14 +174,6 @@ export const BillCard = ({
         </div>
       </Card>
 
-      <AssignBillDialog
-        isOpen={showAssignDialog}
-        onClose={() => setShowAssignDialog(false)}
-        billId={id}
-        billTitle={title}
-        assignedClasses={classes}
-      />
-
       <EditBillForm
         isOpen={showEditDialog}
         onClose={() => setShowEditDialog(false)}
@@ -162,10 +188,17 @@ export const BillCard = ({
           class: classes.map(cls => ({
             id: cls.id,
             name: cls.name,
-            emoji: cls.emoji || "📝", // Provide a default emoji if none exists
-            code: cls.code || "" // Ensure code is always a string
+            emoji: cls.emoji || "📝",
+            code: cls.code || ""
           }))
         }}
+      />
+
+      <CancelBillDialog
+        isOpen={showCancelDialog}
+        onClose={() => setShowCancelDialog(false)}
+        billId={id}
+        billTitle={title}
       />
 
       <DeleteBillDialog

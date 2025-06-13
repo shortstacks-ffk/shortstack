@@ -1,5 +1,5 @@
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/src/lib/auth/config"; // Fixed import path
+import { authOptions } from "@/src/lib/auth/config";
 import { db } from "@/src/lib/db";
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
@@ -17,10 +17,42 @@ export async function GET(
 
     const { id } = await params;
 
+    // Get the appropriate teacherId based on user role
+    let teacherId = session.user.id;
+    
+    if (session.user.role === 'TEACHER') {
+      const teacher = await db.teacher.findUnique({
+        where: { userId: session.user.id },
+        select: { id: true }
+      });
+      
+      if (!teacher) {
+        return NextResponse.json({ error: "Teacher profile not found" }, { status: 404 });
+      }
+      
+      teacherId = teacher.id;
+    } else if (session.user.role === 'STUDENT') {
+      const student = await db.student.findFirst({
+        where: { 
+          OR: [
+            { userId: session.user.id },
+            ...(session.user.email ? [{ schoolEmail: session.user.email }] : [])
+          ]
+        },
+        select: { teacherId: true }
+      });
+      
+      if (!student) {
+        return NextResponse.json({ error: "Student profile not found" }, { status: 404 });
+      }
+      
+      teacherId = student.teacherId;
+    }
+
     const todo = await db.todo.findUnique({
       where: {
         id: id,
-        userId: session.user.id
+        teacherId: teacherId
       },
       include: {
         calendarEvent: true
@@ -54,10 +86,42 @@ export async function PATCH(
 
     const { title, description, completed, dueDate, priority, calendarEventId } = data;
 
+    // Get the appropriate teacherId based on user role
+    let teacherId = session.user.id;
+    
+    if (session.user.role === 'TEACHER') {
+      const teacher = await db.teacher.findUnique({
+        where: { userId: session.user.id },
+        select: { id: true }
+      });
+      
+      if (!teacher) {
+        return NextResponse.json({ error: "Teacher profile not found" }, { status: 404 });
+      }
+      
+      teacherId = teacher.id;
+    } else if (session.user.role === 'STUDENT') {
+      const student = await db.student.findFirst({
+        where: { 
+          OR: [
+            { userId: session.user.id },
+            ...(session.user.email ? [{ schoolEmail: session.user.email }] : [])
+          ]
+        },
+        select: { teacherId: true }
+      });
+      
+      if (!student) {
+        return NextResponse.json({ error: "Student profile not found" }, { status: 404 });
+      }
+      
+      teacherId = student.teacherId;
+    }
+
     const existingTodo = await db.todo.findUnique({
       where: {
         id: id,
-        userId: session.user.id
+        teacherId: teacherId
       },
       include: {
         calendarEvent: true
@@ -72,7 +136,6 @@ export async function PATCH(
     const updateData: Prisma.TodoUpdateInput = {};
     
     if (title !== undefined) updateData.title = title;
-
     if (completed !== undefined) updateData.completed = completed;
     if (priority !== undefined) updateData.priority = priority;
     if (calendarEventId !== undefined) updateData.calendarEvent = { connect: { id: calendarEventId } };
@@ -84,7 +147,7 @@ export async function PATCH(
       where: { id },
       data: updateData,
       include: {
-      calendarEvent: true
+        calendarEvent: true
       }
     });
 
@@ -108,15 +171,47 @@ export async function DELETE(
 
     const { id } = await params;
 
+    // Get the appropriate teacherId based on user role
+    let teacherId = session.user.id;
+    
+    if (session.user.role === 'TEACHER') {
+      const teacher = await db.teacher.findUnique({
+        where: { userId: session.user.id },
+        select: { id: true }
+      });
+      
+      if (!teacher) {
+        return NextResponse.json({ error: "Teacher profile not found" }, { status: 404 });
+      }
+      
+      teacherId = teacher.id;
+    } else if (session.user.role === 'STUDENT') {
+      const student = await db.student.findFirst({
+        where: { 
+          OR: [
+            { userId: session.user.id },
+            ...(session.user.email ? [{ schoolEmail: session.user.email }] : [])
+          ]
+        },
+        select: { teacherId: true }
+      });
+      
+      if (!student) {
+        return NextResponse.json({ error: "Student profile not found" }, { status: 404 });
+      }
+      
+      teacherId = student.teacherId;
+    }
+
     const existingTodo = await db.todo.findUnique({
       where: {
         id: id,
-        userId: session.user.id
+        teacherId: teacherId
       },
       select: {
         id: true,
         calendarEventId: true,
-        userId: true
+        teacherId: true
       }
     });
 

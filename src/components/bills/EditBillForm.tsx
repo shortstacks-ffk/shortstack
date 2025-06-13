@@ -1,16 +1,15 @@
 "use client";
 
-import { useState, useRef } from "react";
+import React, { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/src/components/ui/dialog";
-import { Input } from "@/src/components/ui/input";
-import { Button } from "@/src/components/ui/button";
-import { Label } from "@/src/components/ui/label";
-import { toast } from "sonner";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
+import { Input } from "../ui/input";
+import { Label } from "../ui/label";
+import { Button } from "../ui/button";
 import { Loader2 } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/src/components/ui/tabs";
-import { EmojiPickerButton } from "@/src/components/ui/emoji-picker-button";
+import { toast } from "sonner";
 import { updateBill } from "@/src/app/actions/billActions";
+import { EmojiPickerButton } from "../ui/emoji-picker-button";
 
 interface BillClass {
   id: string;
@@ -44,11 +43,15 @@ const frequencyOptions = [
   { value: "YEARLY", label: "Yearly" },
 ];
 
-const formatDate = (date: string | Date) => {
+// Fix the date formatting to handle timezone properly
+const formatDateForInput = (date: string | Date) => {
   const d = new Date(date);
+  
+  // Get the date in the user's local timezone
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
+  
   return `${year}-${month}-${day}`;
 };
 
@@ -63,7 +66,7 @@ export default function EditBillForm({
   const [title, setTitle] = useState(billData.title);
   const [emoji, setEmoji] = useState(billData.emoji || "💰");
   const [amount, setAmount] = useState(billData.amount?.toString() || "0");
-  const [dueDate, setDueDate] = useState(formatDate(billData.dueDate));
+  const [dueDate, setDueDate] = useState(formatDateForInput(billData.dueDate));
   const [frequency, setFrequency] = useState(billData.frequency);
   const [description, setDescription] = useState(billData.description || "");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -79,11 +82,14 @@ export default function EditBillForm({
     setIsSubmitting(true);
     
     try {
+      // Create a proper Date object in the user's timezone
+      const dueDateObj = new Date(dueDate + 'T00:00:00'); // This creates the date at midnight local time
+      
       const result = await updateBill(billData.id, {
         title,
         emoji,
         amount: parseFloat(amount),
-        dueDate: new Date(dueDate),
+        dueDate: dueDateObj,
         frequency: frequency as any,
         description
       });
@@ -110,106 +116,103 @@ export default function EditBillForm({
           <DialogTitle>Edit Bill</DialogTitle>
         </DialogHeader>
         
+        <form onSubmit={handleSubmit} ref={formRef} className="space-y-4 pt-4">
+          <div className="flex items-center gap-3">
+            <EmojiPickerButton 
+              value={emoji}
+              onChange={setEmoji}
+            />
+            
+            <Input
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              placeholder="Bill title"
+              className="flex-1"
+              required
+              disabled={isSubmitting}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="amount">Amount</Label>
+              <Input
+                id="amount"
+                value={amount}
+                onChange={e => setAmount(e.target.value)}
+                type="number"
+                min="0"
+                step="0.01"
+                required
+                disabled={isSubmitting}
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="dueDate">Due Date</Label>
+              <Input
+                id="dueDate"
+                value={dueDate}
+                onChange={e => setDueDate(e.target.value)}
+                type="date"
+                required
+                disabled={isSubmitting}
+              />
+            </div>
+          </div>
+
+          <div>
+            <Label htmlFor="frequency">Frequency</Label>
+            <select
+              id="frequency"
+              value={frequency}
+              onChange={e => setFrequency(e.target.value)}
+              className="w-full p-2 border rounded"
+              required
+              disabled={isSubmitting}
+            >
+              {frequencyOptions.map(option => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <Label htmlFor="description">Description (Optional)</Label>
+            <textarea
+              id="description"
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              className="w-full p-2 border rounded"
+              rows={3}
+              disabled={isSubmitting}
+            />
+          </div>
           
-            <form onSubmit={handleSubmit} ref={formRef} className="space-y-4 pt-4">
-              <div className="flex items-center gap-3">
-                <EmojiPickerButton 
-                  value={emoji}
-                  onChange={setEmoji}
-                />
-                
-                <Input
-                  value={title}
-                  onChange={e => setTitle(e.target.value)}
-                  placeholder="Bill title"
-                  className="flex-1"
-                  required
-                  disabled={isSubmitting}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="amount">Amount</Label>
-                  <Input
-                    id="amount"
-                    value={amount}
-                    onChange={e => setAmount(e.target.value)}
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    required
-                    disabled={isSubmitting}
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="dueDate">Due Date</Label>
-                  <Input
-                    id="dueDate"
-                    value={dueDate}
-                    onChange={e => setDueDate(e.target.value)}
-                    type="date"
-                    required
-                    disabled={isSubmitting}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="frequency">Frequency</Label>
-                <select
-                  id="frequency"
-                  value={frequency}
-                  onChange={e => setFrequency(e.target.value)}
-                  className="w-full p-2 border rounded"
-                  required
-                  disabled={isSubmitting}
-                >
-                  {frequencyOptions.map(option => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <Label htmlFor="description">Description (Optional)</Label>
-                <textarea
-                  id="description"
-                  value={description}
-                  onChange={e => setDescription(e.target.value)}
-                  className="w-full p-2 border rounded"
-                  rows={3}
-                  disabled={isSubmitting}
-                />
-              </div>
-              
-              <div className="flex justify-end gap-2 pt-2">
-                <Button 
-                  type="button" 
-                  variant="secondary" 
-                  onClick={onClose}
-                  disabled={isSubmitting}
-                >
-                  Cancel
-                </Button>
-                <Button 
-                  type="submit" 
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Updating...
-                    </>
-                  ) : (
-                    "Update Bill"
-                  )}
-                </Button>
-              </div>
-            </form>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button 
+              type="button" 
+              variant="secondary" 
+              onClick={onClose}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button 
+              type="submit" 
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Updating...
+                </>
+              ) : "Update Bill"}
+            </Button>
+          </div>
+        </form>
       </DialogContent>
     </Dialog>
   );

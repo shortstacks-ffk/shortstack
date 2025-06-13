@@ -29,8 +29,12 @@ export default function StudentLoginPage() {
       const result = await signIn("credentials", {
         email,
         password,
+        role: "STUDENT", // Explicitly set this to "STUDENT"
         redirect: false,
       });
+
+      // Check result
+      console.log("Sign-in result:", result);
 
       if (result?.error) {
         // Format the error message appropriately
@@ -40,17 +44,20 @@ export default function StudentLoginPage() {
         }
         setError(errorMessage);
       } else if (result?.ok) {
-        // Check if it's a student account
+        // Force a session update to make sure we have the correct role
         const session = await fetch("/api/auth/session");
         const sessionData = await session.json();
+        
+        console.log("Session data after login:", sessionData);
         
         if (sessionData?.user?.role === "STUDENT") {
           router.push("/student/dashboard");
         } else {
-          router.push("/dashboard"); // Default dashboard for teachers
+          router.push("/student/dashboard"); // Always go to student dashboard when using student login
         }
       }
     } catch (err: any) {
+      console.error("Login error:", err);
       setError(err.message || "An error occurred during login");
     } finally {
       setIsLoading(false);

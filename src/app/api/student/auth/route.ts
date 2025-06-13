@@ -12,17 +12,25 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Find student profile using the correct relation name
+    // Find student profile using the new schema structure
     const student = await db.student.findFirst({
       where: {
         schoolEmail: session.user.email,
       },
       include: {
-        class: {
+        teacher: {
           include: {
             user: true,
           },
         },
+        enrollments: {
+          where: {
+            enrolled: true
+          },
+          include: {
+            class: true
+          }
+        }
       },
     });
 
@@ -30,10 +38,10 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Student profile not found" }, { status: 404 });
     }
 
-    // Access the teacher through the class
-    const teacher = student.class?.user;
+    // Access the teacher through the direct teacher relationship
+    const teacher = student.teacher?.user;
     const teacherName = teacher?.name || 
-      `${teacher?.firstName || ''} ${teacher?.lastName || ''}`.trim() || 
+      `${(teacher as any)?.firstName || ''} ${(teacher as any)?.lastName || ''}`.trim() || 
       'Your Teacher';
 
     return NextResponse.json({ 

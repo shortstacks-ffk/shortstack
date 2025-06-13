@@ -3,6 +3,7 @@ import { db } from "@/src/lib/db";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/src/lib/auth/config";
 
+// Modify the GET handler to respect bill status and exclusions
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
@@ -43,12 +44,30 @@ export async function GET() {
     // Get bills directly from the classes the student is enrolled in
     const bills = await db.bill.findMany({
       where: {
-        class: {
-          some: {
-            id: { in: classIds }
+        AND: [
+          {
+            class: {
+              some: {
+                id: { in: classIds }
+              }
+            }
+          },
+          {
+            status: {
+              in: ["ACTIVE", "DUE", "LATE", "PARTIAL"]
+            }
+          },
+          {
+            // Exclude bills where this student is explicitly excluded
+            NOT: {
+              excludedStudents: {
+                some: {
+                  id: student.id
+                }
+              }
+            }
           }
-        },
-        status: "ACTIVE" 
+        ]
       },
       include: {
         class: {
@@ -83,6 +102,23 @@ export async function GET() {
           return null;
         }
         
+        // Calculate days overdue for the status
+        const now = new Date();
+        const dueDate = new Date(bill.dueDate);
+        const daysOverdue = Math.floor((now.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
+        
+        // Determine the displayed status
+        let displayStatus;
+        if (paidAmount > 0 && paidAmount < bill.amount) {
+          displayStatus = "PARTIAL";
+        } else if (daysOverdue > 0) {
+          displayStatus = `LATE (${daysOverdue} ${daysOverdue === 1 ? 'day' : 'days'})`;
+        } else if (daysOverdue === 0) {
+          displayStatus = "DUE TODAY";
+        } else {
+          displayStatus = "ACTIVE";
+        }
+        
         return {
           id: studentBill?.id || `bill_${bill.id}`, // Use existing studentBill id if available
           billId: bill.id,
@@ -94,7 +130,9 @@ export async function GET() {
           description: bill.description || "",
           classId: bill.class[0]?.id || "",
           className: bill.class[0]?.name || "Unknown class",
-          emoji: bill.class[0]?.emoji || "📝"
+          emoji: bill.class[0]?.emoji || "📝",
+          displayStatus,
+          frequency: bill.frequency
         };
       })
       .filter(Boolean); // Remove nulls (fully paid bills)

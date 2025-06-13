@@ -44,11 +44,18 @@ export async function GET(request: Request) {
     const startDate = new Date(statementYear, statementMonth, 1);
     const endDate = new Date(statementYear, statementMonth + 1, 0); // Last day of month
     
-    // Get all students with bank accounts
+    // Get all students with bank accounts and their enrollments
     const students = await db.student.findMany({
       include: {
         bankAccounts: true,
-        class: true
+        enrollments: {
+          include: {
+            class: true
+          },
+          where: {
+            enrolled: true
+          }
+        }
       }
     });
     
@@ -61,6 +68,10 @@ export async function GET(request: Request) {
     
     // Process each student's accounts
     for (const student of students) {
+      // Get the student's active class name
+      const activeEnrollment = student.enrollments.find(enrollment => enrollment.enrolled);
+      const className = activeEnrollment?.class?.name || 'N/A';
+      
       for (const account of student.bankAccounts) {
         results.total++;
         
@@ -110,7 +121,7 @@ export async function GET(request: Request) {
           // Add headers
           XLSX.utils.sheet_add_aoa(ws, [
             [`Student: ${student.firstName} ${student.lastName}`],
-            [`Class: ${student.class?.name || 'N/A'}`],
+            [`Class: ${className}`],
             [`Account: ${account.accountType} (${account.accountNumber})`],
             [`Statement Period: ${monthName} ${statementYear}`],
             [`Current Balance: $${account.balance.toFixed(2)}`],

@@ -8,7 +8,9 @@ import { useScheduler } from "@/src/providers/scheduler/schedular-provider";
 import { cn } from "@/src/lib/utils";
 import CustomModal from "@/src/components/ui/custom-modal";
 import AddEventModal from "@/src/components/scheduler/_modals/add-event-modal";
+import EditEventModal from "@/src/components/scheduler/_modals/edit-event-modal";
 import { toast } from "react-hot-toast";
+import { Button } from "@/src/components/ui/button";
 
 const formatDate = (d: Date | string) => {
   const date = typeof d === "string" ? new Date(d) : d;
@@ -51,10 +53,12 @@ export default function EventStyled({
 
   // pick override color for bill/assignment, else event.variant, else "default"
   const type = event.metadata?.type || "";
+  // Default to "event" type if no specific type is set
+  const effectiveType = type === "" ? "event" : type;
   const raw =
-    type === "bill"
+    effectiveType === "bill"
       ? "danger"
-      : type === "assignment"
+      : effectiveType === "assignment"
       ? "warning"
       : event.variant || "default";
   // ensure it's one of our keys
@@ -67,9 +71,9 @@ export default function EventStyled({
     setOpen(
       <CustomModal title={event.title || "Details"}>
         <div className="space-y-2">
-          <div className="font-semibold whitespace-nowrap truncate">
+          {/* <div className="font-semibold whitespace-nowrap truncate">
             {event.title}
-          </div>
+          </div> */}
           {event.description && (
             <div className="text-sm opacity-90">{event.description}</div>
           )}
@@ -80,19 +84,36 @@ export default function EventStyled({
               {formatDate(event.startDate)} – {formatDate(event.endDate)}
             </div>
           )}
-          {/* only allow editing on "event" and "todo" */}
-          {["event", "todo"].includes(type) && (
+
+
+          {/* {
+            ["bill"].includes(type) && (
+              <div className="text-xs opacity-80">
+                Frequency:{event.metadata?.frequency || "One-time"}
+                
+              </div>
+            )
+          } */}
+
+          {/* only allow editing on "event" type events (not todo, bill, assignment) */}
+          {effectiveType === "event" && (
             <div className="flex items-center space-x-2 mt-4">
               <button
                 className="flex items-center px-3 py-1 bg-blue-100 text-blue-800 rounded hover:bg-blue-200"
-                onClick={() => handleEditEvent(event)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleEditEvent(event);
+                }}
               >
                 <Edit2 className="h-4 w-4 mr-1" />
                 Edit
               </button>
               <button
                 className="flex items-center px-3 py-1 bg-red-100 text-red-800 rounded hover:bg-red-200"
-                onClick={() => handleDeleteEvent(event.id)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDeleteEvent(event.id);
+                }}
               >
                 <TrashIcon className="h-4 w-4 mr-1" />
                 Delete
@@ -107,52 +128,115 @@ export default function EventStyled({
 
   // Handle editing an event
   const handleEditEvent = (eventToEdit: Event) => {
-    // Ensure we're passing a clean object with properly converted dates
+    // Close the details modal first
+    setOpen(null);
+    
+    // First, make sure we have a valid event with an ID
+    if (!eventToEdit || !eventToEdit.id) {
+      console.error("Invalid event data for editing:", eventToEdit);
+      toast.error("Cannot edit this event: missing data");
+      return;
+    }
+    
+    // Create a completely new object to avoid reference issues
     const cleanEventData = {
       id: eventToEdit.id,
       title: eventToEdit.title || "",
       description: eventToEdit.description || "",
-      startDate: eventToEdit.startDate instanceof Date ? 
-        eventToEdit.startDate : new Date(eventToEdit.startDate),
-      endDate: eventToEdit.endDate instanceof Date ? 
-        eventToEdit.endDate : new Date(eventToEdit.endDate),
+      startDate: new Date(),
+      endDate: new Date(),
       variant: eventToEdit.variant || "primary",
-      isRecurring: eventToEdit.isRecurring || false,
-      recurringDays: eventToEdit.recurringDays || [],
-      metadata: eventToEdit.metadata || {}
+      isRecurring: Boolean(eventToEdit.isRecurring),
+      recurringDays: Array.isArray(eventToEdit.recurringDays) ? [...eventToEdit.recurringDays] : [],
+      metadata: eventToEdit.metadata ? {...eventToEdit.metadata} : {}
     };
+
+    // Process dates first outside the try-catch to ensure they're valid
+    if (eventToEdit.startDate) {
+      cleanEventData.startDate = new Date(eventToEdit.startDate);
+    }
+    
+    if (eventToEdit.endDate) {
+      cleanEventData.endDate = new Date(eventToEdit.endDate);
+    }
 
     console.log("Opening edit modal with data:", cleanEventData);
 
+    // Open modal immediately without timeout
     setOpen(
-      <CustomModal title="Edit Event"> {/* This title will show in the modal header */}
-        <AddEventModal />
+      <CustomModal title="Edit Event">
+        <EditEventModal />
       </CustomModal>,
-      async () => ({ default: cleanEventData })
+      { default: cleanEventData }
     );
   };
 
   // Handle deleting an event
-  const handleDeleteEvent = (id: string) => {
-    // Close any open modals first
-    setOpen(null);
-    
-    console.log("Event deletion requested for ID:", id);
-    
-    // Call the onDelete prop if provided (for local state updates)
-    if (onDelete) {
-      console.log("Calling onDelete callback");
-      onDelete(id);
-    } else {
-      console.log("No onDelete callback provided, using handlers.handleDeleteEvent");
-      // Only trigger UI update if no external handler was provided
-      handlers.handleDeleteEvent(id);
+  const handleDeleteEvent = async (id: string) => {
+    try {
+      // Close any open modals first
+      setOpen(null);
+      
+      // Show a nicer confirmation dialog instead of using window.confirm
+      setOpen(
+        <CustomModal title="Confirm Deletion">
+          <div className="p-4 space-y-4">
+            <p className="text-sm text-gray-700">
+              Are you sure you want to delete this event? This action cannot be undone.
+            </p>
+            <div className="flex justify-end space-x-2">
+              <Button variant="outline" onClick={() => setOpen(null)}>
+                Cancel
+              </Button>
+              <Button 
+                variant="destructive"
+                onClick={async () => {
+                  setOpen(null);
+                  
+                  try {
+                    // Call API to delete the event from the database
+                    const response = await fetch(`/api/calendar/${id}`, {
+                      method: 'DELETE',
+                      headers: { 'Content-Type': 'application/json' },
+                    });
+                    
+                    const responseData = await response.json();
+                    
+                    if (!response.ok) {
+                      throw new Error(responseData.error || 'Failed to delete event');
+                    }
+                    
+                    // Only update UI after successful API call
+                    if (onDelete) {
+                      onDelete(id);
+                    }
+                    
+                    // Update local state - don't call handlers.handleDeleteEvent as it'll already be gone
+                    // Just refresh events to get the latest state
+                    await handlers.refreshEvents();
+                    
+                    // Success notification
+                    toast.success("Event deleted successfully");
+                  } catch (error) {
+                    console.error("Error deleting event:", error);
+                    toast.error(error instanceof Error ? error.message : "Failed to delete event");
+                    
+                    // Always refresh events to ensure UI is in sync with server
+                    await handlers.refreshEvents();
+                  }
+                }}
+              >
+                Delete
+              </Button>
+            </div>
+          </div>
+        </CustomModal>
+      );
+    } catch (error) {
+      console.error("Error in deletion dialog:", error);
+      toast.error("An error occurred");
+      await handlers.refreshEvents();
     }
-    
-    // DO NOT call the API here - let the TeacherCalendarClient handle that
-    
-    // Success notification immediately for better UX
-    toast.success("Event deleted");
   };
 
   return (
@@ -181,14 +265,14 @@ export default function EventStyled({
           <div className="text-xs mb-1 opacity-90 truncate">{event.description}</div>
         )}
 
-        {!event.minmized &&
+        {/* {!event.minmized &&
            (
             <div className="flex flex-col text-xs opacity-90 mt-1">
               <div>
                 {formatDate(event.endDate)}
               </div>
             </div>
-          )}
+          )} */}
 
         {!event.minmized &&
           !["bill", "assignment"].includes(event.metadata?.type || "") && (

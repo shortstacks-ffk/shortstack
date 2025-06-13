@@ -1136,3 +1136,15 @@ body {
     overflow-x: hidden !important;
   }
 }
+
+/* Fix dialog overlays to ensure consistent transparency */
+.fixed.inset-0.z-50.bg-black\/80[data-state="open"] {
+  background-color: rgba(0, 0, 0, 0.2) !important;
+  backdrop-filter: blur(1px);
+}
+
+/* Specifically target the dialog overlay when used within AddBill */
+[role="dialog"] .fixed.inset-0.z-50.bg-black\/80 {
+  background-color: rgba(0, 0, 0, 0.2) !important;
+  backdrop-filter: blur(1px);
+}

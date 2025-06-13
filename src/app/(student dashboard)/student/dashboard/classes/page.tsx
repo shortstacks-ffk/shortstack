@@ -36,6 +36,17 @@ interface Class {
   overview?: string | null; // Added this property from the API response
 }
 
+interface JoinedClassData {
+  id: string;
+  name: string;
+  code: string;
+  emoji: string;
+  color?: string | null;
+  schedule?: string | any;
+  grade?: string | null;
+  createdAt: string; // Ensure createdAt is included
+}
+
 
 export default function StudentClassesPage() {
   const [loading, setLoading] = useState(true);
@@ -104,8 +115,8 @@ export default function StudentClassesPage() {
     } finally {
       setLoading(false);
     }
-  };
 
+  };
   useEffect(() => {
     if (status === "authenticated" && session?.user) {
       fetchClasses();
@@ -115,16 +126,24 @@ export default function StudentClassesPage() {
   }, [status, session]);
 
   // Handle newly joined class
-  const handleClassJoined = (newClass: Class) => {
+  const handleClassJoined = (data: JoinedClassData | null) => {
+    // Add null checks before accessing properties
+    if (!data || !data.schedule) {
+      console.warn("Missing schedule data:", data);
+      // Handle the missing schedule case gracefully
+      return;
+    }
+    
+    // Now safely access data.schedule
     // Check if the class already exists in the list
-    const classExists = classes.some(c => c.id === newClass.id);
+    const classExists = classes.some(c => c.id === data.id);
     
     if (!classExists) {
       // Add the new class to the list with a color and empty counts
       const colorIndex = classes.length % CLASS_COLORS.length;
       
       // Format the schedule if it's an array of objects
-      let schedule = newClass.schedule;
+      let schedule = data.schedule;
       if (Array.isArray(schedule)) {
         schedule = schedule.map(session => 
           `${session.day} ${session.startTime}-${session.endTime}`
@@ -132,10 +151,11 @@ export default function StudentClassesPage() {
       }
       
       const coloredClass = {
-        ...newClass,
-        color: newClass.color || CLASS_COLORS[colorIndex],
+        ...data,
+        color: data.color || CLASS_COLORS[colorIndex],
         schedule: schedule,
-        _count: { enrollments: 0 }
+        _count: { enrollments: 0 },
+        createdAt: new Date().toISOString() // Add createdAt with current date
       };
       setClasses(prevClasses => [...prevClasses, coloredClass]);
     }

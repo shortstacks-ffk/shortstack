@@ -21,32 +21,6 @@ const StudentBank = () => {
   const [isPayBillOpen, setIsPayBillOpen] = useState(false)
   const [showTransactions, setShowTransactions] = useState(false)
   const [showStatements, setShowStatements] = useState(false)
-  
-  const setupAccounts = async () => {
-    try {
-      console.log("Setting up new accounts...");
-      const response = await fetch('/api/student/banking/setup', {
-        method: 'POST',
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Setup failed:", response.status, errorText);
-        return false;
-      }
-      
-      const newAccounts = await response.json();
-      console.log("New accounts created:", newAccounts);
-      setAccounts(newAccounts);
-      
-      await fetchTransactions();
-      
-      return true;
-    } catch (error) {
-      console.error("Error setting up accounts:", error);
-      return false;
-    }
-  };
 
   const fetchAccounts = async () => {
     try {
@@ -54,19 +28,12 @@ const StudentBank = () => {
       
       if (!response.ok) {
         console.error('Fetch failed:', response.status, await response.text());
-        if (response.status === 404) {
-          return await setupAccounts();
-        }
         return;
       }
       
       const data = await response.json();
-      if (data.length === 0) {
-        return await setupAccounts();
-      } else {
-        setAccounts(data);
-        await fetchTransactions();
-      }
+      setAccounts(data);
+      await fetchTransactions();
     } catch (error) {
       console.error("Failed to fetch accounts:", error);
     } finally {
@@ -93,12 +60,12 @@ const StudentBank = () => {
 
   useEffect(() => {
     if (session?.user) {
-      console.log("Student session info:", {
-        id: session.user.id,
-        email: session.user.email,
-        role: session.user.role,
-        name: session.user.name
-      });
+      // console.log("Student session info:", {
+      //   id: session.user.id,
+      //   email: session.user.email,
+      //   role: session.user.role,
+      //   name: session.user.name
+      // });
       fetchAccounts();
     }
   }, [session]);
@@ -205,6 +172,27 @@ const StudentBank = () => {
   }
 
   const renderAccountOverview = () => {
+    // Display message if no accounts found
+    if (accounts.length === 0) {
+      return (
+        <div className="text-center py-12 bg-white rounded-lg shadow-sm border">
+          <div className="p-4">
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No bank accounts found</h3>
+            <p className="text-gray-600 mb-4">
+              Your teacher needs to set up your bank accounts. Please contact your teacher for assistance.
+            </p>
+            <button
+              onClick={refreshAccounts}
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+            >
+              <RefreshCcw size={16} className="mr-2" />
+              Check Again
+            </button>
+          </div>
+        </div>
+      );
+    }
+    
     return (
       <div className="mb-8">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
@@ -261,8 +249,8 @@ const StudentBank = () => {
         
         <Accordion type="single" collapsible defaultValue="recent-transactions" className="mt-8">
           <AccordionItem value="recent-transactions" className="border-none">
-            <AccordionTrigger className="bg-orange-500 text-white p-4 rounded-t-lg hover:no-underline hover:bg-orange-600">
-              <div className="flex justify-between items-center w-full">
+            <AccordionTrigger className="bg-orange-500 text-white p-2 rounded-full hover:no-underline">
+              <div className="flex justify-between items-center w-full pr-2">
                 <h3 className="text-lg font-semibold">Recent Transactions</h3>
                 <div 
                   onClick={(e) => {
@@ -286,46 +274,48 @@ const StudentBank = () => {
                   No transactions yet
                 </div>
               ) : (
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b bg-orange-500">
-                      <th className="py-2 px-4 text-left text-white font-medium">Title</th>
-                      <th className="py-2 px-4 text-left text-white font-medium">Type</th>
-                      <th className="py-2 px-4 text-center text-white font-medium">Amount</th>
-                      <th className="py-2 px-4 text-left text-white font-medium">Account</th>
-                      <th className="py-2 px-4 text-center text-white font-medium">Date</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {transactions.slice(0, 3).map((transaction, index) => {
-                      const displayType = getDisplayTransactionType(transaction);
-                      const transactionColor = getTransactionColor(transaction);
-                      const badgeBackground = getBadgeBackgroundColor(transaction);
-                      
-                      return (
-                        <tr key={transaction.id || index} className="border-b hover:bg-muted/50">
-                          <td className="py-3 px-4">
-                            {transaction.description || "The Value of Saving"}
-                          </td>
-                          <td className={`py-3 px-4 ${transactionColor}`}>
-                            {displayType}
-                          </td>
-                          <td className="py-3 px-4 text-center">
-                            <span className={`inline-flex px-3 py-1 rounded-full font-medium ${badgeBackground} ${transactionColor}`}>
-                              {formatTransactionAmount(transaction)}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4">
-                            {getAccountTypeByID(transaction.accountId)}
-                          </td>
-                          <td className="py-3 px-4 text-center text-sm">
-                            {format(new Date(transaction.createdAt), 'MM/dd/yyyy')}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                <div className="w-full overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b bg-gray-300 w-full">
+                        <th className="py-2 px-4 text-left font-medium">Title</th>
+                        <th className="py-2 px-4 text-left font-medium">Type</th>
+                        <th className="py-2 px-4 text-center font-medium">Amount</th>
+                        <th className="py-2 px-4 text-left font-medium">Account</th>
+                        <th className="py-2 px-4 text-center font-medium">Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {transactions.slice(0, 3).map((transaction, index) => {
+                        const displayType = getDisplayTransactionType(transaction);
+                        const transactionColor = getTransactionColor(transaction);
+                        const badgeBackground = getBadgeBackgroundColor(transaction);
+                        
+                        return (
+                          <tr key={transaction.id || index} className="border-b hover:bg-muted/50">
+                            <td className="py-3 px-4">
+                              {transaction.description || "The Value of Saving"}
+                            </td>
+                            <td className={`py-3 px-4 ${transactionColor}`}>
+                              {displayType}
+                            </td>
+                            <td className="py-3 px-4 text-center">
+                              <span className={`inline-flex px-3 py-1 rounded-full font-medium ${badgeBackground} ${transactionColor}`}>
+                                {formatTransactionAmount(transaction)}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4">
+                              {getAccountTypeByID(transaction.accountId)}
+                            </td>
+                            <td className="py-3 px-4 text-center text-sm">
+                              {format(new Date(transaction.createdAt), 'MM/dd/yyyy')}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </AccordionContent>
           </AccordionItem>

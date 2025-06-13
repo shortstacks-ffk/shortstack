@@ -14,20 +14,30 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Get teacher record
+    const teacher = await db.teacher.findUnique({
+      where: { userId: session.user.id },
+      select: { id: true },
+    });
+
+    if (!teacher) {
+      return NextResponse.json(
+        { error: "Teacher profile not found" },
+        { status: 404 }
+      );
+    }
+
     // Await the params to properly access studentId
     const { studentId } = await context.params;
 
-    // Check if the teacher has access to this student through a class
-    const hasAccess = await db.class.findFirst({
+    // Check if the teacher has access to this student through enrollment
+    const hasAccess = await db.enrollment.findFirst({
       where: {
-        userId: session.user.id,
-        enrollments: {
-          some: {
-            student: {
-              id: studentId,
-            },
-          },
+        studentId: studentId,
+        class: {
+          teacherId: teacher.id,
         },
+        enrolled: true,
       },
     });
 
