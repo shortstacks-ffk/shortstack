@@ -46,8 +46,9 @@ interface StudentBill {
   paidAmount?: number;
   student: {
     id: string;
-    name: string;
-    email: string;
+    firstName: string;
+    lastName: string;
+    schoolEmail?: string;
     class?: {
       id: string;
       name: string;
@@ -585,9 +586,9 @@ export function BillDetailClient({ bill }: BillDetailClientProps) {
                                   <tbody className="divide-y">
                                     {studentsByClass[className].students.map((studentBill: StudentBill) => (
                                       <tr key={studentBill.studentId} className="hover:bg-gray-50">
-                                        <td className="py-3 px-4">{studentBill.student.name}</td>
+                                        <td className="py-3 px-4">{studentBill.student.firstName} {studentBill.student.lastName}</td>
                                         <td className="py-3 px-4 text-gray-500">
-                                          {studentBill.student.email || "-"}
+                                          {studentBill.student.schoolEmail || "-"}
                                         </td>
                                         <td className="py-3 px-4">
                                           {studentBill.isPaid ? (
@@ -659,7 +660,7 @@ export function BillDetailClient({ bill }: BillDetailClientProps) {
                               <div className="flex-1">
                                 <div className="flex justify-between">
                                   <div>
-                                    <p className="font-medium">{studentBill.student.name}</p>
+                                    <p className="font-medium">{studentBill.student.firstName} {studentBill.student.lastName}</p>
                                     <p className="text-sm text-gray-500">
                                       {studentBill.student.class?.name || "No Class"} • {formatCurrency(bill.amount)}
                                     </p>
@@ -751,7 +752,8 @@ export function BillDetailClient({ bill }: BillDetailClientProps) {
         billTitle={bill.title}
         students={bill.students?.map((s: StudentBill) => ({
           id: s.studentId,
-          name: s.student.name,
+          firstName: s.student.firstName,
+          lastName: s.student.lastName,
           className: s.student.class?.name,
           isPaid: s.isPaid
         })) || []}

@@ -13,6 +13,8 @@ import { Loader2, AlertTriangle } from "lucide-react";
 interface StudentData {
   id: string;
   name: string;
+  firstName: string;
+  lastName: string;
   className?: string;
   isPaid?: boolean;
 }
@@ -113,7 +115,7 @@ export default function ExcludeStudentsDialog({
                       className="flex items-center cursor-pointer flex-1"
                       onClick={() => handleToggleStudent(student.id)}
                     >
-                      <span>{student.name}</span>
+                      <span>{student.firstName} {student.lastName}</span>
                       <span className="text-xs text-gray-500 ml-auto">
                         {student.className || "No class"}
                       </span>
