@@ -74,9 +74,9 @@ export default function StudentClassPage() {
         <h1 className="text-2xl font-bold mb-6">
           {classData.emoji} {classData.name}
         </h1>
-        <p className="mb-4 text-gray-600">
-          Teacher: {classData.user?.firstName || classData.user?.name || "Unknown"} {classData.user?.lastName || ""}
-        </p>
+        {/* <p className="mb-4 text-gray-600">
+          Teacher: {classData.teacher?.firstName || "Unknown"} {classData.teacher?.lastName || ""}
+        </p> */}
         <p className="mb-4 text-gray-600">
           Students: {classData._count?.enrollments || 0}
         </p>
