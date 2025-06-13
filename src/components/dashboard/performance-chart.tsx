@@ -1,47 +1,24 @@
-"use client"
+"use client";
 
-// Generate mock data for classes
-const generateClassScoreData = (color: string) => {
-  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  
-  // Different patterns for different classes (following the screenshot)
-  let baseScores;
-  switch(color) {
-    case "primary": // blue line
-      baseScores = [15, 32, 50, 45, 47, 50, 62, 63, 68, 65, 45, 90];
-      break;
-    case "secondary": // purple/pink line
-      baseScores = [18, 34, 51, 50, 52, 53, 60, 62, 69, 65, 47, 92];
-      break;
-    case "destructive": // red/orange line
-      baseScores = [6, 24, 42, 41, 43, 40, 46, 52, 53, 56, 38, 80];
-      break;
-    case "success": // green line
-      baseScores = [20, 33, 29, 32, 46, 36, 65, 58, 61, 53, 41, 81];
-      break;
-    case "warning": // yellow line
-      baseScores = [12, 30, 45, 37, 43, 43, 50, 51, 57, 50, 40, 78];
-      break;
-    default:
-      baseScores = [15, 30, 48, 43, 45, 48, 60, 60, 65, 63, 40, 85];
-  }
-  
-  return months.map((month, i) => ({
-    month,
-    score: baseScores[i]
-  }));
-};
+import { useEffect, useState } from "react";
+import { getTeacherClassesPerformance } from "@/src/app/actions/gradebookActions";
+import { Card, CardContent } from "@/src/components/ui/card";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/src/components/ui/tooltip";
 
-// Get color for class
 const getColorForClass = (color: string) => {
-  switch(color) {
-    case "primary": return "#3b82f6"; // blue
-    case "secondary": return "#ec4899"; // pink (magenta)
-    case "destructive": return "#f97316"; // orange
-    case "success": return "#22c55e"; // green
-    case "warning": return "#eab308"; // yellow
-    default: return "#3b82f6"; // default blue
-  }
+  const colors: Record<string, string> = {
+    primary: "#3b82f6", // blue
+    secondary: "#ec4899", // pink
+    destructive: "#f97316", // orange
+    success: "#22c55e", // green
+    warning: "#eab308", // yellow
+  };
+  return colors[color] || "#3b82f6";
 };
 
 interface ClassData {
@@ -49,6 +26,9 @@ interface ClassData {
   name: string;
   emoji: string;
   color?: string;
+  averageGrade: number;
+  totalStudents: number;
+  studentsWithGrades: number;
 }
 
 interface PerformanceChartProps {
@@ -56,105 +36,128 @@ interface PerformanceChartProps {
 }
 
 export function PerformanceChart({ recentClasses }: PerformanceChartProps) {
-  // Generate data for each class
-  const classesWithData = recentClasses.map(cls => ({
-    ...cls,
-    data: generateClassScoreData(cls.color || "primary"),
-    color: getColorForClass(cls.color || "primary")
-  }));
-  
-  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  
-  // Create array with intervals of 10 for Y-axis
-  const yAxisValues = Array.from({ length: 11 }, (_, i) => 100 - i * 10);
-  
-  return (
-    <div className="w-full h-full py-2">
-      {/* Chart container with padding and height constraints - increased height */}
-      <div className="bg-white rounded-lg w-full h-[40vh] p-4">
-        <div className="relative w-full h-full">
-          {/* Y-axis labels with intervals of 10 */}
-          <div className="absolute left-0 top-0 h-full flex flex-col justify-between text-xs text-gray-500 pr-2">
-            {yAxisValues.map(val => (
-              <div key={val} className="relative" style={{ height: '0', transform: 'translateY(-50%)' }}>
-                {val}
-              </div>
-            ))}
+  const [classData, setClassData] = useState<ClassData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadPerformanceData();
+  }, []);
+
+  const loadPerformanceData = async () => {
+    try {
+      const response = await getTeacherClassesPerformance();
+      if (response.success && response.data) {
+        setClassData(response.data.classes);
+      } else {
+        setError(response.error || "Failed to load performance data");
+      }
+    } catch (err) {
+      setError("Error loading performance data");
+      console.error("Performance data error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="w-full py-2">
+        <Card className="h-[40vh] flex items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-orange-500 border-t-transparent" />
+        </Card>
+      </div>
+    );
+  }
+
+  if (error || classData.length === 0) {
+    return (
+      <div className="w-full py-2">
+        <Card className="h-[40vh] flex items-center justify-center text-center px-6">
+          <div>
+            <p className="text-gray-500 font-medium mb-2">
+              No performance data
+            </p>
+            <p className="text-sm text-gray-400">
+              {error ||
+                "Add classes and assignments to view class performance."}
+            </p>
           </div>
-          
-          {/* Chart area */}
-          <div className="absolute left-8 top-0 right-4 bottom-8 overflow-hidden">
-            {/* Grid lines - increased to 11 lines for intervals of 10 */}
-            <div className="absolute inset-0">
-              {yAxisValues.map((val, i) => (
-                <div 
-                  key={`grid-${i}`}
-                  className="absolute border-t border-gray-100 w-full"
-                  style={{ top: `${i * 10}%`, left: 0 }}
+        </Card>
+      </div>
+    );
+  }
+
+  const yAxisMarkers = [100, 80, 60, 40, 20, 0];
+
+  return (
+    <div className="w-full py-2">
+      <div className="mb-4">
+        <h4 className="text-lg font-semibold text-gray-900">Class Averages</h4>
+      </div>
+
+      <div className="relative h-64 overflow-x-auto">
+        {/* Y-axis markers */}
+        <div className="absolute left-0 top-0 bottom-0 w-12 flex flex-col justify-between text-xs text-gray-400 py-1">
+          {yAxisMarkers.map((val) => (
+            <div key={val} className="flex items-center justify-end pr-2 h-4">
+              <span>{val}%</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Chart area */}
+        <div className="pl-12 h-full">
+          <div className="relative h-full w-max min-w-full">
+            {/* Grid lines */}
+            <div className="absolute inset-0 pointer-events-none">
+              {yAxisMarkers.map((percent, index) => (
+                <div
+                  key={`grid-${percent}`}
+                  className="absolute border-t border-gray-200 w-full"
+                  style={{
+                    top: `${(index / (yAxisMarkers.length - 1)) * 100}%`,
+                  }}
                 />
               ))}
             </div>
-            
-            {/* SVG chart with fixed viewBox */}
-            <svg 
-              className="absolute inset-0 w-full h-full" 
-              viewBox="0 0 1100 500"
-              preserveAspectRatio="none"
-            >
-              {classesWithData.map(cls => (
-                <g key={cls.id}>
-                  {/* Connected line */}
-                  <path 
-                    d={cls.data.map((point, i) => {
-                      const x = (i * 100) + 10;
-                      // Invert Y coordinate (SVG 0 is at top)
-                      const y = 500 - ((point.score / 100) * 500);
-                      return `${i === 0 ? 'M' : 'L'}${x},${y}`;
-                    }).join(' ')}
-                    fill="none"
-                    stroke={cls.color}
-                    strokeWidth="3"
-                    strokeLinejoin="round"
-                    strokeLinecap="round"
-                  />
-                  
-                  {/* Data points */}
-                  {cls.data.map((point, i) => (
-                    <circle 
-                      key={`point-${i}`}
-                      cx={(i * 100) + 10}
-                      cy={500 - ((point.score / 100) * 500)}
-                      r="5"
-                      fill="white"
-                      stroke={cls.color}
-                      strokeWidth="3"
-                    />
-                  ))}
-                </g>
-              ))}
-            </svg>
-          </div>
-          
-          {/* X-axis labels */}
-          <div className="absolute left-8 right-4 bottom-0 flex justify-between text-xs text-gray-500">
-            {months.map(month => (
-              <div key={month}>{month}</div>
-            ))}
-          </div>
-          
-          {/* Legend */}
-          <div className="absolute left-8 right-0 -bottom-6 flex justify-center gap-6">
-            {classesWithData.map(cls => (
-              <div key={cls.id} className="flex items-center">
-                <span 
-                  className="w-3 h-3 rounded-full mr-2"
-                  style={{ backgroundColor: cls.color }}
-                />
-                <span className="text-xs flex items-center">
-                  {cls.emoji} {cls.name}
-                </span>
+
+            <div className="relative h-full flex gap-6 items-end px-4">
+                {classData.map((cls) => {
+                  const classColor = getColorForClass(cls.color || "primary");
+                  const barHeight = `${(cls.averageGrade / 100) * 200}px`;
+
+                  return (
+                    <TooltipProvider key={cls.id}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="flex flex-col items-center w-16 group">
+                            <div className="relative w-full h-[200px] flex items-end justify-center">
+                              <div
+                                className="w-10 rounded-t-md transition-all duration-300 shadow-sm"
+                                style={{
+                                  height: barHeight,
+                                  backgroundColor: classColor,
+                                  minHeight: cls.averageGrade > 0 ? "4px" : "0",
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" align="center">
+                          <p className="text-sm font-semibold">
+                            {cls.emoji} {cls.name}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {cls.averageGrade}% average<br />
+                            {cls.studentsWithGrades}/{cls.totalStudents} graded
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  );
+                })}
               </div>
-            ))}
           </div>
         </div>
       </div>

@@ -573,7 +573,7 @@ export async function deleteAssignment(id: string): Promise<AssignmentResponse> 
   }
 }
 
-// Submit an assignment
+// Submit an assignment - updated to work with lesson plan relationships
 export async function submitAssignment(formData: FormData): Promise<AssignmentResponse> {
   try {
     const session = await getAuthSession();
@@ -595,23 +595,31 @@ export async function submitAssignment(formData: FormData): Promise<AssignmentRe
       return { success: false, error: 'Missing assignment ID' };
     }
     
-    // Check if the assignment exists and student has access
+    // Check if the assignment exists and student has access through lesson plans
     const assignment = await db.assignment.findFirst({
       where: {
         id: assignmentId,
-        classes: {
+        lessonPlans: {
           some: {
-            enrollments: {
+            classes: {
               some: {
-                studentId: student.id,
-                enrolled: true
+                enrollments: {
+                  some: {
+                    studentId: student.id,
+                    enrolled: true
+                  }
+                }
               }
             }
           }
         }
       },
       include: { 
-        classes: true,
+        lessonPlans: {
+          include: {
+            classes: true
+          }
+        },
         teacher: true
       }
     });
@@ -670,56 +678,9 @@ export async function submitAssignment(formData: FormData): Promise<AssignmentRe
       });
     }
 
-    // Create or update a calendar event for this submission
-    try {
-      const teacherId = assignment.teacher.id;
-      
-      if (teacherId) {
-        // First check if there's an existing calendar event
-        const existingEvent = await db.calendarEvent.findFirst({
-          where: {
-            assignmentId,
-            studentId: student.id,
-            title: { contains: 'Submitted:' }
-          }
-        });
-
-        const eventTitle = `Submitted: ${assignment.name}`;
-        const eventDescription = `Assignment submitted by student on ${new Date().toLocaleString()}`;
-        
-        if (existingEvent) {
-          // Update existing event
-          await db.calendarEvent.update({
-            where: { id: existingEvent.id },
-            data: {
-              description: eventDescription,
-              updatedAt: new Date()
-            }
-          });
-        } else {
-          // Create new event
-          await db.calendarEvent.create({
-            data: {
-              title: eventTitle,
-              description: eventDescription,
-              startDate: new Date(),
-              endDate: new Date(new Date().getTime() + 60 * 60 * 1000), // 1 hour duration
-              isRecurring: false,
-              createdById: teacherId,
-              assignmentId,
-              studentId: student.id,
-              variant: "success"
-            }
-          });
-        }
-      }
-    } catch (error) {
-      console.error('Error updating calendar event for submission:', error);
-      // Don't fail the submission if the calendar event fails
-    }
-
     // Revalidate relevant paths for all classes this assignment belongs to
-    for (const classObj of assignment.classes) {
+    const allClasses = assignment.lessonPlans.flatMap(lp => lp.classes);
+    for (const classObj of allClasses) {
       revalidatePath(`/student/dashboard/classes/${classObj.code}`);
     }
     revalidatePath(`/student/dashboard/assignments`);
@@ -787,17 +748,20 @@ export async function getStudentAssignment(assignmentId: string): Promise<Assign
         }
       });
 
-      // Return assignment data with submission details
+      // Return assignment data with submission details - include ALL fields
       return { 
         success: true, 
         data: {
           id: assignment.id,
           name: assignment.name,
-          description: assignment.description || '',
+          description: assignment.description, // Make sure this is included
+          textAssignment: assignment.textAssignment, // Make sure this is included
+          rubric: assignment.rubric, // Make sure this is included
           dueDate: assignment.dueDate,
           activity: assignment.activity || "Assignment",
           fileType: assignment.fileType,
           url: assignment.url,
+          size: assignment.size,
           // Include submission details if available
           submission: submission || null,
           grade: submission?.grade || null,
@@ -836,17 +800,20 @@ export async function getStudentAssignment(assignmentId: string): Promise<Assign
         orderBy: { updatedAt: 'desc' }
       });
 
-      // Return assignment data with all submissions
+      // Return assignment data with all submissions - include ALL fields
       return { 
         success: true, 
         data: {
           id: assignment.id,
           name: assignment.name,
-          description: assignment.description || '',
+          description: assignment.description, // Make sure this is included
+          textAssignment: assignment.textAssignment, // Make sure this is included
+          rubric: assignment.rubric, // Make sure this is included
           dueDate: assignment.dueDate,
           activity: assignment.activity || "Assignment",
           fileType: assignment.fileType,
           url: assignment.url,
+          size: assignment.size,
           submissions: submissions
         } 
       };
