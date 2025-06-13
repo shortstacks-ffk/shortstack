@@ -849,15 +849,14 @@ export async function getStudentAssignment(assignmentId: string): Promise<Assign
         data: {
           id: assignment.id,
           name: assignment.name,
-          description: assignment.description, // Make sure this is included
-          textAssignment: assignment.textAssignment, // Make sure this is included
-          rubric: assignment.rubric, // Make sure this is included
+          description: assignment.description, 
+          textAssignment: assignment.textAssignment, 
+          rubric: assignment.rubric, 
           dueDate: assignment.dueDate,
           activity: assignment.activity || "Assignment",
           fileType: assignment.fileType,
           url: assignment.url,
-          size: assignment.size
-          textAssignment: assignment.textAssignment,
+          size: assignment.size,
           submission: submission || null,
           grade: submission?.grade || null,
           submittedAt: submission?.createdAt || null,
@@ -901,15 +900,14 @@ export async function getStudentAssignment(assignmentId: string): Promise<Assign
         data: {
           id: assignment.id,
           name: assignment.name,
-          description: assignment.description, // Make sure this is included
-          textAssignment: assignment.textAssignment, // Make sure this is included
-          rubric: assignment.rubric, // Make sure this is included
+          description: assignment.description, 
+          textAssignment: assignment.textAssignment, 
+          rubric: assignment.rubric, 
           dueDate: assignment.dueDate,
           activity: assignment.activity || "Assignment",
           fileType: assignment.fileType,
           url: assignment.url,
           size: assignment.size,
-          textAssignment: assignment.textAssignment,
           submissions: submissions
         } 
       };
