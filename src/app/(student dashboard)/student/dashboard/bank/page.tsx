@@ -249,8 +249,8 @@ const StudentBank = () => {
         
         <Accordion type="single" collapsible defaultValue="recent-transactions" className="mt-8">
           <AccordionItem value="recent-transactions" className="border-none">
-            <AccordionTrigger className="bg-orange-500 text-white p-4 rounded-t-lg hover:no-underline hover:bg-orange-600">
-              <div className="flex justify-between items-center w-full">
+            <AccordionTrigger className="bg-orange-500 text-white p-2 rounded-full hover:no-underline">
+              <div className="flex justify-between items-center w-full pr-2">
                 <h3 className="text-lg font-semibold">Recent Transactions</h3>
                 <div 
                   onClick={(e) => {
@@ -274,46 +274,48 @@ const StudentBank = () => {
                   No transactions yet
                 </div>
               ) : (
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b bg-orange-500">
-                      <th className="py-2 px-4 text-left text-white font-medium">Title</th>
-                      <th className="py-2 px-4 text-left text-white font-medium">Type</th>
-                      <th className="py-2 px-4 text-center text-white font-medium">Amount</th>
-                      <th className="py-2 px-4 text-left text-white font-medium">Account</th>
-                      <th className="py-2 px-4 text-center text-white font-medium">Date</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {transactions.slice(0, 3).map((transaction, index) => {
-                      const displayType = getDisplayTransactionType(transaction);
-                      const transactionColor = getTransactionColor(transaction);
-                      const badgeBackground = getBadgeBackgroundColor(transaction);
-                      
-                      return (
-                        <tr key={transaction.id || index} className="border-b hover:bg-muted/50">
-                          <td className="py-3 px-4">
-                            {transaction.description || "The Value of Saving"}
-                          </td>
-                          <td className={`py-3 px-4 ${transactionColor}`}>
-                            {displayType}
-                          </td>
-                          <td className="py-3 px-4 text-center">
-                            <span className={`inline-flex px-3 py-1 rounded-full font-medium ${badgeBackground} ${transactionColor}`}>
-                              {formatTransactionAmount(transaction)}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4">
-                            {getAccountTypeByID(transaction.accountId)}
-                          </td>
-                          <td className="py-3 px-4 text-center text-sm">
-                            {format(new Date(transaction.createdAt), 'MM/dd/yyyy')}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                <div className="w-full overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b bg-gray-300 w-full">
+                        <th className="py-2 px-4 text-left font-medium">Title</th>
+                        <th className="py-2 px-4 text-left font-medium">Type</th>
+                        <th className="py-2 px-4 text-center font-medium">Amount</th>
+                        <th className="py-2 px-4 text-left font-medium">Account</th>
+                        <th className="py-2 px-4 text-center font-medium">Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {transactions.slice(0, 3).map((transaction, index) => {
+                        const displayType = getDisplayTransactionType(transaction);
+                        const transactionColor = getTransactionColor(transaction);
+                        const badgeBackground = getBadgeBackgroundColor(transaction);
+                        
+                        return (
+                          <tr key={transaction.id || index} className="border-b hover:bg-muted/50">
+                            <td className="py-3 px-4">
+                              {transaction.description || "The Value of Saving"}
+                            </td>
+                            <td className={`py-3 px-4 ${transactionColor}`}>
+                              {displayType}
+                            </td>
+                            <td className="py-3 px-4 text-center">
+                              <span className={`inline-flex px-3 py-1 rounded-full font-medium ${badgeBackground} ${transactionColor}`}>
+                                {formatTransactionAmount(transaction)}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4">
+                              {getAccountTypeByID(transaction.accountId)}
+                            </td>
+                            <td className="py-3 px-4 text-center text-sm">
+                              {format(new Date(transaction.createdAt), 'MM/dd/yyyy')}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </AccordionContent>
           </AccordionItem>

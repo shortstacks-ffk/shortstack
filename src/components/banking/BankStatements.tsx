@@ -79,7 +79,7 @@ export default function BankStatements({ accounts }: BankStatementsProps) {
     { name: "February", abbr: "FEB.", index: 1 },
     { name: "March", abbr: "MAR.", index: 2 },
     { name: "April", abbr: "APR.", index: 3 },
-    { name: "May", abbr: "MAY", index: 4 },
+    { name: "May", abbr: "MAY.", index: 4 },
     { name: "June", abbr: "JUN.", index: 5 },
     { name: "July", abbr: "JUL.", index: 6 },
     { name: "August", abbr: "AUG.", index: 7 },
@@ -170,7 +170,7 @@ export default function BankStatements({ accounts }: BankStatementsProps) {
             value={selectedAccountId} 
             onValueChange={setSelectedAccountId}
           >
-            <SelectTrigger className="w-full sm:w-[180px] border-orange-500 text-orange-500">
+            <SelectTrigger className="w-full sm:w-[180px] border-orange-500 text-orange-500 rounded-xl">
               <SelectValue placeholder="Select account" />
             </SelectTrigger>
             <SelectContent>
@@ -188,7 +188,7 @@ export default function BankStatements({ accounts }: BankStatementsProps) {
             value={selectedYear} 
             onValueChange={setSelectedYear}
           >
-            <SelectTrigger className="w-full sm:w-[180px] border-orange-500 text-orange-500">
+            <SelectTrigger className="w-full sm:w-[180px] border-orange-500 text-orange-500 rounded-xl">
               <SelectValue placeholder={selectedYear} />
             </SelectTrigger>
             <SelectContent>
@@ -206,46 +206,90 @@ export default function BankStatements({ accounts }: BankStatementsProps) {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
             {months.map((month) => {
               const disabled = isDisabled(month.index, month.name);
               const isLoading = isDownloading === month.name;
-              const statusColor = disabled ? 'text-gray-400' : 'text-green-700';
               
               return (
                 <div 
                   key={month.abbr}
-                  className={`border rounded-lg overflow-hidden ${disabled ? 'opacity-50' : 'hover:shadow-md transition-all cursor-pointer'}`}
+                  className={`relative w-[140px] h-[125px] mx-auto group ${disabled ? 'opacity-1' : 'cursor-pointer hover:scale-105 transition-all'}`}
                   onClick={() => !disabled && !isLoading && handleDownloadStatement(month.name, month.index)}
                 >
-                  <div className={`bg-green-50 border-b p-3 flex items-center justify-between`}>
-                    <div className="flex items-center">
-                      <Calendar className={`h-5 w-5 ${statusColor} mr-2`} />
-                      <div className="font-medium truncate">{month.name}</div>
-                    </div>
-                    <div className="text-xs text-gray-500">{selectedYear}</div>
-                  </div>
-                  
-                  <div className="p-4">
-                    <div className="text-sm text-gray-600 mb-2">
-                      {getAccountName(selectedAccountId)} Statement
+                  {/* Main container with proper folder shape */}
+                  <div className="w-full h-full relative bg-transparent">
+                    {/* Folder back - the dark green part with tab */}
+                    <div className="absolute top-0 left-0 w-full h-full">
+                      {/* Tab part */}
+                      <div 
+                        className="absolute top-0 left-0 w-[40px] h-[26px] rounded-xl"
+                        style={{ background: '#075D31' }}
+                      />
+                      
+                      
+                      {/* Main back part extending to right */}
+                      <div 
+                        className="absolute top-4 left-[40px] right-0 w-[100px] h-[30px] rounded-xl"
+                        style={{ background: '#075D31' }}
+                      />
+
+
+
+                       <svg className="w-full h-20 rounded-xl" viewBox="0 0 200 40" preserveAspectRatio="none">
+                    <path
+                      d="M0,0 
+                        H50 
+                        C70,0 90,30 110,30 
+                        H200 
+                        V40 
+                        H0 
+                        Z"
+                      fill="#075D31"
+                    />
+                  </svg>
                     </div>
                     
-                    {disabled ? (
-                      <div className="flex items-center text-xs text-amber-600 mt-2">
-                        <AlertCircle className="h-3 w-3 mr-1" />
-                        {parseInt(selectedYear) > currentYear || 
-                          (parseInt(selectedYear) === currentYear && month.index > currentMonth) 
-                          ? 'Not yet available'
-                          : 'No transactions'}
-                      </div>
-                    ) : (
-                      <div className="flex justify-end mt-2">
-                        {isLoading ? (
-                          <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
-                        ) : (
-                          <Download className="h-4 w-4 text-blue-600" />
-                        )}
+                    {/* Front folder - the light green part that covers most of the folder */}
+                    <div 
+                      className="absolute top-[24px] left-0 right-0 bottom-0 rounded-xl"
+                      style={{ 
+                        background: 'linear-gradient(180deg, #72E2AD 0%, #3FCD89 100%)',
+                        boxShadow: 'inset 0px -32px 128px rgba(0, 133, 70, 0.30), inset 0px 6px 8px rgba(255, 255, 255, 0.30)'
+                      }}
+                    />
+                    
+                    {/* Shadow only below the folder */}
+                    <div className="absolute -bottom-3 left-0 right-0 h-6 rounded-full bg-black/20 blur-md -z-10" />
+                    
+                    {/* Horizontal line shadows at bottom */}
+                    <div className="absolute bottom-[15px] left-0 right-0 h-[1px] bg-gradient-to-b from-black/5 to-transparent" />
+                    <div className="absolute bottom-[10px] left-0 right-0 h-[1px] bg-gradient-to-b from-black/5 to-transparent" />
+                    <div className="absolute bottom-[5px] left-0 right-0 h-[1px] bg-gradient-to-b from-black/5 to-transparent" />
+                    
+                    {/* Month text - top left aligned */}
+                    <div className="absolute top-[34px] left-[22px] text-left text-white text-2xl font-medium">
+                      {month.abbr}
+                    </div>
+                    
+                    {/* Download icon - centered and below month text */}
+                    <div className="absolute inset-x-0 bottom-[25px] flex justify-center items-center">
+                      {isLoading ? (
+                        <Loader2 className="h-10 w-10 text-white animate-spin" />
+                      ) : (
+                        <Download className="h-10 w-10 text-white" strokeWidth={1.5} />
+                      )}
+                    </div>
+                    
+                    {/* Hover overlay for disabled states */}
+                    {disabled && (
+                      <div className="absolute inset-0 bg-gray-800 bg-opacity-0 rounded-md flex items-center justify-center opacity-0 group-hover:bg-opacity-50 group-hover:opacity-100 transition-all">
+                        <div className="bg-white/80 px-3 py-1 rounded-md text-sm font-medium text-gray-800">
+                          {parseInt(selectedYear) > currentYear || 
+                            (parseInt(selectedYear) === currentYear && month.index > currentMonth) 
+                            ? 'Not Available'
+                            : 'No Data'}
+                        </div>
                       </div>
                     )}
                   </div>

@@ -75,20 +75,25 @@ const TransactionHistory = ({ accounts }: TransactionHistoryProps) => {
     return matchesType && matchesSearch
   })
   
-  // Determine the display type based on transaction type and direction
+  // Determine the display type based on transaction description and type
   const getDisplayTransactionType = (transaction: any) => {
+    // Check if this is a transfer transaction
+    if (transaction.description.startsWith("Transfer")) {
+      // If it's a transfer TO somewhere, it's a withdrawal
+      if (transaction.description.startsWith("Transfer to")) {
+        return "Withdrawn";
+      }
+      // If it's a transfer FROM somewhere, it's a deposit
+      else if (transaction.description.startsWith("Transfer from")) {
+        return "Deposit";
+      }
+    }
+    
+    // Fall back to transaction type if not a transfer or can't determine direction
     if (transaction.transactionType === "DEPOSIT") {
       return "Deposit";
     } else if (transaction.transactionType === "WITHDRAWAL") {
       return "Withdrawn";
-    } else if (transaction.transactionType === "TRANSFER_OUT") {
-      // For transfers from checking to savings, show as "Withdrawn"
-      if (transaction.description?.includes("Transfer from Checking to Savings")) {
-        return "Withdrawn";
-      }
-      return "Transfer";
-    } else if (transaction.transactionType === "TRANSFER_IN") {
-      return "Transfer";
     } else {
       return transaction.transactionType;
     }
@@ -127,15 +132,16 @@ const TransactionHistory = ({ accounts }: TransactionHistoryProps) => {
   const formatTransactionAmount = (transaction: any) => {
     const displayType = getDisplayTransactionType(transaction);
     
-    switch (displayType) {
-      case "Deposit":
-        return `+${formatCurrency(transaction.amount)}`;
-      case "Withdrawn":
-        return `-${formatCurrency(transaction.amount)}`;
-      case "Transfer":
-        return `•${formatCurrency(transaction.amount)}`;
-      default:
-        return formatCurrency(transaction.amount);
+    // For deposits, show positive amount
+    if (displayType === "Deposit") {
+      return `+$${transaction.amount.toFixed(2)}`;
+    } 
+    // For withdrawals, show negative amount
+    else if (displayType === "Withdrawn") {
+      return `-$${transaction.amount.toFixed(2)}`;
+    } 
+    else {
+      return `$${transaction.amount.toFixed(2)}`;
     }
   };
   
