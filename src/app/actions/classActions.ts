@@ -82,13 +82,13 @@ async function createClassScheduleEvents(classData: any, schedules: any[], timeZ
       // Create a single recurring event with all selected days
       const eventTitle = `${classData.emoji} ${classData.name} Class`;
       
-      // Convert start/end times to proper date objects
+      // Convert start/end times to proper date objects preserving local time
       const startHour = parseInt(schedule.startTime.split(':')[0]);
       const startMinute = parseInt(schedule.startTime.split(':')[1]);
       const endHour = parseInt(schedule.endTime.split(':')[0]);
       const endMinute = parseInt(schedule.endTime.split(':')[1]);
       
-      // Create dates in user's time zone
+      // Create dates with the specified times (these will be stored as the user intended)
       const startDate = new Date();
       startDate.setHours(startHour, startMinute, 0, 0);
       

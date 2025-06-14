@@ -86,6 +86,23 @@ export function createCalendarDisplayDate(dateStr: string | Date): Date {
   return date;
 }
 
+/**
+ * Creates a date with specific time in local timezone, preserving the intended time
+ */
+export function createLocalDateTime(dateStr: string, hours: number, minutes: number = 0): Date {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year, month - 1, day, hours, minutes, 0, 0);
+}
+
+/**
+ * Creates a date that represents the intended local time regardless of storage timezone
+ */
+export function createConsistentLocalTime(date: Date | string, hours: number, minutes: number = 0): Date {
+  const baseDate = typeof date === 'string' ? new Date(date) : new Date(date);
+  const localDate = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate(), hours, minutes, 0, 0);
+  return localDate;
+}
+
 // Add the formatClassSchedule function for consistent display
 const DaysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 

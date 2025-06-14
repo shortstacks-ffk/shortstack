@@ -142,6 +142,14 @@ export async function GET(request: Request) {
         return true;
       })
       .map(event => {
+        if (event.metadata && typeof event.metadata === 'object' && 'type' in event.metadata && event.metadata.type === 'assignment') {
+          return {
+            ...event,
+            startDate: event.startDate.toISOString(),
+            endDate:   event.endDate.toISOString()
+          };
+        }
+        
         // For bills, ensure they show at 12:00 PM - 12:59 PM
         if (event.metadata && typeof event.metadata === 'object' && 
             'type' in event.metadata && event.metadata.type === 'bill') {
@@ -174,7 +182,8 @@ export async function GET(request: Request) {
           };
         }
         
-        // For other events, use their original times
+        // For class sessions and other events, preserve their original stored times
+        // Don't modify these times as they should display as originally scheduled
         return {
           ...event,
           startDate: event.startDate.toISOString(),
