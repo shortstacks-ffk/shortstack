@@ -105,7 +105,6 @@ export default function StudentCalendarClient() {
           return true;
         })
         .map((event: any) => {
-          // For bills, we need special date handling for week view
           if (event.metadata?.type === "bill") {
             // Parse the original date but preserve the time set by the server
             const startDate = new Date(event.startDate);
@@ -132,44 +131,15 @@ export default function StudentCalendarClient() {
               },
             } as Event;
           } 
-          // For assignments
           else if (event.metadata?.type === "assignment") {
-            const date = new Date(event.startDate);
-            
-            // Set assignments to show all day (00:00 to 23:59)
-            const startDate = new Date(
-              date.getFullYear(),
-              date.getMonth(),
-              date.getDate(),
-              0, 0, 0
-            );
-            
-            const endDate = new Date(
-              date.getFullYear(),
-              date.getMonth(),
-              date.getDate(),
-              23, 59, 59
-            );
-
+            // use the real stored instants
             return {
-              id: event.id,
-              title: event.title,
-              description: event.description || "",
-              startDate: startDate,
-              endDate: endDate,
+              ...event,
+              startDate: new Date(event.startDate),
+              endDate:   new Date(event.endDate),
               variant: event.variant || "primary",
-              isRecurring: event.isRecurring === true,
-              recurringDays: event.recurringDays || [],
-              recurrenceType: event.recurrenceType,
-              recurrenceInterval: event.recurrenceInterval,
-              monthlyDate: event.monthlyDate,
-              yearlyMonth: event.yearlyMonth,
-              yearlyDate: event.yearlyDate,
-              metadata: {
-                ...event.metadata,
-                isAllDay: true,
-                originalDueDate: event.metadata.dueDate
-              },
+              isAllDay: false,
+              metadata: { ...event.metadata }
             } as Event;
           } 
           // For regular events (classes, etc.)

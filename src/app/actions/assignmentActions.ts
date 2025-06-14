@@ -131,26 +131,24 @@ export async function createAssignment(data: AssignmentData): Promise<Assignment
       return { success: false, error: 'Some lesson plans not found or you do not have permission' };
     }
     
-    // Fix the date handling - create the date in UTC to prevent timezone shift
-    let dueDate = undefined;
+    // Fix the date handling - store the assignment due at the user's intended time
+    let dueDate: Date | undefined;
     if (data.dueDate) {
       if (typeof data.dueDate === 'string') {
-        // Parse the date string and create a UTC date at 8:00 PM
         const [year, month, day] = data.dueDate.split('-').map(Number);
-        dueDate = new Date(Date.UTC(year, month - 1, day, 20, 0, 0, 0)); // Create in UTC
+        // create a UTC instant at 20:00 local‐equivalent with no shift
+        dueDate = new Date(Date.UTC(year, month - 1, day, 20, 0, 0, 0));
       } else {
         dueDate = new Date(data.dueDate);
-        // Convert to UTC equivalent of 8:00 PM local time
-        const utcDate = new Date(Date.UTC(
+        // likewise shift into UTC slot 20:00
+        dueDate = new Date(Date.UTC(
           dueDate.getFullYear(),
           dueDate.getMonth(),
           dueDate.getDate(),
-          20, 0, 0, 0
+          20, 0, 0
         ));
-        dueDate = utcDate;
       }
       console.log('Assignment due date set to:', dueDate.toISOString());
-      console.log('Assignment due date local representation:', dueDate.toString());
     }
     
     // Create assignment connected to lesson plans
@@ -444,19 +442,14 @@ export async function updateAssignment(id: string, data: AssignmentData): Promis
     let dueDate = null;
     if (data.dueDate) {
       if (typeof data.dueDate === 'string') {
-        // Parse the date string and create a UTC date at 8:00 PM
+        // Parse the date string and create a date that represents 8PM in the user's local timezone
         const [year, month, day] = data.dueDate.split('-').map(Number);
-        dueDate = new Date(Date.UTC(year, month - 1, day, 20, 0, 0, 0)); // Create in UTC
+        // Create date in local timezone at 8PM (20:00)
+        dueDate = new Date(year, month - 1, day, 20, 0, 0, 0);
       } else {
         dueDate = new Date(data.dueDate);
-        // Convert to UTC equivalent of 8:00 PM local time
-        const utcDate = new Date(Date.UTC(
-          dueDate.getFullYear(),
-          dueDate.getMonth(),
-          dueDate.getDate(),
-          20, 0, 0, 0
-        ));
-        dueDate = utcDate;
+        // Set to 8PM in local timezone
+        dueDate.setHours(20, 0, 0, 0);
       }
       console.log('Assignment due date updated to:', dueDate.toISOString());
       console.log('Assignment due date local representation:', dueDate.toString());
