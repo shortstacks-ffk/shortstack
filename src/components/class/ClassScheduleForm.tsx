@@ -30,24 +30,26 @@ const DAYS = [
   { name: "Sat", value: 6 },
 ];
 
+const DEFAULT_SLOT: ClassScheduleItem = {
+  days: [1],
+  startTime: "09:00",
+  endTime: "10:00",
+};
+
 export default function ClassScheduleForm({ value, onChange }: ClassScheduleFormProps) {
   const [schedules, setSchedules] = useState<ClassScheduleItem[]>([]);
-  
-  // Sync with external value prop - add a proper initial state
+
   useEffect(() => {
-    if (value && Array.isArray(value) && value.length > 0) {
+    if (value && value.length > 0) {
       setSchedules(value);
     } else {
-      // Default to an empty array or a default schedule item
-      setSchedules([{ days: [1], startTime: "09:00", endTime: "10:00" }]);
+      setSchedules([DEFAULT_SLOT]);
+      onChange([DEFAULT_SLOT]);
     }
-  }, [value]);
+  }, [value, onChange]);
 
   const addScheduleItem = () => {
-    const newSchedules = [
-      ...schedules,
-      { days: [], startTime: "09:00", endTime: "10:00" }
-    ];
+    const newSchedules = [...schedules, DEFAULT_SLOT];
     setSchedules(newSchedules);
     onChange(newSchedules);
   };

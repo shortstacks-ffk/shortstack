@@ -108,8 +108,19 @@ const AddClass = ({ isOpen, onClose, onSuccess }: AddClassProps) => {
   };
 
   return (
-    <form ref={formRef} action={clientAction} className="space-y-3">
-      <div className="grid grid-cols-2 gap-2">
+    <form
+      ref={formRef}
+      action={clientAction}
+      className="
+        space-y-3
+        overflow-y-auto
+        max-h-[80vh]
+        min-w-[400px]
+        max-w-4xl  
+        mx-auto  
+      "
+    >
+      <div className="grid grid-cols-3 gap-2 p-4">
         <div className="space-y-1">
           <Label htmlFor="name" className="text-xs">Class Name</Label>
           <Input id="name" name="name" placeholder="Class Name" required className="h-8" />
