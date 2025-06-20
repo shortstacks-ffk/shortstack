@@ -7,6 +7,7 @@ import { Button } from '@/src/components/ui/button';
 import { Checkbox } from '@/src/components/ui/checkbox';
 import { toast } from 'react-hot-toast';
 import { createStudent } from '@/src/app/actions/studentActions';
+import { AlertCircle } from 'lucide-react';
 
 interface AddStudentFormProps {
   classCode: string;
@@ -23,6 +24,7 @@ export function AddStudentForm({
 }: AddStudentFormProps) {
   const [loading, setLoading] = useState(false);
   const [generatePassword, setGeneratePassword] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,6 +34,8 @@ export function AddStudentForm({
     // }
 
     setLoading(true);
+    setErrorMessage(null);
+    
     try {
       const form = e.target as HTMLFormElement;
       const formData = new FormData(form);
@@ -42,12 +46,20 @@ export function AddStudentForm({
       // Make sure classCode is in the formData
       formData.append('classCode', classCode);
       
-      console.log("Submitting with classCode:", classCode); // Debug log
-      
       const result = await createStudent(formData, classCode);
 
       if (!result.success) {
-        toast.error(result.error || 'Failed to add student');
+        // Check for email in use errors
+        if (result.error && result.error.includes("email")) {
+          if (result.error.includes("TEACHER")) {
+            setErrorMessage("This email is already in use by a teacher in the system. Please use a different email.");
+          } else {
+            setErrorMessage("This email is already in use by another user. Please use a different email.");
+          }
+        } else {
+          toast.error(result.error || 'Failed to add student');
+        }
+        setLoading(false);
         return;
       }
 
@@ -66,6 +78,13 @@ export function AddStudentForm({
     <form onSubmit={handleSubmit} className="space-y-4 mt-2">
       {/* Adding a hidden input field with the class code */}
       <input type="hidden" name="classCode" value={classCode} />
+      
+      {errorMessage && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md flex items-start gap-2">
+          <AlertCircle className="h-5 w-5 text-red-500 mt-0.5" />
+          <p>{errorMessage}</p>
+        </div>
+      )}
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>

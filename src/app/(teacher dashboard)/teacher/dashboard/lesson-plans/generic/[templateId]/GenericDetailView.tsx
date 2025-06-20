@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
-import { getLessonPlanByID, updateGenericLessonPlan, copyGenericLessonPlanToUser } from '@/src/app/actions/lessonPlansActions';
+import { getLessonPlanByID, updateGenericLessonPlan } from '@/src/app/actions/lessonPlansActions';
+import { getFiles } from '@/src/app/actions/fileActions';
 import Breadcrumbs from '@/src/components/Breadcrumbs';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
@@ -30,11 +31,13 @@ export default function GenericDetailView({ templateId }: GenericDetailViewProps
   const { data: session } = useSession();
   const searchParams = useSearchParams();
   const [template, setTemplate] = useState<any>(null);
+  const [files, setFiles] = useState<any[]>([]);
   const [editMode, setEditMode] = useState(false);
   const [form, setForm] = useState({ name: '', description: '', gradeLevel: 'all' });
   const [error, setError] = useState<string | null>(null);
   const [accordionValue, setAccordionValue] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isLoadingFiles, setIsLoadingFiles] = useState(false);
   const [isAddToClassDialogOpen, setIsAddToClassDialogOpen] = useState(false);
 
   const isSuperUser = session?.user?.role === 'SUPER';
@@ -52,6 +55,27 @@ export default function GenericDetailView({ templateId }: GenericDetailViewProps
     return grade && grade !== 'all' 
       ? `Back to Templates (Grades ${grade})`
       : 'Back to Templates';
+  };
+
+  // Function to fetch files from database
+  const fetchFiles = async () => {
+    if (!templateId) return;
+    
+    try {
+      setIsLoadingFiles(true);
+      const result = await getFiles(templateId, true); // true for generic
+      if (result.success) {
+        setFiles(result.files || []);
+      } else {
+        console.error('Failed to fetch files:', result.error);
+        setFiles([]);
+      }
+    } catch (error) {
+      console.error('Error fetching files:', error);
+      setFiles([]);
+    } finally {
+      setIsLoadingFiles(false);
+    }
   };
 
   // Fetch template on mount
@@ -86,6 +110,13 @@ export default function GenericDetailView({ templateId }: GenericDetailViewProps
     }
   }, [templateId]);
 
+  // Fetch files when template is loaded
+  useEffect(() => {
+    if (templateId) {
+      fetchFiles();
+    }
+  }, [templateId]);
+
   // Save handler: update via action function and update state
   async function handleSave() {
     if (!canEdit) {
@@ -94,9 +125,6 @@ export default function GenericDetailView({ templateId }: GenericDetailViewProps
     }
     
     try {
-      // Make a copy of files before updating
-      const currentFiles = template.files || [];
-      
       // Update the template (only super users can do this)
       const res = await updateGenericLessonPlan(templateId, {
         name: form.name,
@@ -105,11 +133,8 @@ export default function GenericDetailView({ templateId }: GenericDetailViewProps
       });
       
       if (res.success) {
-        // Update template but preserve files
-        setTemplate({
-          ...res.data,
-          files: currentFiles
-        });
+        // Update template state
+        setTemplate(res.data);
         setEditMode(false);
         setError(null);
         toast.success('Template updated successfully');
@@ -134,29 +159,12 @@ export default function GenericDetailView({ templateId }: GenericDetailViewProps
     }
     setEditMode(false);
   }
-  
-  // Refetch template data
-  async function fetchTemplate() {
-    try {
-      const res = await getLessonPlanByID(templateId);
-      if (res.success) {
-        setTemplate(res.data);
-        if (res.data) {
-          setForm({
-            name: res.data.name,
-            description: res.data.description || '',
-            gradeLevel: res.data.gradeLevel || 'all',
-          });
-        }
-        setError(null);
-      } else {
-        setError(res.error || 'Failed to fetch template');
-      }
-    } catch (error: any) {
-      setError(error.message || 'An unexpected error occurred');
-      console.error('Error fetching template:', error);
-    }
-  }
+
+  // Handle successful file upload
+  const handleFileUploaded = (uploadedFile: any) => {
+    // Refresh files from database after upload
+    fetchFiles();
+  };
 
   // Format created date
   const formattedDate = template?.createdAt 
@@ -192,16 +200,6 @@ export default function GenericDetailView({ templateId }: GenericDetailViewProps
           </Link>
         </Button>
       </div>
-
-      {/* Desktop Back Button */}
-      {/* <div className="hidden sm:block">
-        <Button variant="ghost" className="mb-4" asChild>
-          <Link href={getBackUrl()}>
-            <ChevronLeft className="h-4 w-4 mr-2" />
-            {getBackLabel()}
-          </Link>
-        </Button>
-      </div> */}
 
       {/* Template Badge and Grade Level */}
       <div className="flex flex-wrap items-center gap-2">
@@ -304,31 +302,24 @@ export default function GenericDetailView({ templateId }: GenericDetailViewProps
               <div className="flex justify-end mb-2">
                 <UploadFileDialog
                   lessonPlanId={template.id}
-                  isTemplate={true}
-                  onFileUploaded={(newFile) =>
-                    setTemplate((prev: any) => ({
-                      ...prev,
-                      files: [...(prev.files || []), newFile],
-                    }))
-                  }
+                  isGeneric={true}
+                  onFileUploaded={handleFileUploaded}
                 />
               </div>
             )}
             
             {/* File Table */}
-            <FileTable 
-              files={template.files || []} 
-              onUpdate={async () => {
-                // Refetch the template to update the UI
-                await fetchTemplate();
-              }}
-              canDelete={canEdit}
-            />
-            
-            {(!template.files || template.files.length === 0) && (
-              <div className="text-center py-4 text-gray-500">
-                No files have been uploaded yet.
+            {isLoadingFiles ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+                <span className="ml-2 text-gray-600">Loading files...</span>
               </div>
+            ) : (
+              <FileTable 
+                files={files} 
+                onUpdate={fetchFiles} // Refresh files from database after any update
+                canDelete={canEdit}
+              />
             )}
           </AccordionContent>
         </AccordionItem>
