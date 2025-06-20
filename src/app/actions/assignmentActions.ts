@@ -4,6 +4,7 @@ import { db } from "@/src/lib/db";
 import { getAuthSession } from "@/src/lib/auth";
 import { revalidatePath } from "next/cache";
 import { Prisma } from '@prisma/client';
+import { del } from '@vercel/blob';
 
 // Type definitions
 interface AssignmentData {
@@ -96,41 +97,40 @@ export async function createAssignment(data: AssignmentData): Promise<Assignment
   try {
     console.log("Starting assignment creation...");
     const session = await getAuthSession();
-    if (!session?.user?.id || session.user.role !== "TEACHER") {
-      return { success: false, error: 'Unauthorized' };
+    if (!session?.user?.id || (session.user.role !== 'TEACHER' && session.user.role !== 'SUPER')) {
+      return { success: false, error: 'Unauthorized: Only teachers can create assignments' };
     }
-
+    
+    // Find the teacher profile
     const teacher = await db.teacher.findUnique({
-      where: { userId: session.user.id }
+      where: { userId: session.user.id },
+      select: { id: true }
     });
 
     if (!teacher) {
       return { success: false, error: 'Teacher profile not found' };
     }
-
-    if (!data.name || !data.lessonPlanIds || data.lessonPlanIds.length === 0) {
-      return { success: false, error: 'Missing required fields: name and lesson plans' };
+    
+    // Verify the teacher has access to all the specified lesson plans
+    if (!data.lessonPlanIds || data.lessonPlanIds.length === 0) {
+      return { success: false, error: 'At least one lesson plan ID is required' };
     }
     
-    // Verify all lesson plans exist and belong to this teacher's classes
+    // Check if the lesson plans exist and belong to the teacher
     const lessonPlans = await db.lessonPlan.findMany({
-      where: { 
+      where: {
         id: { in: data.lessonPlanIds },
-        classes: {
-          some: {
-            teacherId: teacher.id
-          }
-        }
+        teacherId: teacher.id, // This checks if the teacher owns the lesson plan
       },
       include: {
-        classes: true
+        classes: true // Include classes to use for revalidation
       }
     });
     
     if (lessonPlans.length !== data.lessonPlanIds.length) {
       return { success: false, error: 'Some lesson plans not found or you do not have permission' };
     }
-    
+
     // Fix the date handling - store the assignment due at the user's intended time
     let dueDate: Date | undefined;
     if (data.dueDate) {
@@ -187,11 +187,31 @@ export async function createAssignment(data: AssignmentData): Promise<Assignment
       console.log('Calendar events created for assignment');
     }
     
-    // Revalidate paths for all affected classes
-    const allClasses = lessonPlans.flatMap(lp => lp.classes);
-    for (const classObj of allClasses) {
-      revalidatePath(`/teacher/dashboard/classes/${classObj.code}`);
-      revalidatePath(`/teacher/dashboard/classes/${classObj.code}/lesson-plans`);
+    // Always revalidate lesson plan pages
+    revalidatePath('/teacher/dashboard/lesson-plans', 'page');
+    
+    // Revalidate specific lesson plan detail pages
+    for (const lp of lessonPlans) {
+      revalidatePath(`/teacher/dashboard/lesson-plans/${lp.id}`, 'page');
+    }
+    
+    // Revalidate class-specific pages only if classes exist
+    const allClasses = lessonPlans.flatMap(lp => lp.classes || []);
+    if (allClasses.length > 0) {
+      console.log(`Revalidating paths for ${allClasses.length} classes`);
+      
+      for (const classObj of allClasses) {
+        if (classObj && classObj.code) {
+          // Class dashboard and class lesson plans list
+          revalidatePath(`/teacher/dashboard/classes/${classObj.code}`, 'page');
+          revalidatePath(`/teacher/dashboard/classes/${classObj.code}/lesson-plans`, 'page');
+          
+          // Class-specific lesson plan detail pages
+          for (const lp of lessonPlans) {
+            revalidatePath(`/teacher/dashboard/classes/${classObj.code}/lesson-plans/${lp.id}`, 'page');
+          }
+        }
+      }
     }
     
     return { success: true, data: createdAssignment };
@@ -489,10 +509,25 @@ export async function updateAssignment(id: string, data: AssignmentData): Promis
       }
     }
 
-    // Revalidate paths for all affected classes
-    const allClasses = updatedAssignment.lessonPlans.flatMap(lp => lp.classes);
-    for (const classObj of allClasses) {
-      revalidatePath(`/teacher/dashboard/classes/${classObj.code}`);
+    // Revalidate lesson plan pages
+    revalidatePath('/teacher/dashboard/lesson-plans', 'page');
+    for (const lp of updatedAssignment.lessonPlans) {
+      revalidatePath(`/teacher/dashboard/lesson-plans/${lp.id}`, 'page');
+    }
+
+    // Revalidate class-specific pages when applicable
+    const allClasses = updatedAssignment.lessonPlans.flatMap(lp => lp.classes || []);
+    if (allClasses.length > 0) {
+      for (const classObj of allClasses) {
+        if (classObj && classObj.code) {
+          revalidatePath(`/teacher/dashboard/classes/${classObj.code}`, 'page');
+          revalidatePath(`/teacher/dashboard/classes/${classObj.code}/lesson-plans`, 'page');
+          
+          for (const lp of updatedAssignment.lessonPlans) {
+            revalidatePath(`/teacher/dashboard/classes/${classObj.code}/lesson-plans/${lp.id}`, 'page');
+          }
+        }
+      }
     }
     
     return { success: true, data: updatedAssignment };
@@ -629,7 +664,66 @@ export async function deleteAssignment(id: string): Promise<AssignmentResponse> 
       return { success: false, error: 'Assignment not found or you do not have permission' };
     }
 
-    // Delete associated calendar events first
+    // Check for file URL in the assignment to delete from blob storage
+    let blobDeleteResult = { attempted: false, success: false };
+    if (existingAssignment.url) {
+      try {
+        blobDeleteResult.attempted = true;
+        console.log(`Attempting to delete assignment file from blob: ${existingAssignment.url}`);
+        
+        // Extract the blob path from the URL
+        const urlObj = new URL(existingAssignment.url);
+        const pathname = urlObj.pathname;
+        // The pathname typically starts with a leading slash that we need to remove
+        const blobPath = pathname.startsWith('/') ? pathname.substring(1) : pathname;
+        
+        if (!blobPath) {
+          console.error("Invalid blob path extracted from URL:", existingAssignment.url);
+        } else {
+          console.log(`Deleting assignment blob at path: ${blobPath}`);
+          await del(blobPath);
+          console.log("Assignment blob deleted successfully");
+          blobDeleteResult.success = true;
+        }
+      } catch (blobError) {
+        console.error('Failed to delete assignment file from blob storage:', blobError);
+        // Continue with database deletion even if blob deletion fails
+      }
+    }
+
+    // Now check for student submissions that might have files to clean up
+    const studentSubmissions = await db.studentAssignmentSubmission.findMany({
+      where: { assignmentId: id },
+      select: { id: true, fileUrl: true }
+    });
+    
+    const submissionBlobResults = [];
+    
+    // Try to delete each submission's file from blob storage
+    for (const submission of studentSubmissions) {
+      if (submission.fileUrl) {
+        try {
+          console.log(`Attempting to delete submission file from blob: ${submission.fileUrl}`);
+          
+          // Extract the blob path from the URL
+          const urlObj = new URL(submission.fileUrl);
+          const pathname = urlObj.pathname;
+          const blobPath = pathname.startsWith('/') ? pathname.substring(1) : pathname;
+          
+          if (blobPath) {
+            console.log(`Deleting submission blob at path: ${blobPath}`);
+            await del(blobPath);
+            console.log(`Submission blob deleted successfully for submission ${submission.id}`);
+            submissionBlobResults.push({ id: submission.id, deleted: true });
+          }
+        } catch (submissionBlobError) {
+          console.error(`Failed to delete submission ${submission.id} file from blob:`, submissionBlobError);
+          submissionBlobResults.push({ id: submission.id, deleted: false });
+        }
+      }
+    }
+
+    // Delete associated calendar events
     await db.calendarEvent.deleteMany({
       where: { assignmentId: id }
     });
@@ -644,13 +738,34 @@ export async function deleteAssignment(id: string): Promise<AssignmentResponse> 
       where: { id },
     });
 
-    // Revalidate paths for all affected classes
-    const allClasses = existingAssignment.lessonPlans.flatMap(lp => lp.classes);
-    for (const classObj of allClasses) {
-      revalidatePath(`/teacher/dashboard/classes/${classObj.code}`);
+    // Revalidate lesson plan pages
+    revalidatePath('/teacher/dashboard/lesson-plans', 'page');
+    for (const lp of existingAssignment.lessonPlans) {
+      revalidatePath(`/teacher/dashboard/lesson-plans/${lp.id}`, 'page');
+    }
+
+    // Revalidate class paths when applicable
+    const allClasses = existingAssignment.lessonPlans.flatMap(lp => lp.classes || []);
+    if (allClasses.length > 0) {
+      for (const classObj of allClasses) {
+        if (classObj && classObj.code) {
+          revalidatePath(`/teacher/dashboard/classes/${classObj.code}`, 'page');
+          revalidatePath(`/teacher/dashboard/classes/${classObj.code}/lesson-plans`, 'page');
+          
+          for (const lp of existingAssignment.lessonPlans) {
+            revalidatePath(`/teacher/dashboard/classes/${classObj.code}/lesson-plans/${lp.id}`, 'page');
+          }
+        }
+      }
     }
     
-    return { success: true };
+    return { 
+      success: true,
+      data: {
+        blobDeleteResult,
+        submissionBlobResults
+      }
+    };
   } catch (error: any) {
     console.error('Delete assignment error:', error?.message || 'Unknown error');
     return { success: false, error: 'Failed to delete assignment' };

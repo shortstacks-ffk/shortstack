@@ -221,10 +221,10 @@ const AddClass = ({ isOpen, onClose, onSuccess }: AddClassProps) => {
           type="submit" 
           size="sm"
           disabled={isSubmitting}
-          className="min-w-[100px]"
+          className="min-w-[100px] bg-orange-500 hover:bg-orange-600 text-white"
         >
           {isSubmitting ? (
-            <span className="flex items-center gap-1">
+            <span className="flex items-center gap-1 ">
               <Loader2 className="h-3 w-3 animate-spin" />
               <span>Creating...</span>
             </span>

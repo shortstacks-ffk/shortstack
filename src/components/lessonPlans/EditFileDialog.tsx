@@ -7,22 +7,14 @@ import { Label } from '@/src/components/ui/label';
 import { useState } from 'react';
 import { updateFile } from '@/src/app/actions/fileActions';
 import { Loader2 } from 'lucide-react';
-
-interface FileRecord {
-  id: string;
-  name: string;
-  fileType?: string;
-  activity?: string;
-  size?: number | string;
-  url?: string;
-  classId: string;
-}
+import { FileRecord } from '@/src/types/file';
 
 interface EditFileDialogProps {
   file: FileRecord;
-  isOpen: boolean;
+  onFileSaved: (file: FileRecord) => void;
   onClose: () => void;
-  onUpdate: () => void;
+  open?: boolean; // Add open prop to match Dialog API
+  onUpdate?: () => void; // Optional callback for updating the file list
 }
 
 // File activity options
@@ -39,7 +31,7 @@ const fileActivityOptions = [
   { label: 'Other', value: 'other' }
 ];
 
-export default function EditFileDialog({ file, isOpen, onClose, onUpdate }: EditFileDialogProps) {
+export default function EditFileDialog({ file, open, onClose, onFileSaved, onUpdate }: EditFileDialogProps) {
   const [name, setName] = useState(file.name);
   const [activity, setActivity] = useState(file.activity || 'interactive');
   const [isUpdating, setIsUpdating] = useState(false);
@@ -70,7 +62,13 @@ export default function EditFileDialog({ file, isOpen, onClose, onUpdate }: Edit
       const res = await updateFile(file.id, updateData);
 
       if (res.success) {
-        onUpdate();
+        // Use the first file from the response, or create a merged object
+        const updatedFile = res.data || { ...file, ...updateData };
+        onFileSaved(updatedFile);
+        
+        // Call additional update callback if provided
+        if (onUpdate) onUpdate();
+        
         onClose();
       } else {
         setError(res.error || 'Failed to update file');
@@ -84,7 +82,7 @@ export default function EditFileDialog({ file, isOpen, onClose, onUpdate }: Edit
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(isOpen) => !isOpen && onClose()}>
+    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Edit File</DialogTitle>
@@ -117,47 +115,29 @@ export default function EditFileDialog({ file, isOpen, onClose, onUpdate }: Edit
               ))}
             </select>
           </div>
-
-          {/* Display file info (read-only) */}
-          <div className="space-y-2">
-            <Label>File Information</Label>
-            <div className="text-sm text-gray-600 bg-gray-50 p-2 rounded">
-              <div><strong>Type:</strong> {file.fileType || 'Unknown'}</div>
-              <div><strong>Size:</strong> {typeof file.size === 'number' ? 
-                (file.size < 1024 * 1024 ? 
-                  `${(file.size / 1024).toFixed(1)} KB` : 
-                  `${(file.size / (1024 * 1024)).toFixed(1)} MB`
-                ) : 'Unknown'
-              }</div>
-              {file.url && <div><strong>URL:</strong> <span className="break-all">{file.url}</span></div>}
-            </div>
-          </div>
-
+          
           {error && (
-            <div className="text-red-500 text-sm bg-red-50 p-2 rounded">
+            <div className="bg-red-50 border border-red-200 text-red-700 rounded-md p-3 text-sm">
               {error}
             </div>
           )}
-
-          <div className="flex justify-end gap-2 pt-2">
+          
+          <div className="flex justify-end space-x-2">
             <Button 
-              variant="secondary" 
-              size="sm" 
+              variant="outline" 
               onClick={onClose}
               disabled={isUpdating}
             >
               Cancel
             </Button>
             <Button 
-              size="sm" 
-              onClick={handleSubmit} 
-              disabled={isUpdating || !name.trim()}
-              className="min-w-[80px]"
+              onClick={handleSubmit}
+              disabled={isUpdating}
             >
               {isUpdating ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Updating
+                  Saving...
                 </>
               ) : 'Save Changes'}
             </Button>

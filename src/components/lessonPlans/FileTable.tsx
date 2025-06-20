@@ -24,23 +24,13 @@ import EditFileDialog from './EditFileDialog';
 import AssignFileDialog from './AssignFileDialog';
 import Link from 'next/link';
 import { getSimpleFileType } from '@/src/lib/utils';
+import { toast } from 'sonner';
+import { FileRecord } from '@/src/types/file';
 
-interface FileRecord {
-  id: string;
-  name: string;
-  fileType?: string;
-  activity?: string;
-  createdAt?: string;
-  size?: string | number;
-  url?: string;
-  classId: string;
-}
-
-// Add canDelete parameter to the component props
 interface FileTableProps {
   files: FileRecord[];
   onUpdate?: () => void;
-  canDelete?: boolean;  // Add this prop
+  canDelete?: boolean;
 }
 
 const formatFileSize = (bytes?: number | string): string => {
@@ -48,19 +38,37 @@ const formatFileSize = (bytes?: number | string): string => {
   
   const numBytes = typeof bytes === 'string' ? parseInt(bytes) : bytes;
   
-  if (numBytes < 1024 * 1024) {
-    return `${(numBytes / 1024).toFixed(1)} KB`;
-  }
+  if (isNaN(numBytes) || numBytes <= 0) return 'N/A';
+  
+  if (numBytes < 1024) return `${numBytes} B`;
+  if (numBytes < 1024 * 1024) return `${(numBytes / 1024).toFixed(1)} KB`;
   return `${(numBytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
 const formatDate = (dateString?: string) => {
   if (!dateString) return 'N/A';
   
-  const date = new Date(dateString);
-  return date.toLocaleDateString();
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleDateString();
+  } catch {
+    return 'N/A';
+  }
 };
 
+// Helper function to normalize file objects (handles both DB records and upload responses)
+const normalizeFile = (file: FileRecord): FileRecord => {
+  return {
+    id: file.id || file.fileId || '', // Use id if available, fallback to fileId
+    name: file.name || file.fileName || 'Unknown',
+    fileType: file.fileType,
+    activity: file.activity || 'interactive',
+    createdAt: file.createdAt,
+    size: file.size,
+    url: file.url || file.fileUrl || '',
+    classId: file.classId
+  };
+};
 
 export default function FileTable({ 
   files, 
@@ -70,27 +78,52 @@ export default function FileTable({
   const [fileToDelete, setFileToDelete] = useState<string | null>(null);
   const [fileToEdit, setFileToEdit] = useState<FileRecord | null>(null);
   const [fileToAssign, setFileToAssign] = useState<FileRecord | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const handleDelete = async () => {
     if (!fileToDelete) return;
     
+    setIsDeleting(true);
     try {
       const result = await deleteFile(fileToDelete);
       if (result.success) {
+        toast.success("File deleted successfully");
         onUpdate?.();
+      } else {
+        toast.error(result.error || "Failed to delete file");
       }
     } catch (error) {
       console.error('Failed to delete file:', error);
+      toast.error("An error occurred while deleting the file");
     } finally {
+      setIsDeleting(false);
       setFileToDelete(null);
     }
   };
 
+  // Ensure files is an array and normalize/filter valid entries
+  const validFiles = Array.isArray(files) ? files
+    .filter((file) => {
+      if (!file) return false;
+      
+      // Check for either id or fileId (handles both DB records and upload responses)
+      const hasId = file.id || file.fileId;
+      if (!hasId) return false;
+      
+      // Check for either name or fileName
+      const hasName = file.name || file.fileName;
+      if (!hasName) return false;
+      
+      return true;
+    })
+    .map(normalizeFile) // Normalize all valid files
+    : [];
+
   return (
     <>
       {/* Desktop View */}
-      <div className="hidden sm:block w-full rounded-lg overflow-hidden">
-        {/* Header - Updated with evenly spaced columns */}
+      <div className="hidden sm:block w-full rounded-lg overflow-hidden border">
+        {/* Header */}
         <div className="bg-gray-100 text-gray-800 p-4 grid grid-cols-4 font-medium">
           <div className="col-span-1">Name</div>
           <div className="col-span-1">Activity</div>
@@ -102,82 +135,87 @@ export default function FileTable({
         </div>
         
         {/* File Rows - Desktop */}
-        {files.length === 0 ? (
-          <div className="p-6 text-center text-gray-500">
-            No files uploaded yet
+        {validFiles.length === 0 ? (
+          <div className="p-6 text-center text-gray-500 bg-white">
+            <p>No files uploaded yet</p>
           </div>
         ) : (
-          files.map((file) => (
-            <div key={file.id} className="border-b hover:bg-gray-50 transition-colors">
-              <div className="grid grid-cols-4 p-4 items-center">
-                <div className="col-span-1 min-w-0">
-                  {file.url ? (
-                    <Link 
-                      href={file.url} 
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-medium text-blue-600 hover:text-blue-800 hover:underline truncate block"
-                      title={file.name}
-                    >
-                      {file.name}
-                    </Link>
-                  ) : (
-                    <span className="font-medium truncate block" title={file.name}>
-                      {file.name}
-                    </span>
-                  )}
-                  <div className="text-xs text-gray-500">
-                    {getSimpleFileType(file.fileType, file.name)}
+          <div className="divide-y bg-white">
+            {validFiles.map((file, index) => (
+              <div key={`desktop-file-${file.id}-${index}`} className="hover:bg-gray-50 transition-colors">
+                <div className="grid grid-cols-4 p-4 items-center">
+                  <div className="col-span-1 min-w-0">
+                    {file.url ? (
+                      <Link 
+                        href={file.url} 
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-medium text-blue-600 hover:text-blue-800 hover:underline truncate block"
+                        title={file.name}
+                      >
+                        {file.name}
+                      </Link>
+                    ) : (
+                      <span className="font-medium truncate block" title={file.name}>
+                        {file.name}
+                      </span>
+                    )}
+                    <div className="text-xs text-gray-500">
+                      {getSimpleFileType ? getSimpleFileType(file.fileType, file.name) : (file.fileType || 'Unknown')}
+                    </div>
                   </div>
-                </div>
-                <div className="col-span-1 truncate" title={file.activity}>{file.activity || 'N/A'}</div>
-                <div className="col-span-1">{formatDate(file.createdAt)}</div>
-                <div className="col-span-1 flex justify-between items-center">
-                  <div className="bg-blue-100 px-2 py-1 rounded-full text-blue-700 text-xs inline-flex items-center">
-                    <div className="h-2 w-2 rounded-full bg-blue-500 mr-1"></div>
-                    {typeof file.size === 'number' ? formatFileSize(file.size) : formatFileSize(file.size) || 'N/A'}
-                  </div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon">
-                        <MoreHorizontal className="h-4 w-4" />
-                        <span className="sr-only">Actions</span>
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => setFileToEdit(file)}>
-                        <FileEdit className="mr-2 h-4 w-4" />
-                        Edit
-                      </DropdownMenuItem>
-                      {canDelete && (
-                        <DropdownMenuItem onClick={() => setFileToDelete(file.id)}>
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Delete
+                  <div className="col-span-1 truncate" title={file.activity || 'N/A'}>{file.activity || 'N/A'}</div>
+                  <div className="col-span-1">{formatDate(file.createdAt)}</div>
+                  <div className="col-span-1 flex justify-between items-center">
+                    <div className="bg-blue-100 px-2 py-1 rounded-full text-blue-700 text-xs inline-flex items-center">
+                      <div className="h-2 w-2 rounded-full bg-blue-500 mr-1"></div>
+                      {formatFileSize(file.size)}
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                          <MoreHorizontal className="h-4 w-4" />
+                          <span className="sr-only">Actions</span>
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => setFileToEdit(file)}>
+                          <FileEdit className="mr-2 h-4 w-4" />
+                          Edit
                         </DropdownMenuItem>
-                      )}
-                      <DropdownMenuItem onClick={() => setFileToAssign(file)}>
-                        <Send className="mr-2 h-4 w-4" />
-                        Assign to Class
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                        {canDelete && file.id && (
+                          <DropdownMenuItem 
+                            onClick={() => setFileToDelete(file.id!)}
+                            className="text-red-600 focus:text-red-600"
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem onClick={() => setFileToAssign(file)}>
+                          <Send className="mr-2 h-4 w-4" />
+                          Assign to Class
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))
+            ))}
+          </div>
         )}
       </div>
 
       {/* Mobile View */}
       <div className="sm:hidden w-full">
-        {files.length === 0 ? (
-          <div className="p-4 text-center text-gray-500">
-            No files uploaded yet
+        {validFiles.length === 0 ? (
+          <div className="p-4 text-center text-gray-500 bg-white border rounded-lg">
+            <p>No files uploaded yet</p>
           </div>
         ) : (
           <div className="space-y-3">
-            {files.map((file) => (
-              <div key={file.id} className="border rounded-lg p-3 bg-white shadow-sm">
+            {validFiles.map((file, index) => (
+              <div key={`mobile-file-${file.id}-${index}`} className="border rounded-lg p-3 bg-white shadow-sm">
                 <div className="flex justify-between items-start mb-2">
                   <div className="min-w-0 flex-1 pr-2">
                     {file.url ? (
@@ -204,8 +242,11 @@ export default function FileTable({
                         <FileEdit className="mr-2 h-4 w-4" />
                         Edit
                       </DropdownMenuItem>
-                      {canDelete && (
-                        <DropdownMenuItem onClick={() => setFileToDelete(file.id)}>
+                      {canDelete && file.id && (
+                        <DropdownMenuItem 
+                          onClick={() => setFileToDelete(file.id!)}
+                          className="text-red-600 focus:text-red-600"
+                        >
                           <Trash2 className="mr-2 h-4 w-4" />
                           Delete
                         </DropdownMenuItem>
@@ -221,7 +262,7 @@ export default function FileTable({
                 <div className="text-xs text-gray-500 flex flex-wrap gap-x-4 gap-y-1 mt-1">
                   <div className="flex items-center">
                     <FileIcon className="h-3 w-3 mr-1" />
-                    {getSimpleFileType(file.fileType, file.name)}
+                    {getSimpleFileType ? getSimpleFileType(file.fileType, file.name) : (file.fileType || 'Unknown')}
                   </div>
                   <div className="flex items-center">
                     <Calendar className="h-3 w-3 mr-1" />
@@ -229,7 +270,7 @@ export default function FileTable({
                   </div>
                   <div className="bg-blue-100 px-2 py-1 rounded-full text-blue-700 text-xs inline-flex items-center">
                     <div className="h-2 w-2 rounded-full bg-blue-500 mr-1"></div>
-                    {typeof file.size === 'number' ? formatFileSize(file.size) : formatFileSize(file.size) || 'N/A'}
+                    {formatFileSize(file.size)}
                   </div>
                 </div>
                 
@@ -250,13 +291,17 @@ export default function FileTable({
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete this file. This action cannot be undone.
+              This will permanently delete this file from both the database and cloud storage. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
-              Delete
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDelete} 
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -265,10 +310,14 @@ export default function FileTable({
       {/* Edit File Dialog */}
       {fileToEdit && (
         <EditFileDialog
-          file={fileToEdit}
-          isOpen={!!fileToEdit}
+          file={fileToEdit as FileRecord}
+          open={!!fileToEdit}
           onClose={() => setFileToEdit(null)}
           onUpdate={() => {
+            onUpdate?.();
+            setFileToEdit(null);
+          }}
+          onFileSaved={(file) => {
             onUpdate?.();
             setFileToEdit(null);
           }}
@@ -278,10 +327,11 @@ export default function FileTable({
       {/* Assign File Dialog */}
       {fileToAssign && (
         <AssignFileDialog
-          file={fileToAssign}
-          isOpen={!!fileToAssign}
-          onClose={() => setFileToAssign(null)}
-          onUpdate={() => {
+          file={fileToAssign as FileRecord}
+          onFileAssigned={(file) => {
+            onUpdate?.();
+          }}
+          onClose={() => {
             onUpdate?.();
             setFileToAssign(null);
           }}

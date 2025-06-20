@@ -138,49 +138,54 @@ export function EditClassForm({ isOpen, onClose, classData }: EditClassFormProps
         }
       }}
     >
-      <DialogContent className="max-w-4xl p-4">
-        <DialogHeader className="mb-2">
-          <DialogTitle>Edit Class</DialogTitle>
+      <DialogContent className="max-w-4xl p-6 pt-10 overflow-hidden"> {/* Increased top padding and ensured overflow is handled */}
+        <DialogHeader className="mb-2"> {/* Increased margin bottom */}
+          <DialogTitle className="text-xl">Edit Class</DialogTitle> {/* Made title larger */}
         </DialogHeader>
         
-        <form onSubmit={handleSubmit} className="space-y-3 overflow-y-auto max-h-[80vh]">
+        <form onSubmit={handleSubmit} className="space-y-6 overflow-y-auto max-h-[75vh] pt-1"> {/* Added top padding */}
           {/* Top section - Name, Emoji, Color */}
-          <div className="grid grid-cols-3 gap-2">
-            <div className="space-y-1">
-              <Label htmlFor="name">Class Name</Label>
-              <Input
-                id="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-                className="h-9"
-              />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-1"> {/* Added top padding */}
+            <div className="space-y-2"> {/* Added top padding */}
+              <Label htmlFor="name" className="text-sm font-medium block mb-1">Class Name</Label>
+              {/* Custom input to avoid any potential styling issues */}
+              <div className="relative">
+                <input
+                  id="name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                  className="w-full h-9 px-4 py-3 text-base rounded-md border border-input bg-background"
+                  placeholder="Enter class name"
+                  style={{ 
+                    lineHeight: '1.5', 
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
             </div>
 
-            <div className="space-y-1">
-              <Label>Class Emoji</Label>
+            <div className="space-y-2"> {/* Increased spacing */}
+              <Label className="text-sm font-medium">Class Emoji</Label>
               <EmojiPickerButton 
                 value={emoji}
                 onChange={setEmoji}
-                className="w-full text-2xl h-9"
+                className="w-full text-2xl h-9" /* Increased height */
               />
             </div>
             
-            <div className="space-y-1">
-              <Label>Class Color</Label>
+            <div className="space-y-2"> {/* Increased spacing */}
+              <Label className="text-sm font-medium">Class Color</Label>
               <ColorDropdown 
                 value={color}
                 onChange={setColor}
               />
             </div>
-          </div>
-          
-          {/* Middle section - Grade only (removed Cadence) */}
-          <div className="grid grid-cols-1 gap-2">
-            <div className="space-y-1">
-              <Label htmlFor="grade">Grade</Label>
+
+            <div className="space-y-2"> {/* Increased spacing */}
+              <Label htmlFor="grade" className="text-sm font-medium">Grade</Label>
               <Select value={grade} onValueChange={setGrade}>
-                <SelectTrigger className="h-9">
+                <SelectTrigger className="h-9"> {/* Increased height */}
                   <SelectValue placeholder="Select grade" />
                 </SelectTrigger>
                 <SelectContent>
@@ -193,28 +198,27 @@ export function EditClassForm({ isOpen, onClose, classData }: EditClassFormProps
           </div>
 
           {/* Schedule section */}
-          <div className="space-y-1 pt-1">
-            <Label>Class Schedule</Label>
+          <div className="space-y-2">
             <ClassScheduleForm 
               value={schedules}
               onChange={handleScheduleChange}
             />
           </div>
 
-          <DialogFooter className="mt-4 pt-2 border-t">
+          <DialogFooter className="mt-4 pt-2 border-t"> {/* Increased margin top */}
             <Button 
               type="button" 
               variant="outline" 
               onClick={onClose} 
-              size="sm"
               disabled={isSubmitting}
+              className="h-9" /* Increased height */
             >
               Cancel
             </Button>
             <Button 
               type="submit" 
-              size="sm"
               disabled={isSubmitting}
+              className="h-9 bg-orange-500 hover:bg-orange-600 text-white" /* Increased height */
             >
               {isSubmitting ? "Updating..." : "Update Class"}
             </Button>
