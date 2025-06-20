@@ -94,7 +94,8 @@ export function ExistingStudentForm({ classCode, onClose }: ExistingStudentFormP
           setProgress(prev => ({ ...prev, success: prev.success + 1 }));
           setProcessingStatus(`Sending email to ${student?.firstName}...`);
           
-          if (result.warning) {
+          // Check for email failure in a different way - assuming error might be in data or as a separate property
+          if (result.data && 'emailFailed' in result.data) {
             // Show warning toast but don't interrupt the process
             toast(`${student?.firstName} ${student?.lastName} added but email notification failed`, {
               icon: '⚠️',
