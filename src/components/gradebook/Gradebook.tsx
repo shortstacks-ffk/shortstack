@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Input } from '@/src/components/ui/input';
-import { getAssignments } from '@/src/app/actions/assignmentActions';
+import { getClassAssignments } from '@/src/app/actions/gradebookActions';
 import { Search, BookOpen } from 'lucide-react';
 import { toast } from 'sonner';
 import AssignmentCard from './AssignmentCard';
@@ -59,7 +59,7 @@ export default function Gradebook({ classCode }: GradebookProps) {
     const loadAssignments = async () => {
       setLoading(true);
       try {
-        const response = await getAssignments(classCode);
+        const response = await getClassAssignments(classCode);
         if (response.success && response.data) {
           console.log('Loaded assignments:', response.data);
           setAssignments(response.data);
