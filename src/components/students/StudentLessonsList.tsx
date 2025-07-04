@@ -28,10 +28,11 @@ export default function StudentLessonsList({ classCode, classId, lessonPlans }: 
             href={`/student/dashboard/classes/${classCode}/lessons/${lesson.id}`}
             key={lesson.id}
           >
-            <Card className="bg-primary/10 w-[200px] h-[200px] rounded-xl relative cursor-pointer hover:shadow-lg transition-shadow overflow-hidden border-2 border-primary/20">
-              <div className="absolute top-0 left-0 right-0 bg-primary/20 p-2 flex items-center">
-                <Book className="h-4 w-4 mr-2" />
-                <span className="text-sm font-medium truncate">
+            <Card className="bg-blue-50 w-[250px] h-[250px] rounded-xl overflow-hidden hover:shadow-md transition-shadow cursor-pointer relative">
+              <CardContent className="flex flex-col justify-center items-center h-full">
+                <h3 className="text-lg font-bold text-black line-clamp-2 mb-2 mt-6">{lesson.name}</h3>
+                
+                 <span className="text-sm font-medium truncate">
                   {lesson.createdAt ? formatDate(new Date(lesson.createdAt)) : 'No date'}
                 </span>
               </div>
@@ -41,6 +42,9 @@ export default function StudentLessonsList({ classCode, classId, lessonPlans }: 
                 
                 
                 {/* <div className="mt-auto w-full flex justify-between items-center text-xs text-muted-foreground pt-4">
+
+                <div className="mt-auto w-full flex justify-between items-center text-xs text-muted-foreground pt-4">
+
                   <span>{lesson.assignments?.length || 0} assignments</span>
                   <span>{lesson.files?.length || 0} materials</span>
                 </div> */}

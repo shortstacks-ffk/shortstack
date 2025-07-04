@@ -132,7 +132,7 @@ export default function Gradebook({ classCode }: GradebookProps) {
 
       {/* Assignments Grid - No tabs needed */}
       {filteredAssignments.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
           {filteredAssignments.map((assignment) => (
             <AssignmentCard
               key={assignment.id}

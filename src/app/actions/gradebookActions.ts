@@ -394,11 +394,10 @@ export async function getStudentOverallProgress(): Promise<GradebookResponse> {
     ).length;
     
     const gradedSubmissions = submissions.filter(s => s.grade !== null && s.grade !== undefined);
-    const totalPoints = gradedSubmissions.reduce((sum, sub) => sum + (sub.grade || 0), 0);
     
-    // Calculate averages and other metrics
+    // Calculate average grade instead of total points
     const averageGrade = gradedSubmissions.length > 0 
-      ? Math.round(totalPoints / gradedSubmissions.length) 
+      ? Math.round(gradedSubmissions.reduce((sum, sub) => sum + (sub.grade || 0), 0) / gradedSubmissions.length)
       : 0;
 
     // Get actual bank account balances
@@ -421,18 +420,18 @@ export async function getStudentOverallProgress(): Promise<GradebookResponse> {
 
     } catch (bankError) {
       console.error("Error fetching bank balance:", bankError);
-      // Fall back to points-based calculation if bank fetch fails
-      totalBankBalance = totalPoints;
+      // Fall back to 0 if bank fetch fails
+      totalBankBalance = 0;
     }
 
     // Mock streak calculation
     const streak = Math.min(completedAssignments * 2, 30);
 
-    // Progress summary for dashboard
+    // Progress summary for dashboard - use averageGrade instead of points
     const progressSummary = {
       completedAssignments,
       totalAssignments,
-      points: totalPoints,
+      points: averageGrade, // Changed: now represents average grade instead of total points
       balance: totalBankBalance,
       streak,
       averageGrade,
@@ -451,5 +450,154 @@ export async function getStudentOverallProgress(): Promise<GradebookResponse> {
   } catch (error: any) {
     console.error("Get student overall progress error:", error);
     return { success: false, error: "Failed to fetch progress data" };
+  }
+}
+
+// Get performance data for all teacher's classes (for histogram)
+export async function getTeacherClassesPerformance(): Promise<GradebookResponse> {
+  try {
+    const session = await getAuthSession();
+    if (!session?.user?.id) {
+      return { success: false, error: "Unauthorized" };
+    }
+
+    // Get teacher record
+    const teacher = await db.teacher.findUnique({
+      where: { userId: session.user.id }
+    });
+
+    if (!teacher) {
+      return { success: false, error: "Teacher profile not found" };
+    }
+
+    // Get all teacher's classes with students and submissions
+    const classes = await db.class.findMany({
+      where: { teacherId: teacher.id },
+      include: {
+        enrollments: {
+          where: { enrolled: true },
+          include: {
+            student: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true
+              }
+            }
+          }
+        },
+        assignments: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
+      }
+    });
+
+    // Get all submissions for all students in all classes
+    const allStudentIds = classes.flatMap(cls => 
+      cls.enrollments.map(enrollment => enrollment.student.id)
+    );
+    
+    const allAssignmentIds = classes.flatMap(cls => 
+      cls.assignments.map(assignment => assignment.id)
+    );
+
+    const submissions = await db.studentAssignmentSubmission.findMany({
+      where: {
+        studentId: { in: allStudentIds },
+        assignmentId: { in: allAssignmentIds },
+        grade: { not: null }
+      },
+      select: {
+        studentId: true,
+        assignmentId: true,
+        grade: true,
+        assignment: {
+          select: {
+            classes: {
+              select: {
+                id: true,
+                name: true,
+                emoji: true,
+                color: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    // Calculate average grades per class
+    const classPerformance = classes.map(cls => {
+      const classSubmissions = submissions.filter(sub => 
+        sub.assignment.classes.some(assignmentClass => assignmentClass.id === cls.id)
+      );
+
+      const totalGrades = classSubmissions.reduce((sum, sub) => sum + (sub.grade || 0), 0);
+      const averageGrade = classSubmissions.length > 0 
+        ? Math.round(totalGrades / classSubmissions.length) 
+        : 0;
+
+      // Count students in different grade ranges
+      const studentGrades = new Map<string, number[]>();
+      
+      classSubmissions.forEach(sub => {
+        if (!studentGrades.has(sub.studentId)) {
+          studentGrades.set(sub.studentId, []);
+        }
+        studentGrades.get(sub.studentId)!.push(sub.grade || 0);
+      });
+
+      // Calculate average grade per student in this class
+      const studentAverages = Array.from(studentGrades.entries()).map(([studentId, grades]) => {
+        const avg = grades.reduce((sum, grade) => sum + grade, 0) / grades.length;
+        return Math.round(avg);
+      });
+
+      // Create grade distribution (0-100 in ranges of 10)
+      const gradeRanges = {
+        '90-100': 0,
+        '80-89': 0,
+        '70-79': 0,
+        '60-69': 0,
+        '50-59': 0,
+        '0-49': 0
+      };
+
+      studentAverages.forEach(avg => {
+        if (avg >= 90) gradeRanges['90-100']++;
+        else if (avg >= 80) gradeRanges['80-89']++;
+        else if (avg >= 70) gradeRanges['70-79']++;
+        else if (avg >= 60) gradeRanges['60-69']++;
+        else if (avg >= 50) gradeRanges['50-59']++;
+        else gradeRanges['0-49']++;
+      });
+
+      return {
+        id: cls.id,
+        name: cls.name,
+        emoji: cls.emoji,
+        color: cls.color || 'primary',
+        totalStudents: cls.enrollments.length,
+        studentsWithGrades: studentAverages.length,
+        averageGrade,
+        gradeDistribution: gradeRanges,
+        submissionCount: classSubmissions.length
+      };
+    });
+
+    return {
+      success: true,
+      data: {
+        classes: classPerformance,
+        totalClasses: classes.length,
+        totalStudents: allStudentIds.length
+      }
+    };
+  } catch (error: any) {
+    console.error("Get teacher classes performance error:", error);
+    return { success: false, error: "Failed to fetch performance data" };
   }
 }

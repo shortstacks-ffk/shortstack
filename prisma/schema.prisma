@@ -171,10 +171,10 @@ model GenericLessonPlan {
   id          String       @id @default(cuid())
   name        String       @unique
   description String?
-  gradeLevel  String?      @default("all")
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
   createdBy   String?
+  gradeLevel  String?      @default("all")
   lessonPlans LessonPlan[] @relation("GenericToUserLessonPlans")
   assignments Assignment[] @relation("GenericLessonPlanAssignments")
   files       File[]       @relation("GenericLessonPlanFiles")

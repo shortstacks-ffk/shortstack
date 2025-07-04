@@ -48,7 +48,7 @@ text.txt
 
 pnpm-lock.yaml
 
-.vscode
+.vscode/*
 # clerk configuration (can include secrets)
 /.clerk/
 
