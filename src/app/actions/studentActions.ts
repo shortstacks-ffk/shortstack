@@ -214,8 +214,32 @@ export async function createStudent(formData: FormData, classCode: string) {
         // Create bank accounts immediately after student creation
         await createStudentBankAccounts(student.id);
         
-      } catch (createError) {
+      } catch (createError: any) {
         console.error("Error creating student:", createError);
+        
+        // Check if it's a unique constraint error on email
+        if (createError.code === 'P2002' && 
+            createError.meta?.target?.includes('email')) {
+          
+          // Check if the existing user is a teacher
+          const existingUser = await db.user.findUnique({
+            where: { email: schoolEmail },
+            select: { role: true }
+          });
+          
+          if (existingUser?.role === 'TEACHER') {
+            return { 
+              success: false, 
+              error: "This email is already in use by a TEACHER account. Please use a different email." 
+            };
+          } else {
+            return { 
+              success: false, 
+              error: "This email is already in use. Please use a different email." 
+            };
+          }
+        }
+        
         return { 
           success: false, 
           error: "Failed to create student: " + (createError instanceof Error ? createError.message : "Unknown error") 
@@ -385,46 +409,29 @@ export async function addExistingStudentToClass(studentId: string, classCode: st
       });
     }
 
-    // Send email notification to the student about being added to the class
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/email`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          to: student.schoolEmail,
-          firstName: student.firstName,
-          lastName: student.lastName,
-          className: classData.name,
-          classCode: classCode,
-          email: student.schoolEmail,
-          isNewStudent: false,
-          isPasswordReset: false
-        }),
-      });
-      
-      const result = await response.json();
-      
-      if (!result.success) {
-        console.error("Email notification failed:", result.error);
-        revalidatePath(`/teacher/dashboard/classes/${classCode}`);
-        return { 
-          success: true, 
-          data: enrollment,
-          warning: "Student was added to the class but the notification email couldn't be sent."
-        };
-      }
-    } catch (emailError) {
+    // Send email notification asynchronously - don't await the result
+    // This allows the function to return quicker
+    const emailPromise = fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/email`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        to: student.schoolEmail,
+        firstName: student.firstName,
+        lastName: student.lastName,
+        className: classData.name,
+        classCode: classCode,
+        email: student.schoolEmail,
+        isNewStudent: false,
+        isPasswordReset: false
+      }),
+    }).catch(emailError => {
       console.error("Failed to send class addition email:", emailError);
-      revalidatePath(`/teacher/dashboard/classes/${classCode}`);
-      return { 
-        success: true, 
-        data: enrollment,
-        warning: "Student was added to the class but the notification email couldn't be sent."
-      };
-    }
+      // We're handling this asynchronously, so we don't need to return anything
+    });
 
+    // Don't await the email - we'll handle any errors on the client
     revalidatePath(`/teacher/dashboard/classes/${classCode}`);
     return { success: true, data: enrollment };
 
@@ -1009,9 +1016,12 @@ export async function getStudentClasses() {
       };
     });
 
-      return { success: true, data: classes };
-    } catch (error) {
-      console.error("Get student classes error:", error);
-      return { success: false, error: error instanceof Error ? error.message : "Failed to fetch classes" };
-    }
+    return { success: true, data: classes };
+  } catch (error) {
+    console.error("Get student classes error:", error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : "Failed to fetch student classes" 
+    };
   }
+}

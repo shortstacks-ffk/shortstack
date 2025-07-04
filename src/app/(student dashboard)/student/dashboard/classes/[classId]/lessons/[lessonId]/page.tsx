@@ -4,6 +4,9 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Calendar, FileText, Download, Book, Clock } from 'lucide-react';
 import { formatDate } from '@/src/lib/utils';
+import { isContentVisibleToStudents } from '@/src/lib/visibility';
+import { db } from '@/src/lib/db';
+import { getAuthSession } from '@/src/lib/auth';
 
 interface PageParams {
   params: Promise<{
@@ -12,9 +15,10 @@ interface PageParams {
   }>;
 }
 
-// Updated to use proper interface instead of Promise
+// Updated to use proper interface and handle visibility correctly
 export default async function StudentLessonPage(props: PageParams) {
   const params = await props.params;
+  
   try {
     const { classId, lessonId } = params;
     
@@ -25,14 +29,74 @@ export default async function StudentLessonPage(props: PageParams) {
     
     console.log(`Fetching lesson ${lessonId} for class ${classId}`);
     
-    const response = await getStudentLessonById(lessonId);
-    console.log("Lesson response:", response.success);
-    
-    if (!response.success || !response.data) {
-      console.log("Lesson not found or access denied:", response.error);
+    // Get auth session for the student
+    const session = await getAuthSession();
+    if (!session?.user?.id || session.user.role !== "STUDENT") {
+      console.error("Unauthorized access attempt");
+      notFound();
+    }
+
+    // Find student record
+    const student = await db.student.findFirst({
+      where: {
+        OR: [
+          { userId: session.user.id },
+          ...(session.user.email ? [{ schoolEmail: session.user.email }] : [])
+        ]
+      }
+    });
+
+    if (!student) {
+      console.error("Student profile not found");
+      notFound();
+    }
+
+    // Get class record
+    const classData = await db.class.findUnique({
+      where: { code: classId },
+      select: { id: true, code: true, name: true, emoji: true }
+    });
+
+    if (!classData) {
+      console.error(`Class not found with code: ${classId}`);
+      notFound();
+    }
+
+    // Verify enrollment
+    const enrollment = await db.enrollment.findFirst({
+      where: {
+        studentId: student.id,
+        classId: classData.id,
+        enrolled: true
+      }
+    });
+
+    if (!enrollment) {
+      console.error("Student not enrolled in this class");
       notFound();
     }
     
+
+    // Fetch the lesson plan with all content
+    const lesson = await db.lessonPlan.findFirst({
+      where: {
+        id: lessonId,
+        classes: {
+          some: {
+            id: classData.id
+          }
+        }
+      },
+      include: {
+        files: true,
+        assignments: true,
+        classes: {
+          where: {
+            id: classData.id
+          }
+        }
+      }
+    });
     const lesson = response.data;
     
     // Fix: Find the specific class from the classes array that matches our classId
@@ -46,19 +110,47 @@ export default async function StudentLessonPage(props: PageParams) {
     
     console.log("Lesson loaded:", lesson.name, "Class:", currentClass.name);
 
-    // Add safety checks for lesson.class
-    if (!lesson.classes) {
-      console.error("Lesson class data is missing");
+
+    if (!lesson) {
+      console.error("Lesson not found or not in this class");
       notFound();
     }
 
+    // Get visibility settings for this class
+    const visibilitySettings = await db.classContentVisibility.findMany({
+      where: { classId: classData.id }
+    });
+
+    // Filter files based on visibility
+    const visibleFiles = lesson.files.filter(file => {
+      const fileSetting = visibilitySettings.find(
+        setting => setting.fileId === file.id
+      );
+      return isContentVisibleToStudents(fileSetting);
+    });
+    
+    // Filter assignments based on visibility
+    const visibleAssignments = lesson.assignments.filter(assignment => {
+      const assignmentSetting = visibilitySettings.find(
+        setting => setting.assignmentId === assignment.id
+      );
+      return isContentVisibleToStudents(assignmentSetting);
+    });
+
+    // Create filtered lesson for rendering
+    const filteredLesson = {
+      ...lesson,
+      files: visibleFiles,
+      assignments: visibleAssignments
+    };
+    
     return (
       <main className="container mx-auto px-4 pb-20">
         <div className="mb-6 sm:mb-8 pt-4">
           <Link href={`/student/dashboard/classes/${classId}`}>
             <Button variant="ghost" className="group pl-0 sm:pl-2">
               <ArrowLeft className="h-4 w-4 mr-2 transition-transform group-hover:-translate-x-1" />
-              <span className="text-sm sm:text-base">Back to {lesson.classes?.name || 'Class'}</span>
+              <span className="text-sm sm:text-base">Back to {lesson.classes?.[0]?.name || 'Class'}</span>
             </Button>
           </Link>
         </div>
@@ -74,7 +166,7 @@ export default async function StudentLessonPage(props: PageParams) {
           </div>
           
           <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-3 sm:mb-4 flex items-center gap-2">
-            <span>{lesson.classes?.emoji || '📚'}</span>
+            <span>{lesson.classes?.[0]?.emoji || '📚'}</span>
             <span>{lesson.name}</span>
           </h1>
           
@@ -82,12 +174,12 @@ export default async function StudentLessonPage(props: PageParams) {
           <div className="flex flex-wrap gap-2 sm:gap-4 mt-3 sm:mt-4">
             <div className="bg-background/80 backdrop-blur-sm px-3 py-1 sm:px-4 sm:py-2 rounded-md flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
               <FileText className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
-              <span>{lesson.assignments?.length || 0} Assignments</span>
+              <span>{filteredLesson.assignments.length} Assignments</span>
             </div>
             
             <div className="bg-background/80 backdrop-blur-sm px-3 py-1 sm:px-4 sm:py-2 rounded-md flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
               <Download className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
-              <span>{lesson.files?.length || 0} Materials</span>
+              <span>{filteredLesson.files.length} Materials</span>
             </div>
           </div>
         </div>
@@ -115,7 +207,7 @@ export default async function StudentLessonPage(props: PageParams) {
             </div>
             
             {/* Enhanced Assignments section */}
-            {lesson.assignments && lesson.assignments.length > 0 && (
+            {filteredLesson.assignments.length > 0 && (
               <div className="bg-card rounded-xl shadow-sm border overflow-hidden">
                 <div className="bg-muted/30 px-4 sm:px-6 py-3 sm:py-4 border-b">
                   <h2 className="text-lg sm:text-xl font-semibold flex items-center gap-2">
@@ -124,7 +216,7 @@ export default async function StudentLessonPage(props: PageParams) {
                   </h2>
                 </div>
                 <div className="divide-y">
-                  {lesson.assignments.map((assignment: any) => (
+                  {filteredLesson.assignments.map((assignment: any) => (
                     <div key={assignment.id} className="p-4 sm:p-6">
                       <Link href={`/student/dashboard/classes/${classId}/lessons/${lessonId}/assignments/${assignment.id}`}>
                         <div className="cursor-pointer transition-colors hover:bg-muted/20 -mx-4 -my-4 sm:-mx-6 sm:-my-6 p-4 sm:p-6">
@@ -162,14 +254,14 @@ export default async function StudentLessonPage(props: PageParams) {
           {/* Right column - Materials and resources */}
           <div className="space-y-4 sm:space-y-6">
             {/* Materials/Files section */}
-            {lesson.files && lesson.files.length > 0 && (
+            {filteredLesson.files.length > 0 && (
               <div className="bg-card rounded-xl shadow-sm border overflow-hidden">
                 <div className="bg-muted/30 px-4 sm:px-6 py-3 sm:py-4 border-b">
                   <h2 className="text-lg sm:text-xl font-semibold">Materials</h2>
                 </div>
                 <div className="p-3 sm:p-4">
                   <div className="space-y-1">
-                    {lesson.files.map((file: any) => (
+                    {filteredLesson.files.map((file: any) => (
                       <a 
                         key={file.id}
                         href={file.url} 
@@ -210,11 +302,11 @@ export default async function StudentLessonPage(props: PageParams) {
               <div className="p-4 sm:p-6 space-y-4">
                 <div className="flex items-center gap-3">
                   <div className="h-10 w-10 sm:h-12 sm:w-12 bg-primary/10 rounded-full flex items-center justify-center text-lg sm:text-xl">
-                    {lesson.classes?.emoji || '📚'}
+                    {lesson.classes?.[0]?.emoji || '📚'}
                   </div>
                   <div>
-                    <h3 className="font-medium">{lesson.classes?.name || 'Unknown Class'}</h3>
-                    <p className="text-xs sm:text-sm text-muted-foreground">Class Code: {lesson.classes?.code || 'N/A'}</p>
+                    <h3 className="font-medium">{lesson.classes?.[0]?.name || 'Unknown Class'}</h3>
+                    <p className="text-xs sm:text-sm text-muted-foreground">Class Code: {lesson.classes?.[0]?.code || 'N/A'}</p>
                   </div>
                 </div>
                 

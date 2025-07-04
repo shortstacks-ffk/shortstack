@@ -27,6 +27,7 @@ export function ExistingStudentForm({ classCode, onClose }: ExistingStudentFormP
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0, success: 0, failed: 0 });
+  const [processingStatus, setProcessingStatus] = useState<string>('');
 
   useEffect(() => {
     const loadAvailableStudents = async () => {
@@ -84,13 +85,17 @@ export function ExistingStudentForm({ classCode, onClose }: ExistingStudentFormP
       const student = students.find(s => s.id === studentId);
       
       setProgress(prev => ({ ...prev, current: i + 1 }));
+      setProcessingStatus(`Adding ${student?.firstName} ${student?.lastName}...`);
       
       try {
         const result = await addExistingStudentToClass(studentId, classCode);
         
         if (result.success) {
           setProgress(prev => ({ ...prev, success: prev.success + 1 }));
-          if (result.warning) {
+          setProcessingStatus(`Sending email to ${student?.firstName}...`);
+          
+          // Check for email failure in a different way - assuming error might be in data or as a separate property
+          if (result.data && 'emailFailed' in result.data) {
             // Show warning toast but don't interrupt the process
             toast(`${student?.firstName} ${student?.lastName} added but email notification failed`, {
               icon: '⚠️',
@@ -104,7 +109,14 @@ export function ExistingStudentForm({ classCode, onClose }: ExistingStudentFormP
         console.error(`Error adding student ${studentId}:`, error);
         setProgress(prev => ({ ...prev, failed: prev.failed + 1 }));
       }
+      
+      // Small delay to improve UI feedback
+      if (i < selectedStudentIds.length - 1) {
+        await new Promise(r => setTimeout(r, 300));
+      }
     }
+    
+    setProcessingStatus('Completing process...');
     
     // Show completion toast
     toast.success(`Added ${progress.success} students to class`);
@@ -197,7 +209,7 @@ export function ExistingStudentForm({ classCode, onClose }: ExistingStudentFormP
       {submitting && (
         <div className="bg-muted/30 p-2 rounded-md">
           <div className="mb-1 flex justify-between items-center">
-            <span className="text-sm">Adding students...</span>
+            <span className="text-sm">{processingStatus || 'Adding students...'}</span>
             <span className="text-sm">{progress.current}/{progress.total}</span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-1.5">

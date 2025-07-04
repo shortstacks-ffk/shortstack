@@ -8,17 +8,7 @@ import { getClasses } from '@/src/app/actions/classActions';
 import { getLessonPlansByClass } from '@/src/app/actions/lessonPlansActions';
 import { Loader2, Check } from 'lucide-react';
 import { Checkbox } from '@/src/components/ui/checkbox';
-
-interface FileRecord {
-  id: string;
-  name: string;
-  fileType?: string;
-  activity?: string;
-  size?: number | string;
-  url?: string;
-  classId: string;
-  lessonPlans?: Array<{ id: string; name: string }>;
-}
+import { FileRecord } from '@/src/types/file';
 
 interface ClassRecord {
   id: string;
@@ -33,12 +23,11 @@ interface LessonPlanRecord {
 
 interface AssignFileDialogProps {
   file: FileRecord;
-  isOpen: boolean;
+  onFileAssigned: (file: FileRecord) => void;
   onClose: () => void;
-  onUpdate: () => void;
 }
 
-export default function AssignFileDialog({ file, isOpen, onClose, onUpdate }: AssignFileDialogProps) {
+export default function AssignFileDialog({ file, onFileAssigned, onClose }: AssignFileDialogProps) {
   const [classes, setClasses] = useState<ClassRecord[]>([]);
   const [selectedClass, setSelectedClass] = useState<string>("");
   const [lessonPlans, setLessonPlans] = useState<LessonPlanRecord[]>([]);
@@ -119,7 +108,7 @@ export default function AssignFileDialog({ file, isOpen, onClose, onUpdate }: As
       if (failedResults.length > 0) {
         setError(`Failed to assign file to ${failedResults.length} lesson plans`);
       } else {
-        onUpdate();
+        onFileAssigned(file);
         onClose();
       }
     } catch (error: any) {
@@ -141,7 +130,7 @@ export default function AssignFileDialog({ file, isOpen, onClose, onUpdate }: As
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(isOpen) => !isOpen && onClose()}>
+    <Dialog open={true} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Assign File to Additional Lesson Plans</DialogTitle>

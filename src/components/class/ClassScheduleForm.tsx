@@ -30,24 +30,26 @@ const DAYS = [
   { name: "Sat", value: 6 },
 ];
 
+const DEFAULT_SLOT: ClassScheduleItem = {
+  days: [1],
+  startTime: "09:00",
+  endTime: "10:00",
+};
+
 export default function ClassScheduleForm({ value, onChange }: ClassScheduleFormProps) {
   const [schedules, setSchedules] = useState<ClassScheduleItem[]>([]);
-  
-  // Sync with external value prop - add a proper initial state
+
   useEffect(() => {
-    if (value && Array.isArray(value) && value.length > 0) {
+    if (value && value.length > 0) {
       setSchedules(value);
     } else {
-      // Default to an empty array or a default schedule item
-      setSchedules([{ days: [1], startTime: "09:00", endTime: "10:00" }]);
+      setSchedules([DEFAULT_SLOT]);
+      onChange([DEFAULT_SLOT]);
     }
-  }, [value]);
+  }, [value, onChange]);
 
   const addScheduleItem = () => {
-    const newSchedules = [
-      ...schedules,
-      { days: [], startTime: "09:00", endTime: "10:00" }
-    ];
+    const newSchedules = [...schedules, DEFAULT_SLOT];
     setSchedules(newSchedules);
     onChange(newSchedules);
   };
@@ -83,7 +85,7 @@ export default function ClassScheduleForm({ value, onChange }: ClassScheduleForm
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-medium">Class Schedule</h3>
-        <Button size="sm" onClick={addScheduleItem} type="button">
+        <Button size="sm" onClick={addScheduleItem} type="button" className="bg-orange-500 hover:bg-orange-600 text-white">
           <Plus className="mr-2 h-4 w-4" />
           Add Time Slot
         </Button>
@@ -98,7 +100,7 @@ export default function ClassScheduleForm({ value, onChange }: ClassScheduleForm
       {schedules.map((schedule, index) => (
         <Card key={index} className="h-auto">
           <CardHeader className="pb-2">
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center ">
               <CardTitle className="text-sm font-medium">
                 Time Slot {index + 1}
               </CardTitle>

@@ -35,10 +35,19 @@ export default function StudentLessonsList({ classCode, classId, lessonPlans }: 
                  <span className="text-sm font-medium truncate">
                   {lesson.createdAt ? formatDate(new Date(lesson.createdAt)) : 'No date'}
                 </span>
+              </div>
+              
+              <CardContent className="flex flex-col justify-center items-center h-full pt-10">
+                <h3 className="text-xl font-bold text-center">{lesson.name}</h3>
+                
+                
+                {/* <div className="mt-auto w-full flex justify-between items-center text-xs text-muted-foreground pt-4">
+
                 <div className="mt-auto w-full flex justify-between items-center text-xs text-muted-foreground pt-4">
+
                   <span>{lesson.assignments?.length || 0} assignments</span>
                   <span>{lesson.files?.length || 0} materials</span>
-                </div>
+                </div> */}
               </CardContent>
             </Card>
           </Link>

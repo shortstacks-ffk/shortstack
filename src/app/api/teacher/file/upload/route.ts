@@ -1,172 +1,228 @@
-import { NextResponse } from "next/server";
+import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
+import { NextResponse } from 'next/server';
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/src/lib/auth/config";
 import { db } from "@/src/lib/db";
-import { put } from "@vercel/blob";
 
-// Set maximum request body size
-export const config = {
-  api: {
-    bodyParser: false,
-    responseLimit: '250mb',
-  },
-};
+export async function POST(request: Request): Promise<NextResponse> {
+  const body = (await request.json()) as HandleUploadBody;
 
-// Helper function to parse multipart form data with streaming
-async function parseFormData(req: Request): Promise<{ fields: Record<string, string>, file: File | null }> {
   try {
-    const formData = await req.formData();
-    const fields: Record<string, string> = {};
-    let file = null;
-
-    for (const [key, value] of formData.entries()) {
-      if (value instanceof File) {
-        file = value;
-      } else {
-        fields[key] = value as string;
-      }
-    }
-
-    return { fields, file };
-  } catch (error) {
-    console.error("Error parsing form data:", error);
-    throw new Error("Failed to parse form data");
-  }
-}
-
-export async function POST(request: Request) {
-  try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user?.id || session.user.role !== "TEACHER") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Find the teacher record - using Teacher model from new schema
-    const teacher = await db.teacher.findUnique({
-      where: { userId: session.user.id }
-    });
-
-    if (!teacher) {
-      return NextResponse.json({ error: "Teacher profile not found" }, { status: 404 });
-    }
-
-    // Parse form data
-    const { fields, file } = await parseFormData(request);
-    const { fileName, lessonPlanId, classId, activity } = fields;
-
-    if (!file) {
-      return NextResponse.json({ error: "No file provided" }, { status: 400 });
-    }
-
-    if (!lessonPlanId || !classId) {
-      return NextResponse.json({ error: "Missing required data (lessonPlanId or classId)" }, { status: 400 });
-    }
-
-    // Increased file size limit to 250MB for larger files
-    if (file.size > 250 * 1024 * 1024) {
-      return NextResponse.json({ error: "File too large (max 250MB)" }, { status: 400 });
-    }
-
-    // Verify the teacher has access to this class and lesson plan
-    const classObj = await db.class.findFirst({
-      where: { 
-        code: classId,
-        teacherId: teacher.id
-      }
-    });
-
-    if (!classObj) {
-      return NextResponse.json({ 
-        error: "Class not found or you don't have access to it" 
-      }, { status: 403 });
-    }
-
-    const lessonPlan = await db.lessonPlan.findFirst({
-      where: {
-        id: lessonPlanId,
-        teacherId: teacher.id,
-        classes: {
-          some: {
-            id: classObj.id
-          }
+    const jsonResponse = await handleUpload({
+      body,
+      request,
+      onBeforeGenerateToken: async (pathname, clientPayload) => {
+        // Authenticate and authorize users before generating the token
+        const session = await getServerSession(authOptions);
+        
+        if (!session?.user?.id || (session.user.role !== "TEACHER" && session.user.role !== "SUPER")) {
+          throw new Error("Unauthorized");
         }
-      }
+
+        // Parse client payload to get upload parameters
+        const uploadParams = clientPayload ? JSON.parse(clientPayload) : {};
+        const { 
+          lessonPlanId, 
+          genericLessonPlanId, 
+          isGeneric, 
+          activity,
+          fileName,
+          fileSize
+        } = uploadParams;
+
+        console.log('Upload token generation:', { 
+          role: session.user.role, 
+          isGeneric, 
+          lessonPlanId, 
+          genericLessonPlanId,
+          fileName,
+          fileSize,
+          originalPathname: pathname
+        });
+
+        let teacherId;
+        let userType;
+
+        // Handle SUPER users uploading to generic lesson plans
+        if (session.user.role === "SUPER" && isGeneric && genericLessonPlanId) {
+          console.log('Processing SUPER user upload to generic lesson plan');
+          
+          // Find or create a teacher record for the super user
+          let superTeacher = await db.teacher.findUnique({
+            where: { userId: session.user.id }
+          });
+          
+          if (!superTeacher) {
+            console.log('Creating teacher record for SUPER user');
+            
+            const superUser = await db.user.findUnique({
+              where: { id: session.user.id },
+              select: { name: true, id: true }
+            });
+            
+            if (!superUser) {
+              throw new Error("User not found");
+            }
+            
+            let firstName = "Super";
+            let lastName = "User";
+            
+            if (superUser.name) {
+              const nameParts = superUser.name.trim().split(' ');
+              firstName = nameParts[0] || "Super";
+              lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : "User";
+            }
+            
+            superTeacher = await db.teacher.create({
+              data: {
+                userId: superUser.id,
+                firstName,
+                lastName,
+              }
+            });
+            
+            console.log('Teacher record created for SUPER user:', superTeacher.id);
+          }
+          
+          teacherId = superTeacher.id;
+          userType = 'super';
+          
+          // Verify generic lesson plan exists
+          const genericPlan = await db.genericLessonPlan.findUnique({
+            where: { id: genericLessonPlanId }
+          });
+          
+          if (!genericPlan) {
+            throw new Error("Generic lesson plan not found");
+          }
+          
+        } 
+        // Handle TEACHER users or SUPER users uploading to regular lesson plans
+        else if (lessonPlanId) {
+          console.log('Processing regular lesson plan upload');
+          
+          // For SUPER users uploading to regular lesson plans, ensure they have a teacher record
+          if (session.user.role === "SUPER") {
+            let superTeacher = await db.teacher.findUnique({
+              where: { userId: session.user.id }
+            });
+            
+            if (!superTeacher) {
+              const superUser = await db.user.findUnique({
+                where: { id: session.user.id },
+                select: { name: true, id: true }
+              });
+              
+              if (!superUser) {
+                throw new Error("User not found");
+              }
+              
+              let firstName = "Super";
+              let lastName = "User";
+              
+              if (superUser.name) {
+                const nameParts = superUser.name.trim().split(' ');
+                firstName = nameParts[0] || "Super";
+                lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : "User";
+              }
+              
+              superTeacher = await db.teacher.create({
+                data: {
+                  userId: superUser.id,
+                  firstName,
+                  lastName,
+                }
+              });
+            }
+            
+            teacherId = superTeacher.id;
+            userType = 'super';
+            
+            // SUPER users can access any lesson plan
+            const lessonPlan = await db.lessonPlan.findUnique({
+              where: { id: lessonPlanId }
+            });
+
+            if (!lessonPlan) {
+              throw new Error("Lesson plan not found");
+            }
+            
+          } else {
+            // Regular TEACHER user
+            const teacher = await db.teacher.findUnique({
+              where: { userId: session.user.id },
+            });
+
+            if (!teacher) {
+              throw new Error("Teacher profile not found");
+            }
+            
+            teacherId = teacher.id;
+            userType = 'teacher';
+            
+            // Verify the lesson plan exists and teacher has access to it
+            const lessonPlan = await db.lessonPlan.findUnique({
+              where: { id: lessonPlanId }
+            });
+
+            if (!lessonPlan) {
+              throw new Error("Lesson plan not found");
+            }
+            
+            // Verify teacher owns the lesson plan (only for regular teachers)
+            if (lessonPlan.teacherId !== teacherId) {
+              throw new Error("You don't have access to this lesson plan");
+            }
+          }
+          
+          userType = userType || 'teacher';
+        } else {
+          throw new Error("Invalid upload parameters");
+        }
+
+        console.log('Authorization successful:', { teacherId, userType });
+
+        // Generate token with metadata for upload completion
+        return {
+          allowedContentTypes: [
+            'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
+            'video/mp4', 'video/webm', 'video/quicktime',
+            'application/pdf', 'application/msword', 
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            'text/plain', 'text/csv', 'application/zip', 'application/x-zip-compressed'
+          ],
+          maximumSizeInBytes: 500 * 1024 * 1024, // 500MB
+          addRandomSuffix: true,
+          tokenPayload: JSON.stringify({
+            userId: session.user.id,
+            teacherId,
+            lessonPlanId,
+            genericLessonPlanId,
+            isGeneric,
+            activity,
+            fileName,
+            fileSize,
+            userType
+          }),
+        };
+      },
+      onUploadCompleted: async ({ blob, tokenPayload }) => {
+        // Just log the completion - don't create database records here
+        console.log('🚀 Upload completed:', blob.url);
+        console.log('🚀 Blob size:', blob.url.length);
+        
+        // The client will handle database creation using the createFile action
+      },
     });
 
-    if (!lessonPlan) {
-      return NextResponse.json({ 
-        error: "Lesson plan not found or you don't have access to it" 
-      }, { status: 403 });
-    }
-
-    console.log("Teacher file upload - starting process");
-    
-    // Create a unique, sanitized filename
-    const sanitizedFileName = (fileName || file.name).replace(/\s/g, '-');
-    const fileExtension = file.name.includes('.') ? file.name.substring(file.name.lastIndexOf('.')) : '';
-    const uniqueId = `${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
-    const uniqueFileName = `materials/${teacher.id}/${lessonPlanId}/${uniqueId}${fileExtension}`;
-    
-    // Use optimized blob upload with proper content type detection
-    const blob = await put(uniqueFileName, file, {
-      access: 'public',
-      contentType: file.type || getMimeType(file.name),
-      addRandomSuffix: false, // We already add uniqueness
-    });
-
-    console.log("Blob upload successful:", blob.url);
-
-    // Return success response with file details
-    return NextResponse.json({
-      success: true,
-      fileUrl: blob.url,
-      fileId: blob.url.split('/').pop(),
-      fileName: sanitizedFileName,
-      fileType: file.type || getMimeType(file.name),
-      size: file.size,
-      activity: activity || 'interactive'
-    });
-    
+    return NextResponse.json(jsonResponse);
   } catch (error) {
-    console.error("Error uploading file:", error);
+    console.error("❌ Upload route error:", error);
     return NextResponse.json(
-      { success: false, error: "Failed to upload file" },
-      { status: 500 }
+      { error: (error as Error).message },
+      { status: 400 }
     );
   }
-}
-
-// Helper function to determine MIME type from file extension
-function getMimeType(filename: string): string {
-  const extension = filename.split('.').pop()?.toLowerCase() || '';
-  const mimeTypes: Record<string, string> = {
-    'pdf': 'application/pdf',
-    'doc': 'application/msword',
-    'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'xls': 'application/vnd.ms-excel',
-    'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    'ppt': 'application/vnd.ms-powerpoint',
-    'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-    'jpg': 'image/jpeg',
-    'jpeg': 'image/jpeg',
-    'png': 'image/png',
-    'gif': 'image/gif',
-    'svg': 'image/svg+xml',
-    'mp4': 'video/mp4',
-    'webm': 'video/webm',
-    'mp3': 'audio/mpeg',
-    'wav': 'audio/wav',
-    'txt': 'text/plain',
-    'csv': 'text/csv',
-    'html': 'text/html',
-    'css': 'text/css',
-    'js': 'application/javascript',
-    'json': 'application/json',
-    'zip': 'application/zip',
-    'rar': 'application/vnd.rar',
-    '7z': 'application/x-7z-compressed',
-  };
-
-  return mimeTypes[extension] || 'application/octet-stream';
 }

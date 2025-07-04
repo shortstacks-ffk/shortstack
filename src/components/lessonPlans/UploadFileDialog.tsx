@@ -1,7 +1,6 @@
 'use client';
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/src/components/ui/dialog';
-import { createFile } from '@/src/app/actions/fileActions';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { useState, useRef, useCallback } from 'react';
@@ -10,6 +9,11 @@ import { Loader2, Upload, X, FileIcon, FileText, FileImage, FileVideo } from 'lu
 import { Progress } from '@/src/components/ui/progress';
 import { toast } from 'sonner';
 import { cn } from '@/src/lib/utils';
+import { useSession } from 'next-auth/react';
+import { upload } from '@vercel/blob/client';
+import { type PutBlobResult, type UploadProgressEvent } from '@vercel/blob';
+import { createFile } from '@/src/app/actions/fileActions';
+import { ensureVisibilityRecords } from '@/src/app/actions/contentVisibilityActions';
 
 interface FileRecord {
   id: string;
@@ -20,10 +24,9 @@ interface FileRecord {
   size?: string | number;
 }
 
-// Update props interface
 interface UploadFileDialogProps {
   lessonPlanId: string;
-  isTemplate?: boolean; // Add this prop
+  isGeneric?: boolean;
   onFileUploaded?: (file: any) => void;
 }
 
@@ -38,11 +41,14 @@ const getFileIcon = (fileType: string) => {
 
 export default function UploadFileDialog({
   lessonPlanId,
+  isGeneric = false,
   onFileUploaded,
 }: UploadFileDialogProps) {
-  // Get classId from URL params
+  // Get classId from URL params and session data
   const params = useParams();
   const classId = params.classId as string;
+  const { data: session } = useSession();
+  const isSuperUser = session?.user?.role === 'SUPER';
   
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
@@ -52,6 +58,7 @@ export default function UploadFileDialog({
   const [error, setError] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const [blob, setBlob] = useState<PutBlobResult | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -59,13 +66,39 @@ export default function UploadFileDialog({
   const formatFileSize = (bytes: number): string => {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+    if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+  };
+
+  // Move resetForm INSIDE the component
+  const resetForm = () => {
+    setName('');
+    setActivity('interactive');
+    setFile(null);
+    setError(null);
+    setUploadProgress(0);
+    setBlob(null);
+    setIsDragging(false);
+    
+    // Reset file input if it exists
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const selectedFile = e.target.files[0];
+      
+      // Check file size (500MB limit)
+      const MAX_SIZE = 500 * 1024 * 1024; // 500MB
+      if (selectedFile.size > MAX_SIZE) {
+        setError(`File is too large. Maximum size is 500MB.`);
+        return;
+      }
+      
       setFile(selectedFile);
+      setError(null);
       
       // Auto-fill name from file name if empty
       if (!name) {
@@ -119,7 +152,16 @@ export default function UploadFileDialog({
     
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const droppedFile = e.dataTransfer.files[0];
+      
+      // Check file size (500MB limit)
+      const MAX_SIZE = 500 * 1024 * 1024; // 500MB
+      if (droppedFile.size > MAX_SIZE) {
+        setError(`File is too large. Maximum size is 500MB.`);
+        return;
+      }
+      
       setFile(droppedFile);
+      setError(null);
       
       // Auto-fill name from file name if empty
       if (!name) {
@@ -133,12 +175,16 @@ export default function UploadFileDialog({
 
   const removeSelectedFile = () => {
     setFile(null);
+    setError(null);
+    setBlob(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
     if (!file || !name) {
       setError('Please provide a file name and select a file');
       return;
@@ -149,83 +195,198 @@ export default function UploadFileDialog({
     setUploadProgress(0);
 
     try {
-      // Create a FormData instance for the file upload
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('fileName', name);
-      formData.append('lessonPlanId', lessonPlanId);
-      formData.append('classId', classId);
-      formData.append('activity', activity);
+      console.log('Starting Vercel client upload...');
+
+      // First, get the teacher ID from the session to create the proper folder structure
+      const tempPayload = {
+        lessonPlanId: isGeneric && isSuperUser ? null : lessonPlanId,
+        genericLessonPlanId: isGeneric && isSuperUser ? lessonPlanId : null,
+        isGeneric: isGeneric && isSuperUser,
+        activity: activity,
+        fileName: name,
+        fileSize: file.size
+      };
+
+      // Generate a unique filename with the user's provided name
+      const fileExtension = file.name.includes('.') ? file.name.substring(file.name.lastIndexOf('.')) : '';
+      const sanitizedFileName = name.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9.-_]/g, '');
+      const baseFileName = `${sanitizedFileName}-${Date.now()}${fileExtension}`;
       
-      // Upload the file using fetch with progress tracking
-      const xhr = new XMLHttpRequest();
-      xhr.open('POST', '/api/teacher/file/upload', true);
-      
-      // Track upload progress
-      xhr.upload.addEventListener('progress', (event) => {
-        if (event.lengthComputable) {
-          const percentComplete = Math.round((event.loaded / event.total) * 100);
-          setUploadProgress(percentComplete);
-        }
-      });
-      
-      // Handle the response
-      const uploadPromise = new Promise<any>((resolve, reject) => {
-        xhr.onload = function() {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            try {
-              const response = JSON.parse(xhr.responseText);
-              resolve(response);
-            } catch (error) {
-              reject(new Error('Invalid response format'));
-            }
-          } else {
-            reject(new Error(`Upload failed with status ${xhr.status}`));
-          }
-        };
-        xhr.onerror = function() {
-          reject(new Error('Network error occurred'));
-        };
-      });
-      
-      xhr.send(formData);
-      const uploadData = await uploadPromise;
-      
-      if (!uploadData.success) {
-        throw new Error(uploadData.error || 'File upload failed');
+      // Create the folder structure based on user type and lesson plan type
+      let folderPath;
+      if (isGeneric && isSuperUser) {
+        folderPath = `super/generic-files`;
+      } else if (isSuperUser) {
+        folderPath = `super/lesson-files`;
+      } else {
+        folderPath = `teacher/lesson-files`;
       }
       
-      // Create file record in database with the returned URL
-      const res = await createFile({
-        name,
-        fileType: uploadData.fileType || file.type || 'application/octet-stream',
-        activity,
-        size: uploadData.size || file.size,
-        url: uploadData.fileUrl || '',
-        classId,
-        lessonPlanIds: [lessonPlanId],
+      const fullPathName = `${folderPath}/${baseFileName}`;
+      
+      console.log('Upload path will be:', fullPathName);
+
+      // Upload using Vercel's client upload with the full path
+      const newBlob = await upload(fullPathName, file, {
+        access: 'public',
+        handleUploadUrl: '/api/teacher/file/upload',
+        clientPayload: JSON.stringify(tempPayload),
+        onUploadProgress: (progressEvent: UploadProgressEvent) => {
+          setUploadProgress(progressEvent.percentage);
+          console.log(`Upload progress: ${progressEvent.percentage}%`);
+        },
       });
 
-      if (res.success) {
-        toast.success("File uploaded successfully", {
-          description: `${name} has been uploaded and added to the lesson plan.`,
-          duration: 5000,
-        });
-        onFileUploaded?.(res.data);
-        setOpen(false);
-        setName('');
-        setActivity('interactive');
-        setFile(null);
-      } else {
-        setError(res.error || 'Failed to create file record');
+      setBlob(newBlob);
+      setUploadProgress(100);
+      
+      console.log('Upload completed successfully:', newBlob.url);
+      console.log('Final blob pathname:', newBlob.pathname);
+      
+      // Now create the file record in the database using the createFile action
+      console.log('Creating file record in database...');
+      
+      const fileData = {
+        name: name,
+        fileType: file.type,
+        activity: activity,
+        size: file.size,
+        url: newBlob.url,
+        // For generic lesson plans
+        ...(isGeneric && isSuperUser && { genericLessonPlanIds: [lessonPlanId] }),
+        // For regular lesson plans
+        ...(!isGeneric && { lessonPlanIds: [lessonPlanId] })
+      };
+
+      const createResult = await createFile(fileData);
+      
+      if (!createResult.success) {
+        throw new Error(createResult.error || 'Failed to create file record');
       }
+      
+      console.log('File record created successfully:', createResult.data?.id);
+      
+      // Handle successful upload
+      toast.success("File uploaded successfully", {
+        description: `${name} has been uploaded and added to the lesson plan.`,
+        duration: 5000,
+      });
+      
+      // Call the onFileUploaded callback with the result
+      if (onFileUploaded) {
+        onFileUploaded({
+          success: true,
+          fileUrl: newBlob.url,
+          fileId: createResult.data?.id,
+          fileName: name,
+          fileType: file.type,
+          size: file.size,
+          activity: activity,
+          createdAt: new Date().toISOString()
+        });
+      }
+      
+      // Close dialog and reset form
+      setOpen(false);
+      setName('');
+      setActivity('interactive');
+      setFile(null);
+      setBlob(null);
+      
+      // Assuming this is in the handleSubmit function after the upload succeeds:
+      if (createResult.success && createResult.data) {
+        // Log confirmation that file was created with visibility settings
+        console.log('File uploaded successfully, visibility records should be created:', createResult.data.id);
+        
+        // Ensure visibility records exist for all classes
+        if (!isGeneric && lessonPlanId) {
+  try {
+    // Check if the lesson plan has any classes
+    const lessonPlanResponse = await fetch(`/api/teacher/lesson-plans/${lessonPlanId}/classes`);
+    if (lessonPlanResponse.ok) {
+      const classesData = await lessonPlanResponse.json();
+      
+      if (classesData && classesData.length > 0) {
+        // Create visibility records for each class
+        const classIds = classesData.map((c: any) => c.id);
+        
+        try {
+          // Check if the ensureVisibilityRecords function exists
+          if (typeof ensureVisibilityRecords === 'function') {
+            const ensureResult = await ensureVisibilityRecords({
+              contentType: 'file',
+              contentId: createResult.data.id,
+              classIds
+            });
+            
+            console.log('Visibility records setup result:', ensureResult);
+          } else {
+            console.log('ensureVisibilityRecords function not available, skipping visibility setup');
+            // You may want to call an API endpoint directly instead
+            // const visibilityResponse = await fetch('/api/teacher/content-visibility', {
+            //   method: 'POST',
+            //   headers: { 'Content-Type': 'application/json' },
+            //   body: JSON.stringify({
+            //     contentType: 'file',
+            //     contentId: createResult.data.id,
+            //     classIds,
+            //     lessonPlanId
+            //   })
+            // });
+            // console.log('Visibility API response:', await visibilityResponse.json());
+          }
+        } catch (visibilityError) {
+          console.error('Error setting up visibility records:', visibilityError);
+        }
+      } else {
+        console.log('No classes assigned to this lesson plan yet');
+      }
+    }
+  } catch (err) {
+    console.error('Failed to fetch class data for visibility setup:', err);
+    // Don't block the upload success for this secondary operation
+  }
+}
+        
+        toast.success("File uploaded successfully");
+        setOpen(false);
+        resetForm();
+        if (onFileUploaded) {
+          onFileUploaded(createResult.data);
+        }
+      }
+      
     } catch (error: any) {
       console.error('Error uploading file:', error);
-      setError(error.message || 'An unexpected error occurred');
+      setError(error.message || 'An unexpected error occurred during upload');
     } finally {
       setIsUploading(false);
-      setUploadProgress(0);
     }
+  };
+
+  // Get status message based on upload progress
+  const getUploadStatusMessage = () => {
+    if (uploadProgress === 0) return "Initializing upload...";
+    if (uploadProgress >= 100) return "Upload complete! Processing...";
+    
+    // For very large files, provide more detailed messages
+    if (file && file.size > 100 * 1024 * 1024) { // > 100MB
+      if (uploadProgress < 10) return "Starting upload (large file - this may take a while)...";
+      if (uploadProgress < 25) return "Uploading... (25% complete)";
+      if (uploadProgress < 50) return "Uploading... (halfway there)";
+      if (uploadProgress < 75) return "Uploading... (75% complete)";
+      if (uploadProgress < 90) return "Almost finished...";
+      if (uploadProgress < 100) return "Finalizing upload...";
+      return "Processing file...";
+    }
+    
+    // For smaller files
+    if (uploadProgress < 25) return "Uploading...";
+    if (uploadProgress < 50) return "Uploading... (25% complete)";
+    if (uploadProgress < 75) return "Uploading... (50% complete)";
+    if (uploadProgress < 90) return "Uploading... (75% complete)";
+    if (uploadProgress < 100) return "Almost done...";
+    return "Processing...";
   };
 
   return (
@@ -233,9 +394,8 @@ export default function UploadFileDialog({
       if (!isUploading) {
         setOpen(isOpen);
         if (!isOpen) {
-          setError(null);
-          setFile(null);
-          setUploadProgress(0);
+          // Instead of manually resetting here, you can call resetForm()
+          resetForm();
         }
       }
     }}>
@@ -249,7 +409,8 @@ export default function UploadFileDialog({
         <DialogHeader>
           <DialogTitle>Upload File</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4">
+        
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">File Name</label>
             <Input 
@@ -276,6 +437,15 @@ export default function UploadFileDialog({
             </select>
           </div>
           
+          {file && file.size > 100 * 1024 * 1024 && (
+            <div className="bg-blue-50 border border-blue-200 text-blue-800 rounded-md p-3 text-sm">
+              <p className="font-medium">Uploading large file ({formatFileSize(file.size)})</p>
+              <p className="mt-1">
+                Large files may take several minutes to upload. Please keep this window open and your device awake.
+              </p>
+            </div>
+          )}
+          
           {!file ? (
             <div
               className={cn(
@@ -294,15 +464,17 @@ export default function UploadFileDialog({
                     Drag and drop your file here or click to browse
                   </p>
                   <p className="text-xs text-gray-500">
-                    Supports any file type (PDF, Word, Excel, images, videos, etc.)
+                    Supports any file type up to 500MB
                   </p>
                 </div>
                 <Input
                   ref={fileInputRef}
                   type="file"
+                  name="file"
                   className="hidden"
                   onChange={handleFileChange}
                   disabled={isUploading}
+                  required
                 />
                 <Button 
                   variant="outline" 
@@ -328,6 +500,7 @@ export default function UploadFileDialog({
                 <Button
                   variant="ghost"
                   size="sm"
+                  type="button"
                   className="h-8 w-8 p-0 rounded-full"
                   onClick={removeSelectedFile}
                   disabled={isUploading}
@@ -340,12 +513,17 @@ export default function UploadFileDialog({
           )}
           
           {isUploading && (
-            <div className="space-y-2">
+            <div className="space-y-3">
               <div className="flex items-center justify-between text-sm">
-                <span>Uploading...</span>
-                <span>{uploadProgress}%</span>
+                <span className="font-medium">{getUploadStatusMessage()}</span>
+                <span className="text-blue-600 font-semibold">{uploadProgress}%</span>
               </div>
-              <Progress value={uploadProgress} className="h-2" />
+              <Progress value={uploadProgress} className="h-3" />
+              {uploadProgress > 0 && uploadProgress < 100 && (
+                <div className="text-xs text-gray-500 text-center">
+                  {file && `Uploading ${formatFileSize(file.size)} file...`}
+                </div>
+              )}
             </div>
           )}
           
@@ -358,25 +536,30 @@ export default function UploadFileDialog({
           <div className="flex justify-end gap-2 pt-2">
             <Button 
               variant="secondary" 
-              onClick={() => setOpen(false)}
+              type="button"
+              onClick={() => {
+                if (!isUploading) {
+                  setOpen(false);
+                }
+              }}
               disabled={isUploading}
             >
               Cancel
             </Button>
             <Button 
-              onClick={handleSubmit} 
-              disabled={isUploading || !file}
+              type="submit"
+              disabled={isUploading || !file || !name}
               className="min-w-[90px]"
             >
               {isUploading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Uploading
+                  Uploading...
                 </>
               ) : 'Upload'}
             </Button>
           </div>
-        </div>
+        </form>
       </DialogContent>
     </Dialog>
   );
