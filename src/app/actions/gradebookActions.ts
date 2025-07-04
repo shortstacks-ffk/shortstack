@@ -62,11 +62,28 @@ export async function getClassGradebook(classCode: string): Promise<GradebookRes
     // Get all assignments for the class using many-to-many relationship
     const assignments = await db.assignment.findMany({
       where: { 
-        classes: {
-          some: {
-            id: classData.id
+        OR: [
+          // Direct class assignments
+          {
+            classes: {
+              some: {
+                id: classData.id
+              }
+            }
+          },
+          // Assignments through lesson plans
+          {
+            lessonPlans: {
+              some: {
+                classes: {
+                  some: {
+                    id: classData.id
+                  }
+                }
+              }
+            }
           }
-        }
+        ]
       },
       select: {
         id: true,
@@ -261,11 +278,28 @@ export async function getStudentGrades(classCode: string): Promise<GradebookResp
     // Get all assignments for the class using many-to-many relationship
     const assignments = await db.assignment.findMany({
       where: { 
-        classes: {
-          some: {
-            id: enrollment.classId
+        OR: [
+          // Direct class assignments
+          {
+            classes: {
+              some: {
+                id: enrollment.classId
+              }
+            }
+          },
+          // Assignments through lesson plans
+          {
+            lessonPlans: {
+              some: {
+                classes: {
+                  some: {
+                    id: enrollment.classId
+                  }
+                }
+              }
+            }
           }
-        }
+        ]
       },
       select: {
         id: true,
@@ -351,26 +385,73 @@ export async function getStudentOverallProgress(): Promise<GradebookResponse> {
     const classIds = enrollments.map(e => e.class.id);
 
     // Get all assignments across all enrolled classes using many-to-many relationship
-    const assignments = await db.assignment.findMany({
+    const allAssignments = await db.assignment.findMany({
       where: { 
-        classes: {
-          some: {
-            id: { in: classIds }
+        OR: [
+          // Direct class assignments
+          {
+            classes: {
+              some: {
+                id: { in: classIds }
+              }
+            }
+          },
+          // Assignments through lesson plans
+          {
+            lessonPlans: {
+              some: {
+                classes: {
+                  some: {
+                    id: { in: classIds }
+                  }
+                }
+              }
+            }
           }
-        }
+        ]
       },
       select: {
         id: true,
         name: true,
         dueDate: true,
         classes: {
+          where: {
+            id: { in: classIds }
+          },
           select: {
             id: true,
             code: true
           }
+        },
+        lessonPlans: {
+          where: {
+            classes: {
+              some: {
+                id: { in: classIds }
+              }
+            }
+          },
+          select: {
+            id: true,
+            name: true,
+            classes: {
+              where: {
+                id: { in: classIds }
+              },
+              select: {
+                id: true,
+                code: true
+              }
+            }
+          }
         }
       }
     });
+
+    // Remove duplicates manually since distinct might not work as expected
+    const assignments = allAssignments.filter((assignment, index, self) => 
+      index === self.findIndex(a => a.id === assignment.id)
+    );
 
     // Get all submissions for this student across all classes
     const submissions = await db.studentAssignmentSubmission.findMany({
@@ -389,9 +470,14 @@ export async function getStudentOverallProgress(): Promise<GradebookResponse> {
 
     // Calculate progress statistics
     const totalAssignments = assignments.length;
-    const completedAssignments = submissions.filter(s => 
-      s.status === 'SUBMITTED' || s.status === 'GRADED'
-    ).length;
+    
+    // Count unique assignments that have been submitted (not duplicate submissions)
+    const uniqueSubmittedAssignments = new Set(
+      submissions
+        .filter(s => s.status === 'SUBMITTED' || s.status === 'GRADED')
+        .map(s => s.assignmentId)
+    );
+    const completedAssignments = uniqueSubmittedAssignments.size;
     
     const gradedSubmissions = submissions.filter(s => s.grade !== null && s.grade !== undefined);
     
@@ -399,6 +485,17 @@ export async function getStudentOverallProgress(): Promise<GradebookResponse> {
     const averageGrade = gradedSubmissions.length > 0 
       ? Math.round(gradedSubmissions.reduce((sum, sub) => sum + (sub.grade || 0), 0) / gradedSubmissions.length)
       : 0;
+
+    // Debug logging
+    console.log('Student Progress Debug:', {
+      studentId: student.id,
+      enrolledClasses: classIds.length,
+      totalAssignments,
+      totalSubmissions: submissions.length,
+      completedAssignments,
+      gradedSubmissions: gradedSubmissions.length,
+      averageGrade
+    });
 
     // Get actual bank account balances
     let totalBankBalance = 0;
@@ -470,7 +567,7 @@ export async function getTeacherClassesPerformance(): Promise<GradebookResponse>
       return { success: false, error: "Teacher profile not found" };
     }
 
-    // Get all teacher's classes with students and submissions
+    // Get all teacher's classes with students and assignments
     const classes = await db.class.findMany({
       where: { teacherId: teacher.id },
       include: {
@@ -491,6 +588,16 @@ export async function getTeacherClassesPerformance(): Promise<GradebookResponse>
             id: true,
             name: true
           }
+        },
+        lessonPlans: {
+          include: {
+            assignments: {
+              select: {
+                id: true,
+                name: true
+              }
+            }
+          }
         }
       }
     });
@@ -500,14 +607,22 @@ export async function getTeacherClassesPerformance(): Promise<GradebookResponse>
       cls.enrollments.map(enrollment => enrollment.student.id)
     );
     
-    const allAssignmentIds = classes.flatMap(cls => 
-      cls.assignments.map(assignment => assignment.id)
-    );
+    // Get all assignment IDs from both direct assignments and lesson plan assignments
+    const allAssignmentIds = classes.flatMap(cls => {
+      const directAssignments = cls.assignments.map(assignment => assignment.id);
+      const lessonPlanAssignments = cls.lessonPlans.flatMap(lp => 
+        lp.assignments.map(assignment => assignment.id)
+      );
+      return [...directAssignments, ...lessonPlanAssignments];
+    });
+
+    // Remove duplicates
+    const uniqueAssignmentIds = [...new Set(allAssignmentIds)];
 
     const submissions = await db.studentAssignmentSubmission.findMany({
       where: {
         studentId: { in: allStudentIds },
-        assignmentId: { in: allAssignmentIds },
+        assignmentId: { in: uniqueAssignmentIds },
         grade: { not: null }
       },
       select: {
@@ -523,6 +638,18 @@ export async function getTeacherClassesPerformance(): Promise<GradebookResponse>
                 emoji: true,
                 color: true
               }
+            },
+            lessonPlans: {
+              select: {
+                classes: {
+                  select: {
+                    id: true,
+                    name: true,
+                    emoji: true,
+                    color: true
+                  }
+                }
+              }
             }
           }
         }
@@ -532,7 +659,10 @@ export async function getTeacherClassesPerformance(): Promise<GradebookResponse>
     // Calculate average grades per class
     const classPerformance = classes.map(cls => {
       const classSubmissions = submissions.filter(sub => 
-        sub.assignment.classes.some(assignmentClass => assignmentClass.id === cls.id)
+        sub.assignment.classes.some(assignmentClass => assignmentClass.id === cls.id) ||
+        sub.assignment.lessonPlans.some(lessonPlan => 
+          lessonPlan.classes.some(lpClass => lpClass.id === cls.id)
+        )
       );
 
       const totalGrades = classSubmissions.reduce((sum, sub) => sum + (sub.grade || 0), 0);
@@ -599,5 +729,98 @@ export async function getTeacherClassesPerformance(): Promise<GradebookResponse>
   } catch (error: any) {
     console.error("Get teacher classes performance error:", error);
     return { success: false, error: "Failed to fetch performance data" };
+  }
+}
+
+// Get all assignments for a class (including from lesson plans) - for gradebook
+export async function getClassAssignments(classCode: string): Promise<GradebookResponse> {
+  try {
+    const session = await getAuthSession();
+    if (!session?.user?.id) {
+      return { success: false, error: "Unauthorized" };
+    }
+
+    // Get teacher record
+    const teacher = await db.teacher.findUnique({
+      where: { userId: session.user.id }
+    });
+
+    if (!teacher) {
+      return { success: false, error: "Teacher profile not found" };
+    }
+
+    // Verify the class exists and belongs to the teacher
+    const classData = await db.class.findFirst({
+      where: { 
+        code: classCode,
+        teacherId: teacher.id
+      },
+      select: { id: true }
+    });
+
+    if (!classData) {
+      return { success: false, error: "Class not found or you don't have permission to access it" };
+    }
+
+    // Get all assignments for the class including those from lesson plans
+    const assignments = await db.assignment.findMany({
+      where: { 
+        OR: [
+          // Direct class assignments
+          {
+            classes: {
+              some: {
+                id: classData.id
+              }
+            }
+          },
+          // Assignments through lesson plans
+          {
+            lessonPlans: {
+              some: {
+                classes: {
+                  some: {
+                    id: classData.id
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      select: {
+        id: true,
+        name: true,
+        fileType: true,
+        dueDate: true,
+        activity: true,
+        size: true,
+        url: true,
+        rubric: true,
+        createdAt: true,
+        updatedAt: true,
+        lessonPlans: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
+      },
+      orderBy: { dueDate: 'asc' }
+    });
+
+    // Add classId to each assignment for compatibility
+    const assignmentsWithClassId = assignments.map(assignment => ({
+      ...assignment,
+      classId: classData.id
+    }));
+
+    return {
+      success: true,
+      data: assignmentsWithClassId
+    };
+  } catch (error: any) {
+    console.error("Get class assignments error:", error);
+    return { success: false, error: "Failed to fetch assignments" };
   }
 }
