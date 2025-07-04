@@ -1,7 +1,7 @@
 'use client';
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/src/components/ui/dialog';
-import { createAssignment } from '@/src/app/actions/assignmentActions';
+import { createAssignment, addAssignmentToGenericLessonPlan } from '@/src/app/actions/assignmentActions';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Textarea } from '@/src/components/ui/textarea';
@@ -39,13 +39,13 @@ const getFileIcon = (fileType: string) => {
 export default function UploadAssignmentDialog({
   lessonPlanId,
   onAssignmentUploaded,
-  classId, // We'll still accept this but make it optional
-  isGeneric = false // Add support for generic lesson plans
+  classId,
+  isGeneric = false 
 }: {
   lessonPlanId: string;
   onAssignmentUploaded: (assignment: AssignmentRecord) => void;
-  classId?: string; // Make this optional
-  isGeneric?: boolean; // Add this parameter
+  classId?: string;
+  isGeneric?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
@@ -54,7 +54,6 @@ export default function UploadAssignmentDialog({
   const [textAssignment, setTextAssignment] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [dueDate, setDueDate] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
@@ -173,7 +172,6 @@ export default function UploadAssignmentDialog({
     setActivity('Homework');
     setAssignmentType('file');
     setTextAssignment('');
-    setDueDate('');
     setFile(null);
     setError(null);
     setUploadProgress(0);
@@ -270,48 +268,101 @@ export default function UploadAssignmentDialog({
         }
       }
 
-      // Now create the assignment record
+      // Create the assignment record
       setUploadPhase('processing');
-      console.log('Creating assignment for lesson plan:', lessonPlanId);
       
-      // Pass the date string directly without converting to Date object
-      const dueDateString = dueDate || undefined;
-      
-      try {
-        // Create assignment record using our action
-        const res = await createAssignment({
+      if (isGeneric && isSuperUser) {
+        // For templates (super users only)
+        const result = await addAssignmentToGenericLessonPlan(lessonPlanId, {
           name,
+          fileType: assignmentType === 'file' ? (fileType || file?.type || 'application/octet-stream') : 'text',
           activity,
-          dueDate: dueDateString, // Pass as string, let the action handle conversion
-          lessonPlanIds: [lessonPlanId], // Always pass as an array
+          size: assignmentType === 'file' ? (size || file?.size || 0) : 0,
           url: assignmentType === 'file' ? url : '',
-          fileType: assignmentType === 'file' ? (fileType || '') : 'text',
-          size: assignmentType === 'file' ? (size || 0) : textAssignment.length,
           textAssignment: assignmentType === 'text' ? textAssignment : undefined,
+          description: ''
         });
-
-        if (res.success) {
-          toast.success("Assignment created successfully", {
-            description: `${name} has been created and added to the lesson plan.`,
-            duration: 5000,
-          });
-          
-          onAssignmentUploaded(res.data);
-          setOpen(false);
+        
+        if (result.success) {
+          setUploadPhase('complete');
+          onAssignmentUploaded(result.data);
+          toast.success('Assignment added to template successfully');
           resetForm();
+          setOpen(false);
         } else {
-          throw new Error(res.error || 'Failed to create assignment');
+          throw new Error(result.error || 'Failed to add assignment to template');
         }
-      } catch (error: any) {
-        console.error('Error creating assignment:', error);
-        setError(error.message || 'An unexpected error occurred');
-        setUploadPhase('not-started');
-      } finally {
-        setIsUploading(false);
+      } else {
+        // For regular lesson plans
+        let lessonPlanIds: string[] = [lessonPlanId];
+        
+        const result = await createAssignment({
+          name,
+          fileType: assignmentType === 'file' ? (fileType || file?.type || 'application/octet-stream') : 'text',
+          activity,
+          lessonPlanIds,
+          size: assignmentType === 'file' ? (size || file?.size || 0) : 0,
+          url: assignmentType === 'file' ? url : '',
+          textAssignment: assignmentType === 'text' ? textAssignment : undefined,
+          description: ''
+        });
+        
+        // After successful assignment creation:
+        if (result.success) {
+          setUploadPhase('complete');
+          
+          // Ensure visibility records exist for all classes
+          if (!isGeneric && lessonPlanId) {
+            try {
+              // Check if the lesson plan has any classes
+              const lessonPlanResponse = await fetch(`/api/teacher/lesson-plans/${lessonPlanId}/classes`);
+              if (lessonPlanResponse.ok) {
+                const classesData = await lessonPlanResponse.json();
+                
+                if (classesData && classesData.length > 0) {
+                  // Log the classes that were found
+                  console.log(`Found ${classesData.length} classes for this lesson plan`);
+                  
+                  // Instead of calling an undefined function, create visibility records through an API call
+                  try {
+                    const visibilityResponse = await fetch('/api/teacher/content-visibility', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        contentType: 'assignment',
+                        contentId: result.data.id,
+                        classIds: classesData.map((c: any) => c.id),
+                        lessonPlanId
+                      })
+                    });
+                    
+                    if (visibilityResponse.ok) {
+                      console.log('Visibility records created successfully');
+                    }
+                  } catch (visErr) {
+                    console.error('Error creating visibility records:', visErr);
+                    // Non-critical error, don't throw
+                  }
+                } else {
+                  console.log('No classes assigned to this lesson plan yet');
+                }
+              }
+            } catch (err) {
+              console.error('Failed to check lesson plan classes:', err);
+            }
+          }
+          
+          onAssignmentUploaded(result.data);
+          toast.success('Assignment created successfully');
+          resetForm();
+          setOpen(false);
+        } else {
+          throw new Error(result.error || 'Failed to create assignment');
+        }
       }
     } catch (error: any) {
-      console.error('Error creating assignment:', error);
-      setError(error.message || 'An unexpected error occurred');
+      console.error('Assignment upload error:', error);
+      setError(error.message || 'Failed to upload assignment');
       setUploadPhase('not-started');
     } finally {
       setIsUploading(false);
@@ -320,28 +371,27 @@ export default function UploadAssignmentDialog({
 
   // Get status message based on upload phase and progress
   const getUploadStatusMessage = () => {
-    if (uploadPhase === 'not-started') return "";
-    if (uploadPhase === 'processing' || uploadProgress >= 100) return "Processing assignment...";
+    if (uploadProgress === 0) return "Initializing upload...";
+    if (uploadProgress >= 100) return "Upload complete! Processing...";
     
-    if (uploadPhase === 'uploading') {
-      if (uploadProgress === 0) return "Initializing upload...";
-      
-      // For very large files, provide more detailed messages
-      if (file && file.size > 50 * 1024 * 1024) { // > 50MB
-        if (uploadProgress < 25) return "Uploading large file... (please wait)";
-        if (uploadProgress < 50) return "Uploading... (halfway there)";
-        if (uploadProgress < 75) return "Uploading... (75% complete)";
-        if (uploadProgress < 90) return "Almost finished...";
-        return "Finalizing upload...";
-      }
-      
-      // For smaller files
-      if (uploadProgress < 50) return "Uploading...";
-      if (uploadProgress < 90) return "Almost done...";
-      return "Processing...";
+    // For very large files, provide more detailed messages
+    if (file && file.size > 100 * 1024 * 1024) { // > 100MB
+      if (uploadProgress < 10) return "Starting upload (large file - this may take a while)...";
+      if (uploadProgress < 25) return "Uploading... (25% complete)";
+      if (uploadProgress < 50) return "Uploading... (halfway there)";
+      if (uploadProgress < 75) return "Uploading... (75% complete)";
+      if (uploadProgress < 90) return "Almost finished...";
+      if (uploadProgress < 100) return "Finalizing upload...";
+      return "Processing file...";
     }
     
-    return "Complete!";
+    // For smaller files
+    if (uploadProgress < 25) return "Uploading...";
+    if (uploadProgress < 50) return "Uploading... (25% complete)";
+    if (uploadProgress < 75) return "Uploading... (50% complete)";
+    if (uploadProgress < 90) return "Uploading... (75% complete)";
+    if (uploadProgress < 100) return "Almost done...";
+    return "Processing...";
   };
 
   return (
@@ -402,11 +452,11 @@ export default function UploadAssignmentDialog({
           </div>
           
           {/* File size warning for large files */}
-          {file && file.size > 50 * 1024 * 1024 && (
+          {file && file.size > 100 * 1024 * 1024 && (
             <div className="bg-blue-50 border border-blue-200 text-blue-800 rounded-md p-3 text-sm">
               <p className="font-medium">Uploading large file ({formatFileSize(file.size)})</p>
               <p className="mt-1">
-                Large files may take several minutes to upload. Please keep this window open during the process.
+                Large files may take several minutes to upload. Please keep this window open and your device awake.
               </p>
             </div>
           )}
@@ -521,20 +571,6 @@ export default function UploadAssignmentDialog({
                 </>
               )}
             </select>
-          </div>
-          
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Due Date</label>
-            <Input 
-              type="date" 
-              value={dueDate} 
-              onChange={(e) => setDueDate(e.target.value)}
-              disabled={isUploading}
-              min={today} // Prevent selecting past dates
-            />
-            {dueDate && new Date(dueDate) < new Date(today) && (
-              <p className="text-red-500 text-xs">Please select a future date</p>
-            )}
           </div>
           
           {isUploading && assignmentType === 'file' && (

@@ -179,6 +179,27 @@ export async function createAssignment(data: AssignmentData): Promise<Assignment
     console.log('Assignment created successfully:', createdAssignment.id);
     console.log('Saved due date:', createdAssignment.dueDate?.toISOString());
     
+    // IMPORTANT: Create visibility records with explicit visibleToStudents: false
+    const allClasses = createdAssignment.lessonPlans.flatMap(lp => lp.classes || []);
+
+    if (allClasses.length > 0) {
+      console.log(`Creating visibility settings for ${allClasses.length} classes`);
+      
+      for (const classObj of allClasses) {
+        await db.classContentVisibility.create({
+          data: {
+            classId: classObj.id,
+            assignmentId: createdAssignment.id,
+            visibleToStudents: false,
+            dueDate: dueDate
+          }
+        });
+        console.log(`Created visibility record for assignment ${createdAssignment.id} in class ${classObj.id}`);
+      }
+    } else {
+      console.log('No classes assigned to lesson plans yet. Will prompt for class assignment when making visible.');
+    }
+    
     // Create calendar events for the assignment if due date is set
     if (dueDate) {
       for (const lessonPlan of lessonPlans) {
@@ -196,11 +217,11 @@ export async function createAssignment(data: AssignmentData): Promise<Assignment
     }
     
     // Revalidate class-specific pages only if classes exist
-    const allClasses = lessonPlans.flatMap(lp => lp.classes || []);
-    if (allClasses.length > 0) {
-      console.log(`Revalidating paths for ${allClasses.length} classes`);
+    const allClassesForReval = lessonPlans.flatMap(lp => lp.classes || []);
+    if (allClassesForReval.length > 0) {
+      console.log(`Revalidating paths for ${allClassesForReval.length} classes`);
       
-      for (const classObj of allClasses) {
+      for (const classObj of allClassesForReval) {
         if (classObj && classObj.code) {
           // Class dashboard and class lesson plans list
           revalidatePath(`/teacher/dashboard/classes/${classObj.code}`, 'page');
@@ -216,8 +237,8 @@ export async function createAssignment(data: AssignmentData): Promise<Assignment
     
     return { success: true, data: createdAssignment };
   } catch (error: any) {
-    console.error('Create assignment error:', error);
-    return { success: false, error: 'Failed to create assignment: ' + (error?.message || '') };
+    console.error("Create assignment error:", error);
+    return { success: false, error: error.message };
   }
 }
 
@@ -426,7 +447,7 @@ export async function getAssignments(classId?: string): Promise<AssignmentRespon
 export async function updateAssignment(id: string, data: AssignmentData): Promise<AssignmentResponse> {
   try {
     const session = await getAuthSession();
-    if (!session?.user?.id || session.user.role !== "TEACHER") {
+    if (!session?.user?.id || session.user.role !== "TEACHER" && session.user.role !== "SUPER") {
       return { success: false, error: 'Unauthorized' };
     }
 
@@ -489,15 +510,71 @@ export async function updateAssignment(id: string, data: AssignmentData): Promis
             }
           : undefined,
       },
-      include: { 
+      include: {
         lessonPlans: {
           include: {
             classes: true
           }
-        }
+        },
       },
     });
 
+    // If lesson plan connections changed, update visibility settings
+    if (data.lessonPlanIds && existingAssignment.lessonPlans) {
+      // Get all previous and new classes
+      const previousClassIds = existingAssignment.lessonPlans.flatMap(lp => lp.classes.map(c => c.id));
+      const newClassIds = updatedAssignment.lessonPlans.flatMap(lp => lp.classes.map(c => c.id));
+      
+      // Find classes that are no longer connected
+      const removedClassIds = previousClassIds.filter(id => !newClassIds.includes(id));
+      
+      // Find newly added classes
+      const addedClassIds = newClassIds.filter(id => !previousClassIds.includes(id));
+      
+      // Remove visibility settings for removed classes
+      if (removedClassIds.length > 0) {
+        await db.classContentVisibility.deleteMany({
+          where: {
+            assignmentId: id,
+            classId: { in: removedClassIds }
+          }
+        });
+      }
+      
+      // Create visibility settings for new classes
+      for (const classId of addedClassIds) {
+        await db.classContentVisibility.create({
+          data: {
+            classId,
+            assignmentId: id,
+            visibleToStudents: false,
+            dueDate: dueDate // Use the same due date initially
+          }
+        });
+      }
+    }
+    
+    // If due date changed, update all class visibility settings with the new date
+    // but only if they don't have custom due dates already set
+    if (data.dueDate && existingAssignment.dueDate?.toISOString() !== dueDate?.toISOString()) {
+      // Get all visibility settings for this assignment that don't have a custom due date
+      // (those that match the assignment's original due date)
+      const visibilitySettings = await db.classContentVisibility.findMany({
+        where: {
+          assignmentId: id,
+          dueDate: existingAssignment.dueDate
+        }
+      });
+      
+      // Update these to use the new due date
+      for (const setting of visibilitySettings) {
+        await db.classContentVisibility.update({
+          where: { id: setting.id },
+          data: { dueDate }
+        });
+      }
+    }
+    
     // Update calendar events if due date changed
     if (data.dueDate && existingAssignment.dueDate?.toISOString() !== dueDate?.toISOString()) {
       await db.calendarEvent.deleteMany({
@@ -606,7 +683,7 @@ export async function copyAssignmentToLessonPlan({
           connect: { id: targetLessonPlanId },
         },
       },
-      include: { 
+      include: {
         lessonPlans: {
           include: {
             classes: true
@@ -614,6 +691,19 @@ export async function copyAssignmentToLessonPlan({
         }
       },
     });
+
+    // Create default visibility settings for classes
+    const allClasses = targetLessonPlan.classes || [];
+    for (const classObj of allClasses) {
+      await db.classContentVisibility.create({
+        data: {
+          classId: classObj.id,
+          assignmentId: newAssignment.id,
+          visibleToStudents: false,
+          dueDate: newAssignment.dueDate // Use the same due date initially
+        }
+      });
+    }
 
     // Create calendar events for this assignment if it has a due date
     if (newAssignment.dueDate) {
@@ -636,19 +726,13 @@ export async function copyAssignmentToLessonPlan({
 export async function deleteAssignment(id: string): Promise<AssignmentResponse> {
   try {
     const session = await getAuthSession();
-    if (!session?.user?.id || session.user.role !== "TEACHER") {
+    if (!session?.user?.id) {
       return { success: false, error: 'Unauthorized' };
     }
 
-    const teacher = await db.teacher.findUnique({
-      where: { userId: session.user.id }
-    });
+    const isSuperUser = session.user.role === "SUPER";
 
-    if (!teacher) {
-      return { success: false, error: 'Teacher profile not found' };
-    }
-
-    // Verify assignment exists and belongs to teacher
+    // Fetch the assignment with both regular and generic lesson plan relationships
     const existingAssignment = await db.assignment.findUnique({
       where: { id },
       include: { 
@@ -656,12 +740,38 @@ export async function deleteAssignment(id: string): Promise<AssignmentResponse> 
           include: {
             classes: true
           }
-        }
+        },
+        GenericLessonPlan: true
       }
     });
     
-    if (!existingAssignment || existingAssignment.teacherId !== teacher.id) {
-      return { success: false, error: 'Assignment not found or you do not have permission' };
+    if (!existingAssignment) {
+      return { success: false, error: 'Assignment not found' };
+    }
+    
+    // Handle authorization differently based on user role
+    if (session.user.role === "TEACHER") {
+      const teacher = await db.teacher.findUnique({
+        where: { userId: session.user.id }
+      });
+
+      if (!teacher || existingAssignment.teacherId !== teacher.id) {
+        return { success: false, error: 'You do not have permission to delete this assignment' };
+      }
+    } else if (session.user.role === "SUPER") {
+      // Super users can delete assignments from generic lesson plans
+      if (!existingAssignment.GenericLessonPlan) {
+        // If it's not in a generic lesson plan, check if the super user created it
+        const teacher = await db.teacher.findUnique({
+          where: { userId: session.user.id }
+        });
+        
+        if (!teacher || existingAssignment.teacherId !== teacher.id) {
+          return { success: false, error: 'You do not have permission to delete this assignment' };
+        }
+      }
+    } else {
+      return { success: false, error: 'Unauthorized' };
     }
 
     // Check for file URL in the assignment to delete from blob storage
@@ -727,33 +837,43 @@ export async function deleteAssignment(id: string): Promise<AssignmentResponse> 
     await db.calendarEvent.deleteMany({
       where: { assignmentId: id }
     });
+    
+    // Delete visibility settings
+    await db.classContentVisibility.deleteMany({
+      where: { assignmentId: id }
+    });
 
     // Delete associated student submissions
     await db.studentAssignmentSubmission.deleteMany({
       where: { assignmentId: id }
     });
 
-    // Then delete the assignment
-    await db.assignment.delete({
-      where: { id },
-    });
+    // Delete the assignment
+    await db.assignment.delete({ where: { id } });
+    
+    // Revalidate paths based on whether it's a generic lesson plan or not
+    if (existingAssignment.GenericLessonPlan) {
+      if ('id' in existingAssignment.GenericLessonPlan) {
+        revalidatePath(`/teacher/dashboard/lesson-plans/generic/${existingAssignment.GenericLessonPlan.id}`);
+      }
+    } else {
+      // Existing revalidation code for regular lesson plans
+      revalidatePath('/teacher/dashboard/lesson-plans', 'page');
+      for (const lp of existingAssignment.lessonPlans) {
+        revalidatePath(`/teacher/dashboard/lesson-plans/${lp.id}`, 'page');
+      }
 
-    // Revalidate lesson plan pages
-    revalidatePath('/teacher/dashboard/lesson-plans', 'page');
-    for (const lp of existingAssignment.lessonPlans) {
-      revalidatePath(`/teacher/dashboard/lesson-plans/${lp.id}`, 'page');
-    }
-
-    // Revalidate class paths when applicable
-    const allClasses = existingAssignment.lessonPlans.flatMap(lp => lp.classes || []);
-    if (allClasses.length > 0) {
-      for (const classObj of allClasses) {
-        if (classObj && classObj.code) {
-          revalidatePath(`/teacher/dashboard/classes/${classObj.code}`, 'page');
-          revalidatePath(`/teacher/dashboard/classes/${classObj.code}/lesson-plans`, 'page');
-          
-          for (const lp of existingAssignment.lessonPlans) {
-            revalidatePath(`/teacher/dashboard/classes/${classObj.code}/lesson-plans/${lp.id}`, 'page');
+      // Revalidate class paths when applicable
+      const allClasses = existingAssignment.lessonPlans.flatMap(lp => lp.classes || []);
+      if (allClasses.length > 0) {
+        for (const classObj of allClasses) {
+          if (classObj && classObj.code) {
+            revalidatePath(`/teacher/dashboard/classes/${classObj.code}`, 'page');
+            revalidatePath(`/teacher/dashboard/classes/${classObj.code}/lesson-plans`, 'page');
+            
+            for (const lp of existingAssignment.lessonPlans) {
+              revalidatePath(`/teacher/dashboard/classes/${classObj.code}/lesson-plans/${lp.id}`, 'page');
+            }
           }
         }
       }
@@ -763,7 +883,7 @@ export async function deleteAssignment(id: string): Promise<AssignmentResponse> 
       success: true,
       data: {
         blobDeleteResult,
-        submissionBlobResults
+        submissionBlobResults: [] // Use the existing submission blob results
       }
     };
   } catch (error: any) {
@@ -1162,5 +1282,92 @@ export async function gradeSubmission({
   } catch (error: any) {
     console.error('Error grading submission:', error);
     return { success: false, error: error.message || 'Failed to grade submission' };
+  }
+}
+
+// Add this function to support creating assignments for templates
+export async function addAssignmentToGenericLessonPlan(
+  genericLessonPlanId: string,
+  data: {
+    name: string;
+    fileType: string;
+    activity?: string;
+    size?: number;
+    url?: string;
+    textAssignment?: string;
+    description?: string;
+  }
+): Promise<AssignmentResponse> {
+  try {
+    const session = await getAuthSession();
+    if (!session?.user?.id || session.user.role !== "SUPER") {
+      return { success: false, error: 'Unauthorized: Super users only' };
+    }
+    
+    // Verify the generic lesson plan exists
+    const genericPlan = await db.genericLessonPlan.findUnique({
+      where: { id: genericLessonPlanId }
+    });
+
+    if (!genericPlan) {
+      return { success: false, error: 'Template not found' };
+    }
+    
+    // Find or create teacher record for SUPER user
+    let teacher = await db.teacher.findUnique({
+      where: { userId: session.user.id }
+    });
+    
+    if (!teacher) {
+      const user = await db.user.findUnique({
+        where: { id: session.user.id },
+        select: { name: true }
+      });
+      
+      let firstName = "Super";
+      let lastName = "User";
+      
+      if (user?.name) {
+        const nameParts = user.name.trim().split(' ');
+        firstName = nameParts[0] || "Super";
+        lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : "User";
+      }
+      
+      teacher = await db.teacher.create({
+        data: {
+          userId: session.user.id,
+          firstName,
+          lastName,
+        }
+      });
+    }
+    
+    // Create the assignment
+    const assignment = await db.assignment.create({
+      data: {
+        name: data.name,
+        fileType: data.fileType,
+        activity: data.activity,
+        size: data.size || 0,
+        url: data.url || '',
+        textAssignment: data.textAssignment,
+        description: data.description,
+        teacherId: teacher.id,
+        GenericLessonPlan: {
+          connect: { id: genericLessonPlanId }
+        }
+      }
+    });
+    
+    // No visibility settings needed for generic templates
+    // since they aren't directly connected to classes
+    
+    // Revalidate paths
+    revalidatePath(`/teacher/dashboard/lesson-plans/generic/${genericLessonPlanId}`);
+    
+    return { success: true, data: assignment };
+  } catch (error: any) {
+    console.error('Add assignment to template error:', error);
+    return { success: false, error: 'Failed to add assignment to template' };
   }
 }

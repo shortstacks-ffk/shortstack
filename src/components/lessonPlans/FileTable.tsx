@@ -19,7 +19,7 @@ import {
 } from '@/src/components/ui/alert-dialog';
 import { deleteFile } from '@/src/app/actions/fileActions';
 import { useState } from 'react';
-import { MoreHorizontal, FileEdit, Trash2, Send, Calendar, FileIcon } from 'lucide-react';
+import { MoreHorizontal, FileEdit, Trash2, Send, Calendar, FileIcon, Eye, Download } from 'lucide-react';
 import EditFileDialog from './EditFileDialog';
 import AssignFileDialog from './AssignFileDialog';
 import Link from 'next/link';
@@ -31,6 +31,10 @@ interface FileTableProps {
   files: FileRecord[];
   onUpdate?: () => void;
   canDelete?: boolean;
+  onManageVisibility?: (file: FileRecord) => void;
+  isGeneric?: boolean;
+  onEdit?: (fileId: string, fileName: string) => void;
+  onDelete?: (fileId: string, fileName: string) => void;
 }
 
 const formatFileSize = (bytes?: number | string): string => {
@@ -73,7 +77,11 @@ const normalizeFile = (file: FileRecord): FileRecord => {
 export default function FileTable({ 
   files, 
   onUpdate, 
-  canDelete = true 
+  canDelete = true,
+  onManageVisibility,
+  isGeneric = false,  // Add this new prop
+  onEdit,
+  onDelete
 }: FileTableProps) {
   const [fileToDelete, setFileToDelete] = useState<string | null>(null);
   const [fileToEdit, setFileToEdit] = useState<FileRecord | null>(null);
@@ -179,22 +187,30 @@ export default function FileTable({
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => setFileToEdit(file)}>
-                          <FileEdit className="mr-2 h-4 w-4" />
-                          Edit
-                        </DropdownMenuItem>
-                        {canDelete && file.id && (
+                        {onEdit && (
+                          <DropdownMenuItem onClick={() => onEdit(file.id, file.name)}>
+                            <FileEdit className="mr-2 h-4 w-4" />
+                            Edit
+                          </DropdownMenuItem>
+                        )}
+                        {onDelete && (
                           <DropdownMenuItem 
-                            onClick={() => setFileToDelete(file.id!)}
+                            onClick={() => onDelete(file.id, file.name)}
                             className="text-red-600 focus:text-red-600"
                           >
                             <Trash2 className="mr-2 h-4 w-4" />
                             Delete
                           </DropdownMenuItem>
                         )}
-                        <DropdownMenuItem onClick={() => setFileToAssign(file)}>
-                          <Send className="mr-2 h-4 w-4" />
-                          Assign to Class
+                        {onManageVisibility && (
+                          <DropdownMenuItem onClick={() => onManageVisibility(file)}>
+                            <Eye className="mr-2 h-4 w-4" />
+                            Manage Visibility
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem onClick={() => window.open(file.url, '_blank')}>
+                          <Download className="mr-2 h-4 w-4" />
+                          Download
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -238,22 +254,36 @@ export default function FileTable({
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => setFileToEdit(file)}>
-                        <FileEdit className="mr-2 h-4 w-4" />
-                        Edit
-                      </DropdownMenuItem>
-                      {canDelete && file.id && (
+                      {onEdit && (
+                        <DropdownMenuItem onClick={() => onEdit(file.id, file.name)}>
+                          <FileEdit className="mr-2 h-4 w-4" />
+                          Edit
+                        </DropdownMenuItem>
+                      )}
+                      {onDelete && (
                         <DropdownMenuItem 
-                          onClick={() => setFileToDelete(file.id!)}
+                          onClick={() => onDelete(file.id, file.name)}
                           className="text-red-600 focus:text-red-600"
                         >
                           <Trash2 className="mr-2 h-4 w-4" />
                           Delete
                         </DropdownMenuItem>
                       )}
-                      <DropdownMenuItem onClick={() => setFileToAssign(file)}>
-                        <Send className="mr-2 h-4 w-4" />
-                        Assign
+                      {!isGeneric && (
+                        <DropdownMenuItem onClick={() => setFileToAssign(file)}>
+                          <Send className="mr-2 h-4 w-4" />
+                          Assign
+                        </DropdownMenuItem>
+                      )}
+                      {onManageVisibility && (
+                        <DropdownMenuItem onClick={() => onManageVisibility(file)}>
+                          <Eye className="mr-2 h-4 w-4" />
+                          Manage Visibility
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuItem onClick={() => window.open(file.url, '_blank')}>
+                        <Download className="mr-2 h-4 w-4" />
+                        Download
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>

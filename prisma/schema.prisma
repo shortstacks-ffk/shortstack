@@ -87,6 +87,7 @@ model Class {
   files          File[]          @relation("ClassFiles")
   lessonPlans    LessonPlan[]    @relation("ClassLessonPlans")
   storeItems     StoreItem[]     @relation("StoreItemToClass")
+  contentVisibility ClassContentVisibility[]
 
   @@index([code])
   @@index([teacherId])
@@ -193,6 +194,7 @@ model File {
   classes           Class[]             @relation("ClassFiles")
   GenericLessonPlan GenericLessonPlan[] @relation("GenericLessonPlanFiles")
   lessonPlans       LessonPlan[]        @relation("LessonPlanFiles")
+  classVisibility     ClassContentVisibility[]
 
   @@index([teacherId])
 }
@@ -217,6 +219,7 @@ model Assignment {
   classes            Class[]                       @relation("ClassAssignments")
   GenericLessonPlan  GenericLessonPlan[]           @relation("GenericLessonPlanAssignments")
   lessonPlans        LessonPlan[]                  @relation("LessonPlanAssignments")
+  classVisibility     ClassContentVisibility[]
 
   @@index([teacherId])
 }
@@ -446,6 +449,28 @@ model PasswordReset {
   used                Boolean   @default(false)
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
+}
+
+model ClassContentVisibility {
+  id                  String     @id @default(cuid())
+  classId             String
+  fileId              String?
+  assignmentId        String?
+  visibleToStudents   Boolean    @default(false)
+  visibilityStartDate DateTime?
+  dueDate             DateTime?  // Only relevant for assignments
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+  
+  class               Class      @relation(fields: [classId], references: [id], onDelete: Cascade)
+  file                File?      @relation(fields: [fileId], references: [id], onDelete: SetNull)
+  assignment          Assignment? @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
+  
+  @@unique([classId, fileId])
+  @@unique([classId, assignmentId])
+  @@index([classId])
+  @@index([fileId])
+  @@index([assignmentId])
 }
 
 enum Role {

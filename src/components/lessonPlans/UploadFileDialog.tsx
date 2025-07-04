@@ -13,6 +13,7 @@ import { useSession } from 'next-auth/react';
 import { upload } from '@vercel/blob/client';
 import { type PutBlobResult, type UploadProgressEvent } from '@vercel/blob';
 import { createFile } from '@/src/app/actions/fileActions';
+import { ensureVisibilityRecords } from '@/src/app/actions/contentVisibilityActions';
 
 interface FileRecord {
   id: string;
@@ -67,6 +68,22 @@ export default function UploadFileDialog({
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
     return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+  };
+
+  // Move resetForm INSIDE the component
+  const resetForm = () => {
+    setName('');
+    setActivity('interactive');
+    setFile(null);
+    setError(null);
+    setUploadProgress(0);
+    setBlob(null);
+    setIsDragging(false);
+    
+    // Reset file input if it exists
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -276,6 +293,69 @@ export default function UploadFileDialog({
       setFile(null);
       setBlob(null);
       
+      // Assuming this is in the handleSubmit function after the upload succeeds:
+      if (createResult.success && createResult.data) {
+        // Log confirmation that file was created with visibility settings
+        console.log('File uploaded successfully, visibility records should be created:', createResult.data.id);
+        
+        // Ensure visibility records exist for all classes
+        if (!isGeneric && lessonPlanId) {
+  try {
+    // Check if the lesson plan has any classes
+    const lessonPlanResponse = await fetch(`/api/teacher/lesson-plans/${lessonPlanId}/classes`);
+    if (lessonPlanResponse.ok) {
+      const classesData = await lessonPlanResponse.json();
+      
+      if (classesData && classesData.length > 0) {
+        // Create visibility records for each class
+        const classIds = classesData.map((c: any) => c.id);
+        
+        try {
+          // Check if the ensureVisibilityRecords function exists
+          if (typeof ensureVisibilityRecords === 'function') {
+            const ensureResult = await ensureVisibilityRecords({
+              contentType: 'file',
+              contentId: createResult.data.id,
+              classIds
+            });
+            
+            console.log('Visibility records setup result:', ensureResult);
+          } else {
+            console.log('ensureVisibilityRecords function not available, skipping visibility setup');
+            // You may want to call an API endpoint directly instead
+            // const visibilityResponse = await fetch('/api/teacher/content-visibility', {
+            //   method: 'POST',
+            //   headers: { 'Content-Type': 'application/json' },
+            //   body: JSON.stringify({
+            //     contentType: 'file',
+            //     contentId: createResult.data.id,
+            //     classIds,
+            //     lessonPlanId
+            //   })
+            // });
+            // console.log('Visibility API response:', await visibilityResponse.json());
+          }
+        } catch (visibilityError) {
+          console.error('Error setting up visibility records:', visibilityError);
+        }
+      } else {
+        console.log('No classes assigned to this lesson plan yet');
+      }
+    }
+  } catch (err) {
+    console.error('Failed to fetch class data for visibility setup:', err);
+    // Don't block the upload success for this secondary operation
+  }
+}
+        
+        toast.success("File uploaded successfully");
+        setOpen(false);
+        resetForm();
+        if (onFileUploaded) {
+          onFileUploaded(createResult.data);
+        }
+      }
+      
     } catch (error: any) {
       console.error('Error uploading file:', error);
       setError(error.message || 'An unexpected error occurred during upload');
@@ -314,12 +394,8 @@ export default function UploadFileDialog({
       if (!isUploading) {
         setOpen(isOpen);
         if (!isOpen) {
-          setError(null);
-          setFile(null);
-          setUploadProgress(0);
-          setName('');
-          setActivity('interactive');
-          setBlob(null);
+          // Instead of manually resetting here, you can call resetForm()
+          resetForm();
         }
       }
     }}>

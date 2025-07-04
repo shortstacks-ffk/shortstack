@@ -229,54 +229,128 @@ export async function createFile(data: FileData): Promise<FileResponse> {
       teacherId: teacherId,
     };
 
-    let createdFile;
-
-    if (data.genericLessonPlanIds && data.genericLessonPlanIds.length > 0) {
-      // For generic lesson plans - using many-to-many relationship
-      console.log('Creating file for generic lesson plan:', data.genericLessonPlanIds);
-      
-      createdFile = await db.file.create({
-        data: {
-          ...fileData,
-          GenericLessonPlan: {
-            connect: data.genericLessonPlanIds.map(id => ({ id })) // This is correct for many-to-many
-          }
+    // Create the file first
+    const createdFile = await db.file.create({
+      data: {
+        ...fileData,
+        lessonPlans: {
+          connect: data.lessonPlanIds?.map(id => ({ id })) // This one is correct
+        },
+        GenericLessonPlan: {
+          connect: data.genericLessonPlanIds?.map(id => ({ id })) // This is correct for many-to-many
+        }
+      },
+      include: {
+        lessonPlans: true,
+        GenericLessonPlan: true,
+        teacher: true
+      }
+    });
+    
+    // IMPORTANT: Create visibility records with explicit visibleToStudents: false
+    if (data.lessonPlanIds && data.lessonPlanIds.length > 0) {
+      // Find all classes the lesson plan is assigned to
+      const lessonPlans = await db.lessonPlan.findMany({
+        where: {
+          id: { in: data.lessonPlanIds }
         },
         include: {
-          GenericLessonPlan: true,
-          teacher: true
+          classes: true
         }
       });
       
-      console.log('File created for generic lesson plan:', createdFile.id);
+      // Get all unique classes across all lesson plans
+      const allClasses = Array.from(
+        new Set(
+          lessonPlans.flatMap(lp => lp.classes || [])
+            .map(c => c.id)
+        )
+      );
       
-    } else if (data.lessonPlanIds && data.lessonPlanIds.length > 0) {
-      // For regular lesson plans - using many-to-many relationship
-      console.log('Creating file for regular lesson plans:', data.lessonPlanIds);
-      
-      createdFile = await db.file.create({
-        data: {
-          ...fileData,
-          lessonPlans: {
-            connect: data.lessonPlanIds.map(id => ({ id })) // This one is correct
+      // Create hidden visibility records for each class
+      for (const classId of allClasses) {
+        await db.classContentVisibility.create({
+          data: {
+            classId: classId,
+            fileId: createdFile.id,
+            visibleToStudents: false // Explicitly set to hidden
           }
-        },
-        include: {
-          lessonPlans: true,
-          teacher: true
-        }
-      });
-      
-      console.log('File created for regular lesson plans:', createdFile.id);
-      
-    } else {
-      return { success: false, error: 'Must specify either genericLessonPlanId or lessonPlanIds' };
+        });
+        console.log(`Created hidden visibility record for file ${createdFile.id} in class ${classId}`);
+      }
     }
-
+    
+    // Create a placeholder visibility record for the lesson plan
+    // regardless of whether it has classes assigned
+    if (data.lessonPlanIds && data.lessonPlanIds.length > 0) {
+      console.log('Creating placeholder visibility for lesson plans:', data.lessonPlanIds);
+      
+      // Find all classes the lesson plan is assigned to
+      const lessonPlans = await db.lessonPlan.findMany({
+        where: {
+          id: { in: data.lessonPlanIds }
+        },
+        include: {
+          classes: true
+        }
+      });
+      
+      // Track classIds we've already processed to avoid duplicates
+      const processedClassIds = new Set<string>();
+      
+      // Create a placeholder visibility record for each lesson plan
+      for (const lessonPlan of lessonPlans) {
+        // If lesson plan has classes, create visibility records for each class
+        if (lessonPlan.classes && lessonPlan.classes.length > 0) {
+          console.log(`Lesson plan ${lessonPlan.id} has ${lessonPlan.classes.length} classes, creating visibility records`);
+          
+          for (const classObj of lessonPlan.classes) {
+            // Skip if we've already processed this class
+            if (processedClassIds.has(classObj.id)) {
+              console.log(`Skipping duplicate visibility record for class ${classObj.id}`);
+              continue;
+            }
+            
+            // Add to processed set
+            processedClassIds.add(classObj.id);
+            
+            // Check if a record already exists
+            const existingRecord = await db.classContentVisibility.findUnique({
+              where: {
+                classId_fileId: {
+                  classId: classObj.id,
+                  fileId: createdFile.id
+                }
+              }
+            });
+            
+            if (existingRecord) {
+              console.log(`Visibility record already exists for file ${createdFile.id} in class ${classObj.id}`);
+              continue;
+            }
+            
+            // Create the record if it doesn't exist
+            await db.classContentVisibility.create({
+              data: {
+                classId: classObj.id,
+                fileId: createdFile.id,
+                visibleToStudents: false // Explicitly set to hidden
+              }
+            });
+            console.log(`Created hidden visibility record for file ${createdFile.id} in class ${classObj.id}`);
+          }
+        } else {
+          // The lesson plan doesn't have classes yet
+          // We'll handle this in ContentVisibilityDialog.tsx when the teacher attempts to make it visible
+          console.log(`Lesson plan ${lessonPlan.id} has no classes yet. Will prompt for class assignment when making visible.`);
+        }
+      }
+    }
+    
     return { success: true, data: createdFile };
   } catch (error: any) {
-    console.error('Create file error:', error);
-    return { success: false, error: 'Failed to create file: ' + (error?.message || '') };
+    console.error("Create file error:", error);
+    return { success: false, error: error.message };
   }
 }
 
@@ -479,6 +553,11 @@ export async function deleteFile(id: string): Promise<FileResponse> {
       // Continue with database deletion even if blob deletion fails
     }
 
+    // Delete any visibility settings first (to avoid foreign key issues)
+    await db.classContentVisibility.deleteMany({
+      where: { fileId: id }
+    });
+
     // Delete from database
     await db.file.delete({
       where: { id }
@@ -575,6 +654,26 @@ export async function copyFileToLessonPlan({
         classes: true
       },
     });
+
+    // Find the target class
+    const targetClass = await db.class.findFirst({
+      where: { 
+        code: targetClassId
+      }
+    });
+    
+    if (targetClass) {
+      // Create default visibility settings (hidden) for the target class
+      await db.classContentVisibility.create({
+        data: {
+          classId: targetClass.id,
+          fileId: newFile.id,
+          visibleToStudents: false
+        }
+      });
+      
+      console.log(`Created default visibility setting for copied file in class ${targetClassId}`);
+    }
 
     revalidatePath(`/teacher/dashboard/classes/${targetClassId}`);
     return { success: true, data: newFile };

@@ -754,7 +754,12 @@ export async function getGenericLessonPlans(gradeLevel?: GradeLevel): Promise<Ge
 // Copy a template to create a teacher lesson plan
 export async function copyTemplateToLessonPlan(
   templateId: string,
-  data: { name?: string; description?: string }
+  data: { name?: string; description?: string;
+        actionType?: 'edit' | 'delete' | 'visibility';
+        itemType?: 'file' | 'assignment';
+        itemId?: string;
+        itemName?: string;
+   }
 ): Promise<LessonPlanResponse> {
   try {
     const session = await getAuthSession();
@@ -794,9 +799,9 @@ export async function copyTemplateToLessonPlan(
       }
     });
 
-    // Initialize arrays for file and assignment operations
-    const fileConnections = [];
-    const assignmentConnections = [];
+    // Create arrays to track created items
+    const newFiles = [];
+    const newAssignments = [];
 
     // Copy files if any - create new file records for the teacher to own
     if (template.files && template.files.length > 0) {
@@ -809,13 +814,13 @@ export async function copyTemplateToLessonPlan(
               url: file.url,
               size: file.size,
               fileType: file.fileType,
-              teacherId: session.user.id,
+              teacherId: teacher.id,
               lessonPlans: {
                 connect: { id: newLessonPlan.id }
               }
             }
           });
-          fileConnections.push({ id: newFile.id });
+          newFiles.push(newFile);
         } catch (fileError) {
           console.warn('Failed to copy file:', file.name, fileError);
           // Continue with other files even if one fails
@@ -834,14 +839,18 @@ export async function copyTemplateToLessonPlan(
               description: assignment.description,
               dueDate: assignment.dueDate,
               rubric: assignment.rubric,
-              fileType: assignment.fileType,  // Add the missing fileType field
-              teacherId: session.user.id,
+              fileType: assignment.fileType,
+              activity: assignment.activity,
+              url: assignment.url,
+              size: assignment.size,
+              textAssignment: assignment.textAssignment,
+              teacherId: teacher.id,
               lessonPlans: {
                 connect: { id: newLessonPlan.id }
               }
             }
           });
-          assignmentConnections.push({ id: newAssignment.id });
+          newAssignments.push(newAssignment);
         } catch (assignmentError) {
           console.warn('Failed to copy assignment:', assignment.name, assignmentError);
           // Continue with other assignments even if one fails
@@ -866,8 +875,23 @@ export async function copyTemplateToLessonPlan(
       }
     });
 
+    // Ensure the lesson plan has the expected data
+    if (!completeLessonPlan) {
+      return { success: false, error: 'Failed to create complete lesson plan' };
+    }
+
+    // Revalidate all relevant paths
     revalidatePath('/teacher/dashboard/lesson-plans', 'page');
-    return { success: true, data: completeLessonPlan };
+    revalidatePath(`/teacher/dashboard/lesson-plans/${newLessonPlan.id}`, 'page');
+    
+    return { 
+      success: true, 
+      data: { 
+        ...completeLessonPlan,
+        fileCount: newFiles.length,
+        assignmentCount: newAssignments.length
+      }
+    };
   } catch (error: any) {
     console.error('Copy template error:', error);
     return { success: false, error: 'Failed to copy template' };

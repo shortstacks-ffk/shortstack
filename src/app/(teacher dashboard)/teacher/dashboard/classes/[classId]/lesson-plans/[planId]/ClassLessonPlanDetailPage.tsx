@@ -4,6 +4,7 @@ import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { getLessonPlanByID, updateLessonPlan } from '@/src/app/actions/lessonPlansActions';
+import { getFiles } from '@/src/app/actions/fileActions'; // Add this import
 import Breadcrumbs from '@/src/components/Breadcrumbs';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
@@ -18,7 +19,23 @@ import FileTable from '@/src/components/lessonPlans/FileTable';
 import UploadAssignmentDialog from '@/src/components/lessonPlans/UploadAssignmentDialog';
 import AssignmentTable from '@/src/components/lessonPlans/AssignmentTable';
 import RichEditor from '@/src/components/RichEditor';
-import { Pen, ChevronLeft } from 'lucide-react';
+import { Pen, ChevronLeft, Loader2 } from 'lucide-react';
+import ContentVisibilityDialog from '@/src/components/lessonPlans/ContentVisibilityDialog';
+import EditFileDialog from '@/src/components/lessonPlans/EditFileDialog';
+import EditAssignmentDialog from '@/src/components/lessonPlans/EditAssignmentDialog';
+import { deleteFile } from '@/src/app/actions/fileActions';
+import { deleteAssignment } from '@/src/app/actions/assignmentActions';
+import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/src/components/ui/alert-dialog";
 
 interface LessonPlanDetailProps {
   classId: string;
@@ -30,7 +47,17 @@ export default function ClassLessonPlanDetailPage({ classId, planId }: LessonPla
   const [editMode, setEditMode] = useState(false);
   const [form, setForm] = useState({ name: '', description: '' });
   const [error, setError] = useState<string | null>(null);
-  const [accordionValue, setAccordionValue] = useState<string | null>(null);
+  const [accordionValue, setAccordionValue] = useState<string | null>('assignments');
+  const [fileToManageVisibility, setFileToManageVisibility] = useState<any>(null);
+  const [assignmentToManageVisibility, setAssignmentToManageVisibility] = useState<any>(null);
+  
+  // Add state for edit and delete functionality
+  const [fileToEdit, setFileToEdit] = useState<any>(null);
+  const [fileToDelete, setFileToDelete] = useState<any>(null);
+  const [assignmentToEdit, setAssignmentToEdit] = useState<any>(null);
+  const [assignmentToDelete, setAssignmentToDelete] = useState<any>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isLoadingFiles, setIsLoadingFiles] = useState(false); // Add this state
 
   // Fetch lesson plan on mount.
   useEffect(() => {
@@ -99,27 +126,322 @@ export default function ClassLessonPlanDetailPage({ classId, planId }: LessonPla
     setEditMode(false);
   }
   
-  // Refetch lesson plan data
+  // Add this function to fetch files with visibility data
+  const fetchFiles = async () => {
+    if (!planId) return;
+    
+    setIsLoadingFiles(true);
+    try {
+      // Use the getFiles server action for consistency with LessonPlanDetailView
+      const result = await getFiles(planId, false);
+      
+      if (result.success) {
+        // Update the files in the lesson plan state
+        interface LessonPlanState {
+          id: string;
+          name: string;
+          description: string;
+          files?: FileItem[];
+          assignments?: AssignmentItem[];
+          class?: {
+            id: string;
+            name: string;
+            code: string;
+          };
+        }
+        
+        interface FileItem {
+                  id: string;
+                  name: string;
+                  url: string;
+                  contentType: string;
+                  classVisibility?: Array<{ classId: string; visibleToStudents: boolean }>;
+                }
+        
+                interface AssignmentItem {
+                  id: string;
+                  name: string;
+                  description?: string;
+                  dueDate?: Date | string;
+                  classVisibility?: Array<{ classId: string; visibleToStudents: boolean }>;
+                }
+                
+                setLessonPlan((prev: LessonPlanState) => ({
+          ...prev,
+          files: result.files as FileItem[] || []
+        }));
+      } else {
+        throw new Error(result.error || 'Failed to fetch files');
+      }
+    } catch (error) {
+      console.error("Error fetching files:", error);
+      toast.error("Failed to load files");
+    } finally {
+      setIsLoadingFiles(false);
+    }
+  };
+
+  // Update the fetchPlan function to match LessonPlanDetailView's approach
   async function fetchPlan() {
     try {
+      console.log('Fetching lesson plan with ID:', planId);
       const res = await getLessonPlanByID(planId);
+      console.log('getLessonPlanByID result:', res);
+      
       if (res.success) {
-        setLessonPlan(res.data);
+        // Store the basic lesson plan data
+        const planData = res.data;
+        setLessonPlan(planData);
+        
         if (res.data) {
           setForm({
             name: res.data.name,
             description: res.data.description || '',
           });
+          
+          // Fetch files and assignments with their visibility data
+          setTimeout(() => {
+            fetchFiles();
+            fetchAssignments();
+          }, 100);
         }
         setError(null);
       } else {
         setError(res.error || 'Failed to fetch lesson plan');
+        toast.error(res.error || 'Failed to load lesson plan');
       }
     } catch (error: any) {
       setError(error.message || 'An unexpected error occurred');
       console.error('Error fetching lesson plan:', error);
+      toast.error('Error loading lesson plan');
     }
   }
+
+  // Update the fetchAssignments function to properly fetch visibility data
+  const fetchAssignments = async () => {
+    if (!planId) return;
+    
+    try {
+      console.log('Fetching assignments for lessonPlan:', planId, 'and class ID:', classId);
+      // Fetch assignments with visibility data for this specific class context
+      // Make sure we're using the actual class ID parameter, not the code
+      const response = await fetch(`/api/teacher/lesson-plans/${planId}/assignments?includeVisibility=true`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch assignments');
+      }
+      
+      const data = await response.json();
+      console.log('Assignments with visibility data:', data);
+      
+      // Update the assignments in the lesson plan state
+      // Define the type for assignments data
+      interface Assignment {
+        id: string;
+        name: string;
+        description?: string;
+        dueDate?: Date | string;
+        classVisibility?: Array<{ classId: string; visibleToStudents: boolean }>;
+        // Add other assignment properties as needed
+      }
+      
+      setLessonPlan((prev: { 
+        id: string;
+        name: string; 
+        description: string;
+        files?: any[];
+        assignments?: Assignment[];
+        class?: { 
+          id: string;
+          name: string;
+          code: string;
+        };
+      }) => ({
+        ...prev,
+        assignments: data as Assignment[]
+      }));
+    } catch (error) {
+      console.error("Error fetching assignments:", error);
+      toast.error("Failed to load assignments");
+    }
+  };
+
+  const handleManageFileVisibility = (file: any) => {
+    console.log('Managing file visibility in class context:', classId);
+    setFileToManageVisibility({
+      ...file,
+      // Important: Ensure we have the class info for the dialog
+      lessonPlanClasses: [{ 
+        id: classId, 
+        name: lessonPlan?.class?.name || 'Current Class', 
+        code: lessonPlan?.class?.code || '' 
+      }]
+    });
+  };
+
+  const handleManageAssignmentVisibility = (assignment: any) => {
+    console.log('Managing assignment visibility in class context:', classId);
+    console.log('Managing assignment visibility in class ID:', lessonPlan?.class?.id);
+    setAssignmentToManageVisibility({
+      ...assignment,
+      // Important: Ensure we have the class info for the dialog
+      lessonPlanClasses: [{ 
+        id: classId, 
+        name: lessonPlan?.class?.name || 'Current Class', 
+        code: lessonPlan?.class?.code || '' 
+      }]
+    });
+  };
+  
+  // Add handlers for edit and delete functionality
+  const handleEditFile = (fileId: string, fileName: string) => {
+    const file = lessonPlan.files.find((f: any) => f.id === fileId);
+    if (file) {
+      setFileToEdit(file);
+    }
+  };
+
+  const handleDeleteFile = (fileId: string, fileName: string) => {
+    setFileToDelete(fileId);
+  };
+
+  const handleEditAssignment = (assignmentId: string, assignmentName: string) => {
+    const assignment = lessonPlan.assignments.find((a: any) => a.id === assignmentId);
+    if (assignment) {
+      // Check if assignment is visible in any class
+      interface ClassVisibility {
+        classId: string;
+        visibleToStudents: boolean;
+      }
+      
+      const isVisible: boolean = assignment.classVisibility && 
+            (assignment.classVisibility as ClassVisibility[]).some(v => v.visibleToStudents);
+      
+      setAssignmentToEdit({
+        ...assignment,
+        isVisible: isVisible
+      });
+    }
+  };
+
+  const handleDeleteAssignment = (assignmentId: string, assignmentName: string) => {
+    setAssignmentToDelete(assignmentId);
+  };
+
+  const handleFileDelete = async () => {
+    if (!fileToDelete) return;
+    
+    setIsDeleting(true);
+    try {
+      const result = await deleteFile(fileToDelete);
+      if (result.success) {
+        toast.success("File deleted successfully");
+        await fetchPlan();
+      } else {
+        toast.error(result.error || "Failed to delete file");
+      }
+    } catch (error) {
+      console.error('Failed to delete file:', error);
+      toast.error("An error occurred while deleting the file");
+    } finally {
+      setIsDeleting(false);
+      setFileToDelete(null);
+    }
+  };
+
+  const handleAssignmentDelete = async () => {
+    if (!assignmentToDelete) return;
+    
+    setIsDeleting(true);
+    try {
+      const result = await deleteAssignment(assignmentToDelete);
+      if (result.success) {
+        toast.success("Assignment deleted successfully");
+        await fetchPlan();
+      } else {
+        toast.error(result.error || "Failed to delete assignment");
+      }
+    } catch (error) {
+      console.error('Failed to delete assignment:', error);
+      toast.error("An error occurred while deleting the assignment");
+    } finally {
+      setIsDeleting(false);
+      setAssignmentToDelete(null);
+    }
+  };
+
+  // Add an effect to fetch appropriate data when accordion changes
+  useEffect(() => {
+    if (!accordionValue) return;
+    
+    if (accordionValue === 'assignments') {
+      fetchAssignments();
+    } else if (accordionValue === 'files') {
+      // Similarly implement fetchFiles if needed
+      fetchPlan(); // This will refresh all data including files
+    }
+  }, [accordionValue]);
+
+  // Add this function to verify that we have the correct class ID
+  const checkClassInfo = async () => {
+    try {
+      // Try both the API endpoint and the class information from lessonPlan
+      console.log('Checking class info for ID:', classId);
+      
+      // Get the class info from the lesson plan if available
+      if (lessonPlan?.class?.id) {
+        console.log('Class info from lesson plan:', {
+          id: lessonPlan.class.id,
+          name: lessonPlan.class.name,
+          code: lessonPlan.class.code
+        });
+        
+        // Now directly check visibility settings for a specific content ID
+        if (lessonPlan?.assignments?.length > 0) {
+          const assignmentId = lessonPlan.assignments[0].id;
+          // Use the class ID from the lesson plan data instead of the URL parameter
+          const visibilityResponse = await fetch(
+            `/api/teacher/content-visibility?assignmentId=${assignmentId}&classIds=${lessonPlan.class.id}`
+          );
+          const visibilityData = await visibilityResponse.json();
+          console.log('Direct visibility check for assignment:', visibilityData);
+        }
+        
+        // No need to make an additional API call if we have the class info
+        return;
+      }
+      
+      // Only make an API call if we don't have the class info in the lesson plan
+      const response = await fetch(`/api/teacher/classes/${classId}`);
+      if (response.ok) {
+        const classData = await response.json();
+        console.log('Class details from API:', classData);
+        
+        // Now directly check visibility settings for a specific content ID
+        if (lessonPlan?.assignments?.length > 0) {
+          const assignmentId = lessonPlan.assignments[0].id;
+          const actualClassId = classData.id;
+          const visibilityResponse = await fetch(
+            `/api/teacher/content-visibility?assignmentId=${assignmentId}&classIds=${actualClassId}`
+          );
+          const visibilityData = await visibilityResponse.json();
+          console.log('Direct visibility check for assignment:', visibilityData);
+        }
+      } else {
+        console.warn('Could not fetch class data:', classId);
+        // Don't throw an error here, just log it
+      }
+    } catch (error) {
+      console.error('Error checking class info:', error);
+    }
+  };
+
+  // Call this function after successfully fetching the lesson plan
+  useEffect(() => {
+    if (lessonPlan && classId) {
+      checkClassInfo();
+    }
+  }, [lessonPlan, classId]);
 
   if (!lessonPlan) return <div className="flex justify-center items-center min-h-[60vh]">Loading...</div>;
 
@@ -145,16 +467,6 @@ export default function ClassLessonPlanDetailPage({ classId, planId }: LessonPla
           </Link>
         </Button>
       </div>
-
-      {/* Desktop Back to Class Button */}
-      {/* <div className="hidden sm:block">
-        <Button variant="ghost" className="mb-4" asChild>
-          <Link href={`/teacher/dashboard/classes/${classId}?tab=lessonPlans`}>
-            <ChevronLeft className="h-4 w-4 mr-2" />
-            Back to Class Lesson Plans
-          </Link>
-        </Button>
-      </div> */}
 
       {/* Header: Title, Edit, Save & Cancel */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -221,24 +533,31 @@ export default function ClassLessonPlanDetailPage({ classId, planId }: LessonPla
             <div className="flex justify-end mb-2">
               <UploadFileDialog
                 lessonPlanId={lessonPlan.id}
-                onFileUploaded={(newFile) =>
-                  setLessonPlan((prev: any) => ({
-                    ...prev,
-                    files: [...(prev.files || []), newFile],
-                  }))
-                }
+                onFileUploaded={(newFile) => {
+                  // Open the files accordion
+                  setAccordionValue('files');
+                  // Refresh files from database after upload
+                  setTimeout(() => fetchFiles(), 500);
+                }}
               />
             </div>
-            {/* File Table */}
-            <FileTable 
-              files={lessonPlan.files || []} 
-              onUpdate={async () => {
-                // Refetch the lesson plan to update the UI
-                await fetchPlan();
-              }}
-            />
+            {/* File Table with loading state */}
+            {isLoadingFiles ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+                <span className="ml-2 text-gray-600">Loading files...</span>
+              </div>
+            ) : (
+              <FileTable 
+                files={lessonPlan.files || []} 
+                onUpdate={fetchFiles}
+                onManageVisibility={handleManageFileVisibility}
+                onEdit={handleEditFile}
+                onDelete={handleDeleteFile}
+              />
+            )}
             
-            {(!lessonPlan.files || lessonPlan.files.length === 0) && (
+            {(!lessonPlan.files || lessonPlan.files.length === 0) && !isLoadingFiles && (
               <div className="text-center py-4 text-gray-500">
                 No files have been uploaded yet.
               </div>
@@ -266,10 +585,12 @@ export default function ClassLessonPlanDetailPage({ classId, planId }: LessonPla
             </div>
             <AssignmentTable 
               assignments={lessonPlan.assignments || []} 
-              onUpdate={() => {
-                // Refresh lesson plan data
-                fetchPlan();
+              onUpdate={async () => {
+                await fetchPlan();
               }} 
+              onManageVisibility={handleManageAssignmentVisibility}
+              onEdit={handleEditAssignment}
+              onDelete={handleDeleteAssignment}
             />
             
             {(!lessonPlan.assignments || lessonPlan.assignments.length === 0) && (
@@ -282,6 +603,138 @@ export default function ClassLessonPlanDetailPage({ classId, planId }: LessonPla
       </Accordion>
 
       {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
+
+      {/* File Visibility Dialog */}
+      {fileToManageVisibility && (
+        <ContentVisibilityDialog
+          isOpen={!!fileToManageVisibility}
+          onClose={() => setFileToManageVisibility(null)}
+          contentType="file"
+          contentId={fileToManageVisibility.id}
+          contentName={fileToManageVisibility.name}
+          lessonPlanId={lessonPlan.id}
+          classes={[{ 
+            id: classId, 
+            name: lessonPlan?.class?.name || 'Current Class', 
+            code: lessonPlan?.class?.code || ''
+          }]}
+          onSuccess={() => {
+            fetchFiles();
+            setFileToManageVisibility(null);
+          }}
+        />
+      )}
+
+      {/* Assignment Visibility Dialog */}
+      {assignmentToManageVisibility && (
+        <ContentVisibilityDialog
+          isOpen={!!assignmentToManageVisibility}
+          onClose={() => setAssignmentToManageVisibility(null)}
+          contentType="assignment"
+          contentId={assignmentToManageVisibility.id}
+          contentName={assignmentToManageVisibility.name}
+          lessonPlanId={lessonPlan.id}
+          classes={[{ 
+            id: classId, 
+            name: lessonPlan?.class?.name || 'Current Class', 
+            code: lessonPlan?.class?.code || '' 
+          }]}
+          onSuccess={() => {
+            fetchAssignments();
+            setAssignmentToManageVisibility(null);
+          }}
+        />
+      )}
+      
+      {/* File Edit Dialog */}
+      {fileToEdit && (
+        <EditFileDialog
+          file={fileToEdit}
+          open={!!fileToEdit}
+          onClose={() => setFileToEdit(null)}
+          onFileSaved={(updatedFile) => {
+            fetchPlan();
+            setFileToEdit(null);
+          }}
+          onUpdate={fetchPlan}
+        />
+      )}
+
+      {/* Assignment Edit Dialog */}
+      {assignmentToEdit && (
+        <EditAssignmentDialog
+          assignment={assignmentToEdit}
+          isOpen={!!assignmentToEdit}
+          onClose={() => setAssignmentToEdit(null)}
+          onUpdate={() => {
+            fetchPlan();
+            setAssignmentToEdit(null);
+          }}
+          currentLessonPlanId={planId}
+        />
+      )}
+
+      {/* File Delete Dialog */}
+      {fileToDelete && (
+        <AlertDialog open={!!fileToDelete} onOpenChange={(open) => !open && setFileToDelete(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete File</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete this file? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleFileDelete}
+                disabled={isDeleting}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  'Delete'
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+
+      {/* Assignment Delete Dialog */}
+      {assignmentToDelete && (
+        <AlertDialog open={!!assignmentToDelete} onOpenChange={(open) => !open && setAssignmentToDelete(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Assignment</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete this assignment? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleAssignmentDelete}
+                disabled={isDeleting}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  'Delete'
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </div>
   );
 }

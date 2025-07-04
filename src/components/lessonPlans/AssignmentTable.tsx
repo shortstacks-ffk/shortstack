@@ -25,12 +25,13 @@ import {
   DialogTitle,
 } from '@/src/components/ui/dialog';
 import Link from 'next/link';
-import { MoreHorizontal, FileEdit, Trash2, Send, Calendar, FileIcon, Clock, FileText, Eye } from 'lucide-react';
+import { MoreHorizontal, FileEdit, Trash2, Send, Calendar, FileIcon, Clock, FileText, Eye, EyeOff } from 'lucide-react';
 import { deleteAssignment } from '@/src/app/actions/assignmentActions';
 import EditAssignmentDialog from './EditAssignmentDialog';
 import AssignAssignmentDialog from './AssignAssignmentDialog';
 import { AssignmentRecord } from '@/src/types/assignments';
 import { getSimpleFileType } from '@/src/lib/utils';
+import { format } from 'date-fns';
 
 const formatFileSize = (bytes?: number): string => {
   if (!bytes) return 'N/A';
@@ -57,13 +58,24 @@ const formatDate = (dateString?: string) => {
   });
 };
 
+// Update the props interface
+interface AssignmentTableProps {
+  assignments: AssignmentRecord[];
+  onUpdate?: () => void;
+  onManageVisibility?: (assignment: AssignmentRecord) => void;
+  isGeneric?: boolean;
+  onEdit?: (assignmentId: string, assignmentName: string) => void;
+  onDelete?: (assignmentId: string, assignmentName: string) => void;
+}
+
 export default function AssignmentTable({ 
   assignments, 
-  onUpdate 
-}: { 
-  assignments: AssignmentRecord[],
-  onUpdate?: () => void 
-}) {
+  onUpdate,
+  onManageVisibility,
+  isGeneric = false,  // Add this new prop
+  onEdit,
+  onDelete
+}: AssignmentTableProps) {
   const [assignmentToDelete, setAssignmentToDelete] = useState<string | null>(null);
   const [assignmentToEdit, setAssignmentToEdit] = useState<AssignmentRecord | null>(null);
   const [assignmentToAssign, setAssignmentToAssign] = useState<AssignmentRecord | null>(null);
@@ -170,7 +182,40 @@ export default function AssignmentTable({
                   {assignment.activity || 'N/A'}
                 </div>
                 <div className="col-span-1">{formatDate(assignment.createdAt || assignment.dueDate)}</div>
-                <div className="col-span-1">{formatDate(assignment.dueDate)}</div>
+                <div className="col-span-1">
+                  {/* Due Date (with improved visibility status) */}
+                  <div className="text-sm">
+                    {assignment.dueDate ? (
+                      <>
+                        {format(new Date(assignment.dueDate), 'MMM d, yyyy')}, {' '}
+                        {format(new Date(assignment.dueDate), 'h:mm a')}
+                      </>
+                    ) : (
+                      <span 
+                        className="text-gray-500" 
+                        title="Set a due date in assignment settings"
+                      >
+                        No due date yet
+                      </span>
+                    )}
+                  </div>
+                  
+                  {/* Show visibility status */}
+                  {assignment.visibleToStudents === false && (
+                    <div className="text-xs text-amber-600 mt-1 flex items-center">
+                      <EyeOff className="h-3 w-3 mr-1" />
+                      Not visible to students
+                    </div>
+                  )}
+                  
+                  {/* Show scheduled visibility indicator */}
+                  {assignment.scheduledVisibility && assignment.visibleToStudents && (
+                    <div className="text-xs text-blue-600 mt-1 flex items-center">
+                      <Clock className="h-3 w-3 mr-1" />
+                      Visible from {format(new Date(assignment.scheduledVisibility), 'MMM d, yyyy')}
+                    </div>
+                  )}
+                </div>
                 <div className="col-span-1 flex justify-between items-center">
                   <div className="bg-blue-100 px-2 py-1 rounded-full text-blue-700 text-xs flex items-center">
                     <div className="h-2 w-2 rounded-full bg-blue-500 mr-1"></div>
@@ -193,25 +238,39 @@ export default function AssignmentTable({
                           View Text
                         </DropdownMenuItem>
                       )}
-                      <DropdownMenuItem onClick={() => setAssignmentToEdit(assignment)}>
-                        <FileEdit className="mr-2 h-4 w-4" />
-                        Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setAssignmentToDelete(assignment.id)}>
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setAssignmentToAssign(assignment)}>
-                        <Send className="mr-2 h-4 w-4" />
-                        Assign to Plans
-                      </DropdownMenuItem>
+                      {onEdit && (
+                        <DropdownMenuItem onClick={() => onEdit(assignment.id, assignment.name)}>
+                          <FileEdit className="mr-2 h-4 w-4" />
+                          Edit
+                        </DropdownMenuItem>
+                      )}
+                      {onDelete && (
+                        <DropdownMenuItem onClick={() => onDelete(assignment.id, assignment.name)}>
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </DropdownMenuItem>
+                      )}
+                      {/* Only show Assign option if not a generic lesson plan */}
+                      {!isGeneric && (
+                        <DropdownMenuItem onClick={() => setAssignmentToAssign(assignment)}>
+                          <Send className="mr-2 h-4 w-4" />
+                          Assign to Additional Lesson Plans
+                        </DropdownMenuItem>
+                      )}
+                      {onManageVisibility && (
+                        <DropdownMenuItem onClick={() => onManageVisibility(assignment)}>
+                          <Eye className="mr-2 h-4 w-4" />
+                          Manage Visibility
+                        </DropdownMenuItem>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
               </div>
             </div>
           ))
-        )}
+        )
+        }
       </div>
       
       {/* Mobile View */}
@@ -241,18 +300,28 @@ export default function AssignmentTable({
                           View Text
                         </DropdownMenuItem>
                       )}
-                      <DropdownMenuItem onClick={() => setAssignmentToEdit(assignment)}>
-                        <FileEdit className="mr-2 h-4 w-4" />
-                        Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setAssignmentToDelete(assignment.id)}>
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete
-                      </DropdownMenuItem>
+                      {onEdit && (
+                        <DropdownMenuItem onClick={() => onEdit(assignment.id, assignment.name)}>
+                          <FileEdit className="mr-2 h-4 w-4" />
+                          Edit
+                        </DropdownMenuItem>
+                      )}
+                      {onDelete && (
+                        <DropdownMenuItem onClick={() => onDelete(assignment.id, assignment.name)}>
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuItem onClick={() => setAssignmentToAssign(assignment)}>
                         <Send className="mr-2 h-4 w-4" />
                         Assign
                       </DropdownMenuItem>
+                      {onManageVisibility && (
+                        <DropdownMenuItem onClick={() => onManageVisibility(assignment)}>
+                          <Eye className="mr-2 h-4 w-4" />
+                          Manage Visibility
+                        </DropdownMenuItem>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
@@ -264,10 +333,28 @@ export default function AssignmentTable({
                 )}
                 
                 <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs">
-                  {assignment.dueDate && (
+                  {assignment.dueDate ? (
                     <div className="flex items-center text-amber-600">
                       <Calendar className="h-3 w-3 mr-1" />
-                      Due: {formatDate(assignment.dueDate)}
+                      Due: {format(new Date(assignment.dueDate), 'MMM d, yyyy')}; {format(new Date(assignment.dueDate), 'h:mm a')}
+                    </div>
+                  ) : (
+                    <div 
+                      className="flex items-center text-gray-500"
+                      title={assignment.visibleToStudents 
+                        ? "Set a due date in edit assignment" 
+                        : "Make visible to set due date"}
+                    >
+                      <Calendar className="h-3 w-3 mr-1" />
+                      No due date yet
+                    </div>
+                  )}
+                  
+                  {/* Explicitly check if visibleToStudents is false - not undefined, null, etc. */}
+                  {assignment.visibleToStudents === false && (
+                    <div className="flex items-center text-amber-600 font-medium ml-4">
+                      <EyeOff className="h-3 w-3 mr-1" />
+                      Not visible
                     </div>
                   )}
                   
@@ -374,6 +461,7 @@ export default function AssignmentTable({
             onUpdate?.();
             setAssignmentToEdit(null);
           }}
+          isGeneric={isGeneric} // Pass the isGeneric prop
         />
       )}
 

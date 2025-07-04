@@ -11,11 +11,16 @@ import { toast } from 'sonner';
 import { AssignmentRecord } from '@/src/types/assignments';
 import { Loader2 } from 'lucide-react';
 
+// Modify your EditAssignmentDialogProps to include the current lesson plan ID
 interface EditAssignmentDialogProps {
-  assignment: AssignmentRecord;
+  assignment: AssignmentRecord & {
+    isVisible?: boolean;
+  };
   isOpen: boolean;
   onClose: () => void;
   onUpdate: () => void;
+  isGeneric?: boolean;
+  currentLessonPlanId?: string; // Add this prop
 }
 
 // File-based assignment activity options
@@ -39,7 +44,9 @@ export default function EditAssignmentDialog({
   assignment,
   isOpen,
   onClose,
-  onUpdate
+  onUpdate,
+  isGeneric = false, // Optional prop to indicate if this is a generic assignment
+  currentLessonPlanId = '' // Add this with a default empty string
 }: EditAssignmentDialogProps) {
   const [form, setForm] = useState({
     name: '',
@@ -76,24 +83,38 @@ export default function EditAssignmentDialog({
       // Get the lessonPlanIds from the assignment
       let lessonPlanIds: string[] = [];
       
-      // Try to get lessonPlanIds directly if available
-      if (assignment.lessonPlanIds && assignment.lessonPlanIds.length > 0) {
-        lessonPlanIds = assignment.lessonPlanIds;
-      } 
-      // Otherwise try to extract them from the lessonPlans relationship if available
-      else if (assignment.lessonPlans && assignment.lessonPlans.length > 0) {
-        lessonPlanIds = assignment.lessonPlans.map(lp => lp.id);
-      }
-      
-      // Ensure we have at least one lessonPlanId
-      if (lessonPlanIds.length === 0) {
-        throw new Error("No lesson plan found for this assignment");
+      // For generic lesson plans, handle differently - check isGeneric prop
+      if (isGeneric) {
+        // For generic assignments, we'll pass an empty array or use the templateId if available
+        // This indicates to the server action that it's a generic assignment
+        if (assignment.genericLessonPlanId) {
+          lessonPlanIds = [assignment.genericLessonPlanId];
+        }
+        // Even if no genericLessonPlanId, we'll continue without throwing an error
+      } else {
+        // Regular lesson plan logic - try to get lessonPlanIds from various sources
+        // First, try to use the current lesson plan ID if provided
+        if (currentLessonPlanId) {
+          lessonPlanIds = [currentLessonPlanId];
+        }
+        // If not, try to get from the assignment object as before
+        else if (assignment.lessonPlanIds && assignment.lessonPlanIds.length > 0) {
+          lessonPlanIds = assignment.lessonPlanIds;
+        } 
+        else if (assignment.lessonPlans && assignment.lessonPlans.length > 0) {
+          lessonPlanIds = assignment.lessonPlans.map(lp => lp.id);
+        }
+        
+        // Now check if we have any lesson plans
+        if (lessonPlanIds.length === 0) {
+          throw new Error("No lesson plan found for this assignment");
+        }
       }
       
       const result = await updateAssignment(assignment.id, {
         name: form.name,
         activity: form.activity,
-        dueDate: form.dueDate || undefined, // Pass as string, let action handle conversion
+        dueDate: form.dueDate || undefined,
         lessonPlanIds: lessonPlanIds,
         textAssignment: isTextAssignment ? form.textAssignment : undefined,
         // Include other required fields from the original assignment
@@ -122,6 +143,16 @@ export default function EditAssignmentDialog({
   
   // Check if past date is selected
   const isPastDate = form.dueDate ? new Date(form.dueDate) < new Date(today) : false;
+
+  // Calculate the visibility condition separately
+  const shouldShowDueDate = assignment.dueDate || assignment.isVisible === true;
+
+  console.log('Due date field visibility:', {
+    condition: shouldShowDueDate,
+    isGeneric,
+    hasDueDate: Boolean(assignment.dueDate),
+    isVisible: assignment.isVisible === true
+  });
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -181,20 +212,23 @@ export default function EditAssignmentDialog({
             </div>
           )}
           
-          <div className="space-y-2">
-            <Label htmlFor="dueDate">Due Date</Label>
-            <Input
-              id="dueDate"
-              type="date"
-              value={form.dueDate}
-              onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
-              disabled={isSubmitting}
-              min={today} // Prevent selecting past dates
-            />
-            {isPastDate && (
-              <p className="text-red-500 text-xs">Please select a future date</p>
-            )}
-          </div>
+          {/* Only show due date field if assignment already has a due date */}
+          {shouldShowDueDate && (
+            <div className="space-y-2">
+              <Label htmlFor="dueDate">Due Date</Label>
+              <Input
+                id="dueDate"
+                type="date"
+                value={form.dueDate}
+                onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
+                disabled={isSubmitting}
+                min={today} // Prevent selecting past dates
+              />
+              {isPastDate && (
+                <p className="text-red-500 text-xs">Please select a future date</p>
+              )}
+            </div>
+          )}
           
           <div className="flex justify-end space-x-2 pt-2">
             <Button
