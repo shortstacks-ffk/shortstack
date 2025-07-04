@@ -804,16 +804,37 @@ export async function getClassAssignments(classCode: string): Promise<GradebookR
             id: true,
             name: true
           }
+        },
+        studentSubmissions: {
+          where: {
+            grade: { not: null }
+          },
+          select: {
+            grade: true
+          }
         }
       },
       orderBy: { dueDate: 'asc' }
     });
 
-    // Add classId to each assignment for compatibility
-    const assignmentsWithClassId = assignments.map(assignment => ({
-      ...assignment,
-      classId: classData.id
-    }));
+    // Calculate average grades and add classId to each assignment for compatibility
+    const assignmentsWithClassId = assignments.map(assignment => {
+      const grades = assignment.studentSubmissions.map(sub => sub.grade).filter(grade => grade !== null) as number[];
+      const averageGrade = grades.length > 0 
+        ? Math.round(grades.reduce((sum, grade) => sum + grade, 0) / grades.length)
+        : null;
+
+      // Get the first lesson plan name if available
+      const lessonPlanName = assignment.lessonPlans.length > 0 ? assignment.lessonPlans[0].name : null;
+
+      return {
+        ...assignment,
+        classId: classData.id,
+        averageGrade,
+        totalSubmissions: assignment.studentSubmissions.length,
+        lessonPlanName
+      };
+    });
 
     return {
       success: true,
