@@ -83,8 +83,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   // Update page title based on current path
   useEffect(() => {
-    if (pathname.includes("/calendar")) setPageTitle("Calendar");
-    else if (pathname.includes("/classes")) setPageTitle("Classes");
+    if (pathname.includes("/classes")) setPageTitle("Classes");
+    // else if (pathname.includes("/calendar")) setPageTitle("Calendar");
     else if (pathname.includes("/bills")) setPageTitle("Bills");
     else if (pathname.includes("/bank-accounts")) setPageTitle("Bank Accounts");
     else if (pathname.includes("/lesson-plans")) setPageTitle("Lesson Plans");

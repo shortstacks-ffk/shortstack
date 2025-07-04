@@ -35,7 +35,7 @@ export default function StudentLessonsList({ classCode, classId, lessonPlans }: 
                  <span className="text-sm font-medium truncate">
                   {lesson.createdAt ? formatDate(new Date(lesson.createdAt)) : 'No date'}
                 </span>
-              </div>
+              </CardContent>
               
               <CardContent className="flex flex-col justify-center items-center h-full pt-10">
                 <h3 className="text-xl font-bold text-center">{lesson.name}</h3>
