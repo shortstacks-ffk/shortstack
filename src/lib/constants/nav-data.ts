@@ -30,11 +30,11 @@ export const dashboardData = {
       url: "/teacher/dashboard/classes",
       icon: SquarePen,
     },
-    {
-      title: "Calendar",
-      url: "/teacher/dashboard/calendar",
-      icon: Calendar,
-    },
+    // {
+    //   title: "Calendar",
+    //   url: "/teacher/dashboard/calendar",
+    //   icon: Calendar,
+    // },
     {
       title: "Bank Accounts",
       url: "/teacher/dashboard/bank-accounts",
@@ -75,11 +75,11 @@ export const studentDashboardData = {
       url: "/student/dashboardclasses",
       icon: SquarePen,
     },
-    {
-      title: "Calendar",
-      url: "/student/dashboardcalendar",
-      icon: Calendar,
-    },
+    // {
+    //   title: "Calendar",
+    //   url: "/student/dashboardcalendar",
+    //   icon: Calendar,
+    // },
     {
       title: "Bank Accounts",
       url: "/student/dashboardbank-accounts",

@@ -27,7 +27,7 @@ export function StudentSidebarLeft({ isMobileOpen, setIsMobileOpen }: DashboardS
   const navItems = [
     { href: "/student/dashboard", icon: Home, label: "Dashboard", exact: true },
     { href: "/student/dashboard/classes", icon: SquarePen, label: "Classes" },
-    { href: "/student/dashboard/calendar", icon: Calendar, label: "Calendar" },
+    // { href: "/student/dashboard/calendar", icon: Calendar, label: "Calendar" },
     { href: "/student/dashboard/bank", icon: Wallet, label: "Bank" },
     { href: "/student/dashboard/storefront", icon: ShoppingBag, label: "Storefront" },
   ];

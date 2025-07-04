@@ -62,7 +62,7 @@ export default function StudentDashboardLayout({ children }: { children: React.R
     if (pathname.includes("/classes")) setPageTitle("Classes");
     else if (pathname.includes("/account")) setPageTitle("Account");
     else if (pathname.includes("/assignments")) setPageTitle("Assignments");
-    else if (pathname.includes("/calendar")) setPageTitle("Calendar");
+    // else if (pathname.includes("/calendar")) setPageTitle("Calendar");
     else if (pathname.includes("/bank")) setPageTitle("Bank");
     else if (pathname.includes("/storefront")) setPageTitle("Storefront");
     else setPageTitle("Dashboard");
@@ -77,7 +77,7 @@ export default function StudentDashboardLayout({ children }: { children: React.R
   const navItems = [
     { href: "/student/dashboard", icon: Home, label: "Dashboard", exact: true },
     { href: "/student/dashboard/classes", icon: SquarePen, label: "Classes" },
-    { href: "/student/dashboard/calendar", icon: Calendar, label: "Calendar" },
+    // { href: "/student/dashboard/calendar", icon: Calendar, label: "Calendar" },
     { href: "/student/dashboard/bank", icon: Wallet, label: "Bank" },
     { href: "/student/dashboard/storefront", icon: ShoppingBag, label: "Storefront" },
   ];
