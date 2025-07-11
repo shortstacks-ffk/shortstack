@@ -250,59 +250,52 @@ export default function LessonPlanCard({
         </div>
 
         <Link href={getLinkUrl()} onClick={handleCardClick}>
-          <CardContent className="flex flex-col h-full p-0">
-            <div className="p-4 flex-1 flex flex-col">
-              {/* Title */}
-              <h1 className="text-lg font-bold text-black line-clamp-2 mb-2 mt-6">
+          <CardContent className="flex flex-col h-full p-4">
+            {/* Content container with consistent margins */}
+            <div className="flex flex-col h-full mt-6 mb-4">
+              {/* Title - fixed height to prevent overflow */}
+              <h1 className="text-lg font-bold text-black line-clamp-2 mb-2 min-h-[3.5rem]">
                 {plan.name}
               </h1>
               
-              {/* Description */}
+              {/* Description - reduced length and fixed height */}
               {plan.description && (
-                <p className="text-sm text-black/70 line-clamp-3 mb-3">
-                  {plan.description.replace(/<[^>]*>/g, '').substring(0, 120)}
-                  {plan.description.length > 120 ? '...' : ''}
-                </p>
-              )}
-              
-              {/* Grade level badge */}
-              {plan.gradeLevel && plan.gradeLevel !== 'all' && (
-                <div className="mb-3">
-                  <Badge variant="outline" className="text-xs bg-white/70">
-                    Grades {plan.gradeLevel}
-                  </Badge>
+                <div className="mb-3 min-h-[2.5rem]">
+                  <p className="text-sm text-black/70 line-clamp-2">
+                    {plan.description.replace(/<[^>]*>/g, '').substring(0, 80)}
+                    {plan.description.replace(/<[^>]*>/g, '').length > 80 ? '...' : ''}
+                  </p>
                 </div>
               )}
               
-              {/* Footer with class assignment status and date */}
+              {/* Grade level badge - fixed height */}
+              <div className="mb-3 min-h-[1.5rem]">
+                {plan.gradeLevel && plan.gradeLevel !== 'all' && (
+                  <Badge variant="outline" className="text-xs bg-white/70">
+                    Grades {plan.gradeLevel}
+                  </Badge>
+                )}
+              </div>
+              
+              {/* Footer with class assignment status and date - push to bottom */}
               <div className="mt-auto space-y-2">
-                {/* Class assignment status - similar to BillCard */}
-                <div className="flex flex-wrap gap-1.5">
+                {/* Class assignment status - simplified to show count only */}
+                <div className="flex items-center justify-between">
                   {plan.classes && plan.classes.length > 0 ? (
-                    plan.classes.slice(0, 2).map((cls) => (
-                      <span key={cls.code} className="inline-flex items-center text-xs bg-white rounded-full px-2 py-1 border">
-                        <span className="mr-1">📚</span>
-                        <span className="truncate max-w-[80px]">{cls.name}</span>
-                      </span>
-                    ))
+                    <span className="inline-flex items-center text-xs bg-white rounded-full px-2 py-1 border">
+                      {/* <span className="mr-1">📚</span> */}
+                      <span>{plan.classes.length} class{plan.classes.length > 1 ? 'es' : ''} Assigned</span>
+                    </span>
                   ) : (
                     viewContext === 'dashboard' && !isTemplate && (
                       <span className="inline-flex items-center text-xs bg-white rounded-full px-2 py-1 border text-gray-500">
-                        <span className="mr-1">📝</span>
+                        {/* <span className="mr-1">📝</span> */}
                         <span>Unassigned</span>
                       </span>
                     )
                   )}
-
-                  {plan.classes && plan.classes.length > 2 && (
-                    <span className="inline-flex items-center text-xs bg-white rounded-full px-2 py-1 border">
-                      +{plan.classes.length - 2} more
-                    </span>
-                  )}
-                </div>
-                
-                {/* Created date */}
-                <div className="flex justify-between items-center">
+                  
+                  {/* Created date on the same line */}
                   <span className="text-xs text-black/60">
                     {formattedDate}
                   </span>

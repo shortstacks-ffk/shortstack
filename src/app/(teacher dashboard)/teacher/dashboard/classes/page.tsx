@@ -28,7 +28,6 @@ interface ClassResponse {
   error?: string;
 }
 
-
 // Main page component
 export default function ClassesPage() {
   return (
@@ -88,6 +87,24 @@ function ClassesContent() {
     setClasses(prevClasses => prevClasses.filter(cls => cls.id !== deletedClassId));
   };
   
+  // Add this function to ClassesContent component:
+  const handleClassUpdated = (updatedClass: any) => {
+    setClasses(prevClasses => 
+      prevClasses.map(cls => 
+        cls.id === updatedClass.id 
+          ? { 
+              ...cls, 
+              ...updatedClass,
+              // Ensure we preserve the enrollment count and other nested data
+              _count: cls._count,
+              // Make sure classSessions is properly updated
+              classSessions: updatedClass.classSessions || []
+            }
+          : cls
+      )
+    );
+  };
+  
   // Fetch classes on component mount
   useEffect(() => {
     fetchClasses();
@@ -125,7 +142,8 @@ function ClassesContent() {
             numberOfStudents={cls._count?.enrollments || 0}
             schedule={formatClassSchedule(cls.classSessions)}
             overview={cls.overview}
-            onDelete={handleClassDeleted} // Add this prop
+            onDelete={handleClassDeleted}
+            onUpdate={handleClassUpdated} // Add this line
           />
         ))}
         

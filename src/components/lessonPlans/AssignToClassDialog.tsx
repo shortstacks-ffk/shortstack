@@ -157,32 +157,35 @@ export default function AssignToClassDialog({
             </div>
           ) : allClasses.length > 0 ? (
             <div className="max-h-60 overflow-y-auto border rounded p-2">
-              {allClasses.map(cls => (
-                <div
-                  key={cls.id}
-                  className={`flex items-center gap-2 p-2 rounded cursor-pointer mb-1 ${
-                    selectedClassCodes.includes(cls.code) ? "bg-gray-100" : "hover:bg-gray-50"
-                  }`}
-                >
-                  <Checkbox
-                    id={`class-${cls.id}`}
-                    checked={selectedClassCodes.includes(cls.code)}
-                    onCheckedChange={() => handleToggleClass(cls.code)}
-                  />
-                  <Label
-                    htmlFor={`class-${cls.id}`}
-                    className="flex items-center cursor-pointer flex-1"
-                    onClick={() => handleToggleClass(cls.code)}
-                  >
-                    <span className="text-xl mr-2">{cls.emoji}</span>
-                    <span>{cls.name}</span>
-                    <span className="text-xs text-gray-500 ml-auto">
-                      {cls.studentCount} students
-                    </span>
-                  </Label>
-                </div>
-              ))}
-            </div>
+  {allClasses.map(cls => {
+    const isSelected = selectedClassCodes.includes(cls.code)
+    return (
+      <div
+        key={cls.id}
+        className={`flex items-center gap-2 p-2 rounded cursor-pointer mb-1 ${
+          isSelected ? "bg-gray-100" : "hover:bg-gray-50"
+        }`}
+      >
+        <Checkbox
+          id={`class-${cls.id}`}
+          checked={isSelected}
+          onCheckedChange={() => handleToggleClass(cls.code)}
+        />
+        <Label
+          htmlFor={`class-${cls.id}`}
+          className="flex items-center cursor-pointer flex-1"
+        >
+          <span className="text-xl mr-2">{cls.emoji}</span>
+          <span>{cls.name}</span>
+          <span className="text-xs text-gray-500 ml-auto">
+            {cls.studentCount} students
+          </span>
+        </Label>
+      </div>
+    )
+  })}
+</div>
+
           ) : (
             <p className="text-center py-4 text-gray-500">
               You don't have any classes yet. Create a class first to assign templates.

@@ -160,7 +160,7 @@ export default function AssignToClassPrompt({
     <Dialog open={isOpen} onOpenChange={(open) => !isSubmitting && !open && onClose()}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Assign to Class</DialogTitle>
+          <DialogTitle>Assign to Class Test</DialogTitle>
         </DialogHeader>
 
         <div className="py-2 space-y-4">
@@ -197,23 +197,30 @@ export default function AssignToClassPrompt({
                   
                   {/* List of classes with checkboxes */}
                   <div className="space-y-2 max-h-[240px] overflow-y-auto pl-1">
-                    {availableClasses.map(cls => (
-                      <div key={cls.code} className="flex items-center space-x-2">
-                        <Checkbox 
-                          id={`class-${cls.code}`}
-                          checked={selectedClassCodes.includes(cls.code)}
-                          onCheckedChange={() => toggleClass(cls.code)}
-                        />
-                        <Label 
-                          htmlFor={`class-${cls.code}`}
-                          className="cursor-pointer text-sm"
-                        >
-                          {cls.emoji && <span className="mr-2">{cls.emoji}</span>}
-                          {cls.name}
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
+  {availableClasses.map(cls => {
+    const isSelected = selectedClassCodes.includes(cls.code)
+    return (
+      <label
+        key={cls.code}
+        htmlFor={`class-${cls.code}`}
+        className={`flex items-center space-x-2 p-2 rounded cursor-pointer transition-colors ${
+          isSelected ? 'bg-blue-50' : 'hover:bg-gray-50'
+        }`}
+      >
+        <Checkbox
+          id={`class-${cls.code}`}
+          checked={isSelected}
+          onCheckedChange={() => toggleClass(cls.code)}
+        />
+        <span className="text-sm flex-1 select-none">
+          {cls.emoji && <span className="mr-2">{cls.emoji}</span>}
+          {cls.name}
+        </span>
+      </label>
+    )
+  })}
+</div>
+
                 </>
               )}
             </div>

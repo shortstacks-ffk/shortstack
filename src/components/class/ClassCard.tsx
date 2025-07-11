@@ -55,6 +55,7 @@ interface ClassCardProps {
   schedule?: string | null;
   overview?: string;
   onDelete?: (id: string) => void;
+  onUpdate?: (updatedClass: any) => void; // Add this
 }
 
 export const ClassCard = ({ 
@@ -67,7 +68,8 @@ export const ClassCard = ({
   numberOfStudents,
   schedule,
   overview,
-  onDelete
+  onDelete,
+  onUpdate // Add this
 }: ClassCardProps) => {
   const router = useRouter();
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
@@ -155,6 +157,13 @@ export const ClassCard = ({
       setIsDeleting(false);
     }
   };
+
+  // Add this function to handle updates
+  const handleClassUpdate = (updatedClass: any) => {
+    if (onUpdate) {
+      onUpdate(updatedClass);
+    }
+  };
   
   return (
     <>
@@ -216,6 +225,7 @@ export const ClassCard = ({
             isOpen={isUpdateDialogOpen}
             onClose={() => setIsUpdateDialogOpen(false)}
             classData={classData}
+            onUpdate={handleClassUpdate} // Add this prop
           />
         )}
       </Card>
