@@ -11,6 +11,7 @@ import { toast } from "react-toastify"
 import { EmojiPickerButton } from "@/src/components/ui/emoji-picker-button"
 import { ColorDropdown } from "@/src/components/ui/color-dropdown"
 import ClassScheduleForm from "./ClassScheduleForm"
+import { useRouter } from "next/navigation";
 
 interface ClassScheduleItem {
   days: number[];
@@ -32,9 +33,12 @@ interface EditClassFormProps {
   isOpen: boolean
   onClose: () => void
   classData: ClassData
+  onUpdate?: (updatedClass: any) => void // Add this
 }
 
-export function EditClassForm({ isOpen, onClose, classData }: EditClassFormProps) {
+export function EditClassForm({ isOpen, onClose, classData, onUpdate }: EditClassFormProps) {
+  const router = useRouter();
+  
   const [name, setName] = useState(classData.name)
   const [emoji, setEmoji] = useState(classData.emoji)
   const [grade, setGrade] = useState(classData.grade || "9th")
@@ -115,6 +119,14 @@ export function EditClassForm({ isOpen, onClose, classData }: EditClassFormProps
       if (!result.success) {
         toast.error(result.error || "Failed to update class");
       } else {
+        // Update parent state immediately
+        if (result.data && onUpdate) {
+          onUpdate(result.data);
+        }
+        
+        // Force router refresh as fallback
+        router.refresh();
+        
         onClose();
         setTimeout(() => {
           toast.success("Class updated successfully");

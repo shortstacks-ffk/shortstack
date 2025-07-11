@@ -444,7 +444,8 @@ export async function updateClass(id: string, data: any): Promise<ClassResponse>
       }
     });
 
-    // Process each schedule
+    // Process each schedule and collect the created sessions
+    const createdSessions = [];
     if (data.schedules && data.schedules.length > 0) {
       for (const schedule of data.schedules) {
         const dayNumbers = schedule.days.map((day: any) => 
@@ -455,7 +456,7 @@ export async function updateClass(id: string, data: any): Promise<ClassResponse>
 
         // Create class session records for this time slot
         for (const day of dayNumbers) {
-          await db.classSession.create({
+          const session = await db.classSession.create({
             data: {
               classId: id,
               dayOfWeek: day,
@@ -463,6 +464,7 @@ export async function updateClass(id: string, data: any): Promise<ClassResponse>
               endTime: schedule.endTime
             }
           });
+          createdSessions.push(session);
         }
         
         // Create calendar event for this time slot
@@ -489,14 +491,14 @@ export async function updateClass(id: string, data: any): Promise<ClassResponse>
             variant: validColor,
             isRecurring: true,
             recurringDays: dayNumbers,
-            createdById: session.user.teacherId, // Use teacherId
+            createdById: session.user.teacherId,
             classId: id
           }
         });
       }
     }
 
-    // Recreate calendar events with the utility
+    // Recreate calendar events with the utility (if needed)
     if (data.startDate) {
       // Get the updated class with new sessions
       const updatedClassWithSessions = await db.class.findUnique({
@@ -545,6 +547,7 @@ export async function updateClass(id: string, data: any): Promise<ClassResponse>
     revalidatePath('/teacher/dashboard/classes', 'page');
     revalidatePath(`/teacher/dashboard/classes/${id}`, 'page');
     revalidatePath('/teacher/dashboard', 'page');
+    revalidatePath('/', 'layout');
     
     return { 
       success: true, 
@@ -557,12 +560,13 @@ export async function updateClass(id: string, data: any): Promise<ClassResponse>
         grade: updatedClass.grade ?? undefined,
         startDate: updatedClass.startDate ?? undefined,
         endDate: updatedClass.endDate ?? undefined,
-        classSessions: (data.classSessions || []).map((session: any) => ({
+        // Return the actual created sessions instead of trying to use data.classSessions
+        classSessions: createdSessions.map((session: any) => ({
           id: session.id,
           dayOfWeek: session.dayOfWeek,
           startTime: session.startTime,
           endTime: session.endTime
-        })) ?? []
+        }))
       }
     };
   } catch (error: any) {
