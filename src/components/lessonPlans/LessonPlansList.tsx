@@ -44,13 +44,13 @@ export default function LessonPlansList({ classCode, cName }: LessonPlansListPro
 
   return (
     <div className="space-y-6">
-      <Breadcrumbs
+      {/* <Breadcrumbs
         items={[
           { label: 'Dashboard', href: '/teacher/dashboard' },
           { label: cName, href: `/teacher/dashboard/classes/${classCode}` },
           { label: 'Lesson Plans', href: `/teacher/dashboard/classes/${classCode}/lesson-plans` },
         ]}
-      />
+      /> */}
       
       <h2 className="text-xl font-semibold">Lesson Plans</h2>
       

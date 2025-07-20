@@ -19,6 +19,16 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Account ID is required" }, { status: 400 });
     }
     
+    // Get teacher record
+    const teacher = await db.teacher.findUnique({
+      where: { userId: session.user.id },
+      select: { id: true }
+    });
+
+    if (!teacher) {
+      return NextResponse.json({ error: "Teacher profile not found" }, { status: 404 });
+    }
+
     // Get the account with its student to check teacher access
     const account = await db.bankAccount.findUnique({
       where: { id: accountId },
@@ -40,15 +50,26 @@ export async function GET(req: Request) {
     }
     
     // Check if the teacher has access to the student through a class
-    const teacherClasses = account.student.enrollments.map(e => e.class).filter(c => c.teacherId === session.user.id);
+    // Look for enrollments where the class has this teacher's ID
+    const hasAccess = account.student.enrollments.some(enrollment => 
+      enrollment.class.teacherId === teacher.id && enrollment.enrolled
+    );
     
-    if (!teacherClasses.length) {
-      return NextResponse.json({ error: "Access denied to this account" }, { status: 403 });
+    if (!hasAccess) {
+      // Also check if this teacher directly created the student account
+      if (account.student.teacherId !== teacher.id) {
+        return NextResponse.json({ error: "Access denied to this account" }, { status: 403 });
+      }
     }
     
-    // Fetch the transactions
+    // Fetch the transactions - include received transfers too
     const transactions = await db.transaction.findMany({
-      where: { accountId },
+      where: {
+        OR: [
+          { accountId },
+          { receivingAccountId: accountId }
+        ]
+      },
       orderBy: { createdAt: "desc" }
     });
     

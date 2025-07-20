@@ -28,6 +28,17 @@ import AssignmentTable from '@/src/components/lessonPlans/AssignmentTable';
 import { TemplateCopyDialog } from '@/src/components/lessonPlans/TemplateCopyDialog';
 import EditFileDialog from '@/src/components/lessonPlans/EditFileDialog';
 import EditAssignmentDialog from '@/src/components/lessonPlans/EditAssignmentDialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/src/components/ui/alert-dialog";
+import { Loader2 } from 'lucide-react';
 
 interface GenericDetailViewProps {
   templateId: string;
@@ -64,6 +75,8 @@ export default function GenericDetailView({ templateId }: GenericDetailViewProps
   const [fileToEdit, setFileToEdit] = useState<any>(null);
   const [assignmentToEdit, setAssignmentToEdit] = useState<any>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+    // Add this state near your other state declarations
+  const [showCopyConfirmation, setShowCopyConfirmation] = useState(false);
 
   const isSuperUser = session?.user?.role === 'SUPER';
   const canEdit = isSuperUser;
@@ -423,6 +436,42 @@ export default function GenericDetailView({ templateId }: GenericDetailViewProps
     }
   };
 
+
+
+  // Replace the direct copy function with a two-step process
+  const handleTeacherCopyButton = () => {
+    if (!isTeacher) return;
+    setShowCopyConfirmation(true);
+  };
+
+  // Update the copy handler to be used after confirmation
+  const handleTeacherCopy = async () => {
+    if (!isTeacher) return;
+    
+    setIsCopying(true);
+    setShowCopyConfirmation(false);
+    
+    try {
+      const copyResponse = await copyTemplateToLessonPlan(templateId, {
+        name: template.name,
+      });
+      
+      if (!copyResponse.success) {
+        throw new Error(copyResponse.error || "Failed to copy template");
+      }
+
+      toast.success("Template copied successfully");
+      
+      // Navigate to the new lesson plan with the from=template parameter
+      router.push(`/teacher/dashboard/lesson-plans/${copyResponse.data.id}?from=template`);
+    } catch (error: any) {
+      console.error("Error copying template:", error);
+      toast.error(error.message || "Failed to copy template");
+    } finally {
+      setIsCopying(false);
+    }
+  };
+
   return (
     <div className="w-full h-[100vh] lg:w-5/6 xl:w-3/4 mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
       {/* Breadcrumbs - hidden on mobile */}
@@ -504,6 +553,7 @@ export default function GenericDetailView({ templateId }: GenericDetailViewProps
           
           {/* For Teachers: Only show the Edit button (remove duplicate, assign to class, etc.) */}
           {isTeacher && (
+            <>
             <Button 
               onClick={() => handleTeacherEdit()} 
               size="sm" 
@@ -512,6 +562,16 @@ export default function GenericDetailView({ templateId }: GenericDetailViewProps
               <Pen className="h-4 w-4 mr-2" />
               Edit
             </Button>
+            <Button 
+              onClick={handleTeacherCopyButton}
+              size="sm" 
+              className="bg-blue-500 hover:bg-blue-600"
+              disabled={isCopying}
+            > 
+              <BookPlus className="h-4 w-4 mr-2" />
+              {isCopying ? "Copying..." : "Copy"}
+            </Button>
+            </>
           )}
         </div>
       </div>
@@ -679,6 +739,36 @@ export default function GenericDetailView({ templateId }: GenericDetailViewProps
       )}
 
       {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
+
+      {/* Copy Confirmation Dialog for Teachers */}
+      <AlertDialog open={showCopyConfirmation} onOpenChange={setShowCopyConfirmation}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Copy Template</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will create a personal copy of &quot;{template?.name}&quot; in your lesson plans.
+              You'll be able to modify the copy without affecting the original template.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isCopying}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleTeacherCopy}
+              disabled={isCopying}
+              className="bg-blue-500 hover:bg-blue-600"
+            >
+              {isCopying ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Copying...
+                </>
+              ) : (
+                'Create Copy'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

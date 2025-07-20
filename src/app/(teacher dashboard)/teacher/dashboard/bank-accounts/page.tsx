@@ -281,7 +281,7 @@ function BankAccountsContent() {
             </div>
           </div>
           
-          <Card>
+          <Card className="min-h-auto">
             <CardContent className="p-0">
               <div className="overflow-x-auto">
                 <table className="w-full">
