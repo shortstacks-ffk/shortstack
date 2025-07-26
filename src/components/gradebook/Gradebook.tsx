@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Input } from '@/src/components/ui/input';
-import { getAssignments } from '@/src/app/actions/assignmentActions';
+import { getClassAssignments } from '@/src/app/actions/gradebookActions';
 import { Search, BookOpen } from 'lucide-react';
 import { toast } from 'sonner';
 import AssignmentCard from './AssignmentCard';
@@ -23,7 +23,10 @@ interface Assignment {
   rubric?: string | null;      
   classId: string;             
   createdAt: string;          
-  updatedAt: string;           
+  updatedAt: string;
+  averageGrade?: number | null;
+  totalSubmissions?: number;
+  lessonPlanName?: string | null;
   
   lessonPlans?: Array<{
     id: string;
@@ -59,7 +62,7 @@ export default function Gradebook({ classCode }: GradebookProps) {
     const loadAssignments = async () => {
       setLoading(true);
       try {
-        const response = await getAssignments(classCode);
+        const response = await getClassAssignments(classCode);
         if (response.success && response.data) {
           console.log('Loaded assignments:', response.data);
           setAssignments(response.data);
@@ -140,9 +143,12 @@ export default function Gradebook({ classCode }: GradebookProps) {
                 id: assignment.id,
                 name: assignment.name,
                 classId: assignment.classId,
+                averageGrade: assignment.averageGrade,
+                lessonPlanName: assignment.lessonPlanName,
+                totalSubmissions: assignment.totalSubmissions,
               }}
               backgroundColor="bg-white"
-              onSelect={handleAssignmentSelect} 
+              onSelectAction={handleAssignmentSelect} 
             />
           ))}
         </div>

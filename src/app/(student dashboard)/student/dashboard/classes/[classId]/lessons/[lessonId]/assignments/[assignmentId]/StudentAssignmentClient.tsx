@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Button } from '@/src/components/ui/button';
 import { Badge } from '@/src/components/ui/badge';
-import { ArrowLeft, Calendar, Download, Upload, FileText, ExternalLink, Eye, Clock } from 'lucide-react';
+import { ArrowLeft, Calendar, Download, Upload, FileText, ExternalLink, Eye, Clock, CheckCircle } from 'lucide-react';
 import { getSimpleFileType, formatFileSize } from '@/src/lib/utils';
 import AssignmentSubmitDialog from '@/src/components/students/AssignmentSubmitDialog';
 
@@ -165,13 +165,13 @@ function DueDateDisplay({
 
     if (diffInDays < 0) {
       const overdueDays = Math.abs(diffInDays);
-      setDueDateStatus(`${overdueDays} day${overdueDays !== 1 ? 's' : ''} overdue`);
+      setDueDateStatus(`${overdueDays} Day${overdueDays !== 1 ? 's' : ''} Overdue`);
     } else if (diffInDays === 0) {
-      setDueDateStatus('Due today');
+      setDueDateStatus('Due Today');
     } else if (diffInDays === 1) {
-      setDueDateStatus('Due tomorrow');
+      setDueDateStatus('Due Tomorrow');
     } else if (diffInDays <= 7) {
-      setDueDateStatus(`Due in ${diffInDays} days`);
+      setDueDateStatus(`Due in ${diffInDays} Days`);
     } else {
       setDueDateStatus(''); // Don't show status for far future dates
     }
@@ -182,9 +182,9 @@ function DueDateDisplay({
       <span className="text-sm text-gray-900 font-medium">{formattedDate}</span>
       {dueDateStatus && (
         <span className={`text-xs mt-1 ${
-          dueDateStatus.includes('overdue') ? 'text-red-600' :
-          dueDateStatus.includes('today') ? 'text-orange-600' :
-          dueDateStatus.includes('tomorrow') ? 'text-yellow-600' :
+          dueDateStatus.includes('Overdue') ? 'text-red-600' :
+          dueDateStatus.includes('Today') ? 'text-orange-600' :
+          dueDateStatus.includes('Tomorrow') ? 'text-yellow-600' :
           'text-blue-600'
         }`}>
           {dueDateStatus}
@@ -228,7 +228,7 @@ function SubmissionPreview({
             variant={submission.status === 'GRADED' ? 'default' : 'secondary'}
             className="text-sm"
           >
-            {submission.status.replace('_', ' ').toLowerCase()}
+            {submission.status}
           </Badge>
         </div>
       </div>
@@ -450,7 +450,7 @@ export default function StudentAssignmentClient({
                     variant={submission.status === 'GRADED' ? 'default' : 'secondary'}
                     className="mt-2"
                   >
-                    {submission.status.replace('_', ' ').toLowerCase()}
+                    {submission.status}
                   </Badge>
                 )}
                 {submission?.comments && submission.status === 'GRADED' && (
@@ -465,7 +465,7 @@ export default function StudentAssignmentClient({
             </div>
           </div>
           
-          {/* Submission section - Restored original design with light green buttons */}
+          {/* Submission section - Updated to hide resubmit button if graded */}
           <div className="bg-card rounded-lg border p-6">
             <h2 className="text-lg font-semibold mb-4">Submission</h2>
             
@@ -487,24 +487,39 @@ export default function StudentAssignmentClient({
                 </a>
               )}
               
-              {/* Submit/Resubmit assignment */}
-              <AssignmentSubmitDialog 
-                assignment={{
-                  id: assignmentId,
-                  name: assignment.name,
-                  fileType: assignment.fileType,
-                  dueDate: assignment.dueDate ? new Date(assignment.dueDate) : null,
-                  activity: assignment.activity || "Assignment",
-                  url: assignment.url,
-                  description: assignment.description,
-                  textAssignment: assignment.textAssignment
-                }}
-              >
-                <Button variant="secondary" className="bg-lime-500 text-white hover:bg-lime-600">
-                  <Upload className="h-4 w-4 mr-2" /> 
-                  {submission ? 'Resubmit Assignment' : 'Submit Assignment'}
-                </Button>
-              </AssignmentSubmitDialog>
+              {/* Submit/Resubmit assignment - Only show if not graded */}
+              {(!submission || submission.status !== 'GRADED') && (
+                <AssignmentSubmitDialog 
+                  assignment={{
+                    id: assignmentId,
+                    name: assignment.name,
+                    fileType: assignment.fileType,
+                    dueDate: assignment.dueDate ? new Date(assignment.dueDate) : null,
+                    activity: assignment.activity || "Assignment",
+                    url: assignment.url,
+                    description: assignment.description,
+                    textAssignment: assignment.textAssignment
+                  }}
+                >
+                  <Button variant="secondary" className="bg-lime-500 text-white hover:bg-lime-600">
+                    <Upload className="h-4 w-4 mr-2" /> 
+                    {submission ? 'Resubmit Assignment' : 'Submit Assignment'}
+                  </Button>
+                </AssignmentSubmitDialog>
+              )}
+              
+              {/* Show message if assignment is graded */}
+              {submission && submission.status === 'GRADED' && (
+                <div className="w-full p-4 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="flex items-center gap-2 text-green-700">
+                    <CheckCircle className="h-5 w-5" />
+                    <span className="font-medium">Assignment Graded</span>
+                  </div>
+                  <p className="text-sm text-green-600 mt-1">
+                    This assignment has been graded by your teacher. No further submissions are allowed.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>
