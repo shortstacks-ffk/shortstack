@@ -63,11 +63,7 @@ const TransactionHistory = ({ accounts }: TransactionHistoryProps) => {
     const matchesType = 
       filterType === "ALL" || 
       (filterType === "DEPOSIT" && transaction.transactionType === "DEPOSIT") ||
-      (filterType === "WITHDRAWAL" && transaction.transactionType === "WITHDRAWAL") ||
-      (filterType === "TRANSFER" && (
-        transaction.transactionType === "TRANSFER_IN" || 
-        transaction.transactionType === "TRANSFER_OUT"
-      ))
+      (filterType === "WITHDRAWAL" && transaction.transactionType === "WITHDRAWAL")
     
     const matchesSearch = searchQuery === "" || 
       transaction.description.toLowerCase().includes(searchQuery.toLowerCase())
@@ -190,7 +186,7 @@ const TransactionHistory = ({ accounts }: TransactionHistoryProps) => {
                   <SelectItem value="ALL">All Transactions</SelectItem>
                   <SelectItem value="DEPOSIT">Deposits</SelectItem>
                   <SelectItem value="WITHDRAWAL">Withdrawals</SelectItem>
-                  <SelectItem value="TRANSFER">Transfers</SelectItem>
+
                 </SelectContent>
               </Select>
             </div>
