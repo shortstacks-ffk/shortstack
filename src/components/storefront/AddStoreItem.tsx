@@ -8,6 +8,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter
 } from "@/src/components/ui/dialog";
 import { Input } from "@/src/components/ui/input";
 import { Label } from "@/src/components/ui/label";
@@ -167,31 +168,34 @@ const AddStoreItem = ({ isOpen = false, onClose, onSuccess }: AddStoreItemProps)
             <Label htmlFor="isAvailable">Available for Purchase</Label>
           </div>
 
-          <div className="flex justify-end gap-2 pt-2 mt-4 border-t border-gray-200">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              disabled={isSubmitting}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                "Create Item"
-              )}
-            </Button>
-          </div>
-        </form>
-      </DialogContent>
+         <div className="py-2 text-gray-600 text-sm">
+                     <p>This bill will be created without assigning to any class or student.</p>
+                     <p className="mt-1">You can assign it to classes or students later from the bill details page.</p>
+                   </div>
+         
+                   <DialogFooter className="pt-2 border-t">
+                     <Button 
+                       type="button" 
+                       variant="outline"
+                       onClick={onClose}
+                       disabled={isSubmitting}
+                     >
+                       Cancel
+                     </Button>
+                     <Button 
+                       type="submit" 
+                       disabled={isSubmitting}
+                     >
+                       {isSubmitting ? (
+                         <>
+                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                           Creating...
+                         </>
+                       ) : "Create Item"}
+                     </Button>
+                   </DialogFooter>
+                 </form>
+               </DialogContent>
     </Dialog>
   );
 };
