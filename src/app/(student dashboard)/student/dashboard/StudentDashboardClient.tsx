@@ -1,5 +1,6 @@
 "use client";
 
+import { useResponsive } from "@/src/hooks/use-responsive";
 import { Card, CardContent } from "@/src/components/ui/card";
 import { StudentClassCard } from "@/src/components/class/StudentClassCard";
 import Link from "next/link";
@@ -10,269 +11,232 @@ import { formatCurrency } from "@/src/lib/utils";
 
 // Define the color options for class cards
 const CLASS_COLORS = [
-  "primary",
-  "secondary",
-  "success",
-  "warning",
-  "destructive",
-  "default",
+	"primary",
+	"secondary",
+	"success",
+	"warning",
+	"destructive",
+	"default",
 ];
 
 interface ClassSession {
-  id: string;
-  dayOfWeek: number;
-  startTime: string;
-  endTime: string;
+	id: string;
+	dayOfWeek: number;
+	startTime: string;
+	endTime: string;
 }
 
 interface Class {
-  id: string;
-  name: string;
-  code: string;
-  emoji: string;
-  grade?: string;
-  color?: string;
-  schedule?: string;
-  classSessions?: ClassSession[];
-  _count?: {
-    enrollments: number;
-  };
+	id: string;
+	name: string;
+	code: string;
+	emoji: string;
+	grade?: string;
+	color?: string;
+	schedule?: string;
+	classSessions?: ClassSession[];
+	_count?: {
+		enrollments: number;
+	};
 }
 
 const DaysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 // Helper function to format class schedules
 const formatClassSchedule = (sessions?: ClassSession[]) => {
-  if (!sessions || sessions.length === 0) return null;
+	if (!sessions || sessions.length === 0) return null;
 
-  return sessions
-    .map((session) => {
-      const day = DaysOfWeek[session.dayOfWeek];
-      return `${day} ${session.startTime}-${session.endTime}`;
-    })
-    .join(", ");
+	return sessions
+		.map((session) => {
+			const day = DaysOfWeek[session.dayOfWeek];
+			return `${day} ${session.startTime}-${session.endTime}`;
+		})
+		.join(", ");
 };
 
 interface Student {
-  id: string;
-  firstName: string;
-  lastName: string;
-  schoolEmail: string;
-  profileImage?: string | null;
-  progress?: {
-    completedAssignments: number;
-    totalAssignments: number;
-    points: number;
-    balance: number;
-    streak: number;
-  } | null;
-  teacher?: {
-    id: string;
-    name: string;
-    email: string;
-    image?: string | null;
-  } | null;
+	id: string;
+	firstName: string;
+	lastName: string;
+	schoolEmail: string;
+	profileImage?: string | null;
+	progress?:
+		| {
+				completedAssignments: number;
+				totalAssignments: number;
+				points: number;
+				balance: number;
+				streak: number;
+		  }
+		| null;
+	teacher?:
+		| {
+				id: string;
+				name: string;
+				email: string;
+				image?: string | null;
+		  }
+		| null;
 }
 
 interface StudentDashboardClientProps {
-  student: Student | null;
-  classes: Class[];
+	student: Student | null;
+	classes: Class[];
 }
 
 export default function StudentDashboardClient({
-  student,
-  classes,
+	student,
+	classes,
 }: StudentDashboardClientProps) {
-  // Get user initials for avatar fallback
-  const getInitials = () => {
-    if (!student) return "ST";
-    return `${student.firstName?.charAt(0) || ""}${student.lastName?.charAt(0) || ""}`;
-  };
+	const { isMobile, isTablet, isDesktop } = useResponsive();
 
-  // Process classes to ensure they have colors and counts
-  const classesWithColors = classes.map((classItem, index) => {
-    // Generate schedule if not already provided
-    const schedule =
-      classItem.schedule || formatClassSchedule(classItem.classSessions);
+	// Get user initials for avatar fallback
+	const getInitials = () => {
+		if (!student) return "ST";
+		return `${student.firstName?.charAt(0) || ""}${student.lastName?.charAt(0) || ""}`;
+	};
 
-    if (!classItem.color) {
-      // Use the class item's index to pick a color, or cycle through colors if more classes than colors
-      const colorIndex = index % CLASS_COLORS.length;
-      return {
-        ...classItem,
-        color: CLASS_COLORS[colorIndex],
-        schedule,
-        _count: classItem._count || { enrollments: 0 },
-      };
-    }
-    return {
-      ...classItem,
-      schedule,
-      _count: classItem._count || { enrollments: 0 },
-    };
-  });
+	// Process classes to ensure they have colors and counts
+	const classesWithColors = classes.map((classItem, index) => {
+		// Generate schedule if not already provided
+		const schedule =
+			classItem.schedule || formatClassSchedule(classItem.classSessions);
 
-  return (
-    <div className="w-full">
-      
-      {/* Classes Section */}
-      <section className="w-full mb-8">
-        <h2 className="text-xl md:text-2xl font-semibold mb-6 text-gray-800">
-          My Classes
-        </h2>
-        
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-          {classesWithColors.length > 0 ? (
-            classesWithColors
-              .slice(0, 3)
-              .map((classItem) => (
-                <StudentClassCard
-                  key={classItem.id}
-                  id={classItem.id}
-                  emoji={classItem.emoji}
-                  name={classItem.name}
-                  code={classItem.code}
-                  color={classItem.color}
-                  grade={classItem.grade}
-                  schedule={classItem.schedule}
-                  numberOfStudents={classItem._count?.enrollments}
-                />
-              ))
-          ) : (
-            <Card className="col-span-full">
-              <CardContent className="p-6 text-center">
-                <p className="text-muted-foreground mb-4">
-                  You don't have any classes yet.
-                </p>
-                <Link href="/student/dashboard/classes">
-                  <Button variant="default" className="mt-2">
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    Join a Class
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
-          )}
+		if (!classItem.color) {
+			// Use the class item's index to pick a color, or cycle through colors if more classes than colors
+			const colorIndex = index % CLASS_COLORS.length;
+			return {
+				...classItem,
+				color: CLASS_COLORS[colorIndex],
+				schedule,
+				_count: classItem._count || { enrollments: 0 },
+			};
+		}
+		return {
+			...classItem,
+			schedule,
+			_count: classItem._count || { enrollments: 0 },
+		};
+	});
 
-          {classesWithColors.length > 0 && classesWithColors.length > 3 && (
-            <Card className="bg-muted/40 border border-dashed border-muted-foreground/20">
-              <CardContent className="p-6 flex flex-col items-center justify-center h-full">
-                <p className="text-muted-foreground mb-2">
-                  {classesWithColors.length - 3} more classes
-                </p>
-                <Link href="/student/dashboard/classes">
-                  <Button variant="outline" size="sm">
-                    View All
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      </section>
+	return (
+		<div className="min-h-screen bg-gray-50">
+			<div className="container-responsive py-responsive">
+				{/* Welcome Section - Responsive */}
+				<div className="card-responsive bg-white border shadow-sm mb-4 sm:mb-6">
+					<div className="flex-responsive-col items-start sm:items-center justify-between gap-3">
+						<div className="flex items-center gap-3 sm:gap-4">
+							<div className="w-12 h-12 sm:w-16 sm:h-16 bg-green-100 rounded-full flex items-center justify-center">
+								{student?.profileImage ? (
+									<img
+										src={student.profileImage}
+										alt="Profile"
+										className="w-full h-full rounded-full object-cover"
+									/>
+								) : (
+									<span className="text-green-600 font-semibold text-lg sm:text-xl">
+										{getInitials()}
+									</span>
+								)}
+							</div>
+							<div>
+								<h1 className="text-responsive-lg font-bold text-gray-900">
+									Welcome back,{" "}
+									{`${student?.firstName || ""} ${student?.lastName || ""}`}!
+								</h1>
+								<p className="text-responsive-sm text-gray-600">
+									{student?.schoolEmail}
+								</p>
+							</div>
+						</div>
 
-      {/* Progress Cards */}
-      <section className="w-full">
-        <h2 className="text-xl md:text-2xl font-semibold mb-6 text-gray-800">
-          My Progress
-        </h2>
+						{/* Stats - Responsive layout */}
+						<div className="w-full sm:w-auto">
+							<div className="grid grid-cols-2 sm:flex gap-2 sm:gap-4">
+								<div className="text-center bg-green-50 rounded-lg p-2 sm:p-3">
+									<div className="text-lg sm:text-xl font-bold text-green-600">
+										{student?.progress?.points || 0}
+									</div>
+									<div className="text-xs sm:text-sm text-gray-600">
+										Points
+									</div>
+								</div>
+								<div className="text-center bg-blue-50 rounded-lg p-2 sm:p-3">
+									<div className="text-lg sm:text-xl font-bold text-blue-600">
+										${student?.progress?.balance || 0}
+									</div>
+									<div className="text-xs sm:text-sm text-gray-600">
+										Balance
+									</div>
+								</div>
+								{!isMobile && (
+									<>
+										<div className="text-center bg-orange-50 rounded-lg p-2 sm:p-3">
+											<div className="text-lg sm:text-xl font-bold text-orange-600">
+												{student?.progress?.streak || 0}
+											</div>
+											<div className="text-xs sm:text-sm text-gray-600">
+												Streak
+											</div>
+										</div>
+										<div className="text-center bg-purple-50 rounded-lg p-2 sm:p-3">
+											<div className="text-lg sm:text-xl font-bold text-purple-600">
+												{student?.progress?.completedAssignments || 0}/
+												{student?.progress?.totalAssignments || 0}
+											</div>
+											<div className="text-xs sm:text-sm text-gray-600">
+												Complete
+											</div>
+										</div>
+									</>
+								)}
+							</div>
+						</div>
+					</div>
+				</div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          {/* Completed Assignments Card */}
-          <div className="group relative overflow-hidden bg-gradient-to-br from-blue-50 to-indigo-100 border-0 rounded-xl p-8 text-center shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
-            <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-blue-400/20 to-indigo-500/20 rounded-full -translate-y-8 translate-x-8"></div>
-            <div className="absolute bottom-0 left-0 w-16 h-16 bg-gradient-to-tr from-blue-300/10 to-indigo-400/10 rounded-full translate-y-6 -translate-x-6"></div>
+				{/* Classes Grid - Responsive */}
+				<div className="content-spacing">
+					<div className="flex items-center justify-between mb-4">
+						<h2 className="text-responsive-lg font-semibold text-gray-900">
+							My Classes
+						</h2>
+						<span className="text-responsive-sm text-gray-600 bg-gray-100 px-2 py-1 rounded-full">
+							{classes.length}{" "}
+							{classes.length === 1 ? "class" : "classes"}
+						</span>
+					</div>
 
-            <div className="relative z-10">
-              <div className="inline-flex items-center justify-center w-12 h-12 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg mb-4 shadow-lg">
-                <svg
-                  className="w-6 h-6 text-white"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-              </div>
-
-              <p className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-700 bg-clip-text text-transparent mb-2">
-                {student?.progress?.completedAssignments || 0}/
-                {student?.progress?.totalAssignments || 0}
-              </p>
-              <p className="text-gray-600 text-sm font-medium uppercase tracking-wide">
-                Completed Assignments
-              </p>
-            </div>
-          </div>
-
-          {/* Average Grade Card (formerly Total Points) */}
-          <div className="group relative overflow-hidden bg-gradient-to-br from-emerald-50 to-teal-100 border-0 rounded-xl p-8 text-center shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
-            <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-emerald-400/20 to-teal-500/20 rounded-full -translate-y-8 translate-x-8"></div>
-            <div className="absolute bottom-0 left-0 w-16 h-16 bg-gradient-to-tr from-emerald-300/10 to-teal-400/10 rounded-full translate-y-6 -translate-x-6"></div>
-
-            <div className="relative z-10">
-              <div className="inline-flex items-center justify-center w-12 h-12 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-lg mb-4 shadow-lg">
-                <svg
-                  className="w-6 h-6 text-white"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                  />
-                </svg>
-              </div>
-
-              <p className="text-3xl font-bold bg-gradient-to-r from-emerald-600 to-teal-700 bg-clip-text text-transparent mb-2">
-                {student?.progress?.points || 0}%
-              </p>
-              <p className="text-gray-600 text-sm font-medium uppercase tracking-wide">
-                Average Grade
-              </p>
-            </div>
-          </div>
-
-          {/* Bank Balance Card */}
-          <div className="group relative overflow-hidden bg-gradient-to-br from-amber-50 to-orange-100 border-0 rounded-xl p-8 text-center shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
-            <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-amber-400/20 to-orange-500/20 rounded-full -translate-y-8 translate-x-8"></div>
-            <div className="absolute bottom-0 left-0 w-16 h-16 bg-gradient-to-tr from-amber-300/10 to-orange-400/10 rounded-full translate-y-6 -translate-x-6"></div>
-
-            <div className="relative z-10">
-              <div className="inline-flex items-center justify-center w-12 h-12 bg-gradient-to-r from-amber-500 to-orange-600 rounded-lg mb-4 shadow-lg">
-                <svg
-                  className="w-6 h-6 text-white"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"
-                  />
-                </svg>
-              </div>
-
-              <p className="text-3xl font-bold bg-gradient-to-r from-amber-600 to-orange-700 bg-clip-text text-transparent mb-2">
-                {formatCurrency(student?.progress?.balance || 0)}
-              </p>
-              <p className="text-gray-600 text-sm font-medium uppercase tracking-wide">
-                Bank Balance
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-    </div>
-  );
+					{classes.length > 0 ? (
+						<div className="grid-classes gap-responsive">
+							{classesWithColors.map((classItem) => (
+								<StudentClassCard
+									key={classItem.id}
+									id={classItem.id}
+									emoji={classItem.emoji}
+									name={classItem.name}
+									code={classItem.code}
+									color={classItem.color}
+									grade={classItem.grade}
+									schedule={classItem.schedule}
+									numberOfStudents={classItem._count?.enrollments}
+								/>
+							))}
+						</div>
+					) : (
+						<div className="card-responsive bg-white border-2 border-dashed border-gray-300 text-center py-8 sm:py-12">
+							<div className="text-4xl sm:text-6xl mb-3 sm:mb-4">📚</div>
+							<h3 className="text-responsive-base font-medium text-gray-900 mb-2">
+								No Classes Yet
+							</h3>
+							<p className="text-responsive-sm text-gray-600 max-w-md mx-auto">
+								You haven't been enrolled in any classes yet. Check with your
+								teacher or administrator to get started.
+							</p>
+						</div>
+					)}
+				</div>
+			</div>
+		</div>
+	);
 }
