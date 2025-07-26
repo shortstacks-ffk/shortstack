@@ -12,7 +12,6 @@ import { X, LogOut } from "lucide-react";
 import { NavMain } from "@/src/components/nav-main";
 import { NavLogo } from "@/src/components/nav-logo";
 import { dashboardData } from "@/src/lib/constants/nav-data";
-import SuperUserBadge from "@/src/components/SuperUserBadge";
 
 // Define a more specific type for session user to avoid TypeScript errors
 type UserWithExtendedProfile = {
@@ -190,18 +189,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <SidebarProvider>
-      {/* Mobile Sidebar Overlay */}
+      {/* Mobile Sidebar Overlay - Show on tablets too */}
       {isMobileSidebarOpen && (
         <div 
-          className="fixed inset-0 bg-black/30 z-30 md:hidden"
+          className="fixed inset-0 bg-black/30 z-30 lg:hidden"
           onClick={closeMobileSidebar}
           aria-hidden="true"
         />
       )}
       
-      {/* Mobile Sidebar */}
+      {/* Mobile Sidebar - Show on tablets too */}
       <div 
-        className={`fixed inset-y-0 left-0 w-72 bg-[#f1faf3] shadow-lg transform transition-transform duration-300 ease-in-out z-40 md:hidden ${
+        className={`fixed inset-y-0 left-0 w-72 bg-[#f1faf3] shadow-lg transform transition-transform duration-300 ease-in-out z-40 lg:hidden ${
           isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -225,11 +224,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
       </div>
       
-      {/* Desktop Sidebar */}
-      <div className="hidden md:block">
+      {/* Desktop Sidebar - Only show on large screens */}
+      <div className="hidden lg:block">
         <SidebarLeft filteredNavItems={filteredNavItems} />
       </div>
       
+      {/* Main content - No margin for tablets */}
       <SidebarInset className="relative flex flex-col h-screen">
         {/* Header Component */}
         <DashboardHeader
@@ -244,10 +244,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         
         {/* Main content area */}
         <div 
-          className={`flex-1 bg-gray-50`}
+          className="flex-1 bg-gray-50"
           style={{ height: `calc(100vh - ${HEADER_HEIGHT}px)` }}
         >
-          <div className={`mx-auto min-h-screen min-w-screen ${isCalendarPage ? 'p-0 max-w-none bg-gray-50' : 'max-w-7xl px-2 sm:px-4 md:px-4s py-2 md:py-4 bg-gray-50'}`}>
+          <div className={`mx-auto min-h-screen min-w-screen ${isCalendarPage ? 'p-0 max-w-none bg-gray-50' : 'max-w-7xl px-2 sm:px-4 md:px-6 py-2 md:py-4 bg-gray-50'}`}>
             {children}
           </div>
         </div>

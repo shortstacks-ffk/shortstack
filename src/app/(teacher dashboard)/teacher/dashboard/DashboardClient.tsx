@@ -56,7 +56,7 @@ const DashboardClient = ({ classes }: DashboardClientProps) => {
     <div className="w-full">
       <div className="w-full">
         <section className="mb-6 md:mb-8">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
             {displayedClasses.map((cls) => (
               <ClassCard
                 key={cls.id}
@@ -77,7 +77,6 @@ const DashboardClient = ({ classes }: DashboardClientProps) => {
                 FormComponent={AddClass}
                 onItemAdded={(newClass) => {
                   if (newClass) {
-                    // This will refresh the page to show the new class
                     window.location.reload();
                   }
                 }}

@@ -142,18 +142,19 @@ export default function StudentDashboardLayout({ children }: { children: React.R
 
   return (
     <SidebarProvider>
-      {/* MOBILE SIDEBAR OVERLAY */}
+      {/* Mobile Sidebar Overlay - Show on tablets too */}
       {isMobileSidebarOpen && (
         <div 
-          className="fixed inset-0 bg-black/30 z-30 md:hidden"
+          className="fixed inset-0 bg-black/30 z-30 lg:hidden"
           onClick={closeMobileSidebar}
           aria-hidden="true"
         />
       )}
       
-      {/* MOBILE SIDEBAR */}
+      {/* Mobile Sidebar - Show on tablets too */}
       <div 
-        className={`fixed inset-y-0 left-0 w-full max-w-xs bg-[#f1faf3] shadow-lg transform transition-transform duration-300 ease-in-out z-40 md:hidden ${
+
+        className={`fixed inset-y-0 left-0 w-72 bg-[#f1faf3] shadow-lg transform transition-transform duration-300 ease-in-out z-40 lg:hidden ${
           isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -198,10 +199,10 @@ export default function StudentDashboardLayout({ children }: { children: React.R
         </div>
       </div>
       
-      {/* DESKTOP SIDEBAR */}
+      {/* Desktop Sidebar - Only show on large screens */}
       <aside
-        className={`hidden md:flex md:flex-col bg-[#f1faf3] border-r transition-all duration-300 h-full fixed top-0 left-0 z-20
-          ${isDesktopSidebarCollapsed ? "w-16" : "w-56 lg:w-64"}
+        className={`hidden lg:flex lg:flex-col bg-[#f1faf3] border-r transition-all duration-300 h-full fixed top-0 left-0
+          ${isDesktopSidebarCollapsed ? "w-16" : "w-64"}
         `}
       >
         {/* Collapse button */}
@@ -261,10 +262,10 @@ export default function StudentDashboardLayout({ children }: { children: React.R
         </div>
       </aside>
       
-      <SidebarInset className={cn(
-        "relative flex flex-col h-screen transition-all duration-300",
-        isDesktopSidebarCollapsed ? "md:ml-16" : "md:ml-56 lg:md:ml-64"
-      )}>
+      {/* Main content - Apply margin only on large screens */}
+      <SidebarInset className={`relative flex flex-col h-screen ${
+        isDesktopSidebarCollapsed ? "lg:ml-16" : "lg:ml-64"
+      }`}>
         {/* Header Component */}
         <StudentDashboardHeader
           pageTitle={pageTitle}
@@ -281,12 +282,8 @@ export default function StudentDashboardLayout({ children }: { children: React.R
           className="bg-gray-50 flex-1 overflow-y-auto"
           style={{ height: `calc(100vh - ${HEADER_HEIGHT}px)` }}
         >
-          {/* Apply different styles based on page type and screen size */}
-          <div className={`mx-auto w-full ${
-            isCalendarPage 
-              ? 'p-0 max-w-none' 
-              : 'max-w-7xl px-3 sm:px-4 md:px-6 lg:px-8 py-2 md:py-4'
-          }`}>
+          <div className={`mx-auto w-full ${isCalendarPage ? 'p-0 max-w-none' : 'max-w-7xl px-2 sm:px-4 md:px-6 py-2 md:py-4'}`}>
+
             {children}
           </div>
         </div>

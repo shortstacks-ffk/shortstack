@@ -49,7 +49,7 @@ async function BillsContent() {
 
   return (
     <div className="min-h-full bg-gray-50"> {/* Ensure full height background */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 p-8 sm:p-4 bg-gray-50">
+      <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 p-4 sm:p-6 bg-gray-50">
         {sortedBills.map((bill, index) => (
           <BillCard
             key={bill.id}

@@ -134,6 +134,7 @@ export default function AssignBillDialog({
                   className={`flex items-center gap-2 p-2 rounded cursor-pointer mb-1 ${
                     selectedClassIds.includes(cls.id) ? "bg-gray-100" : "hover:bg-gray-50"
                   }`}
+                  onClick={() => handleToggleClass(cls.id)}
                 >
                   <Checkbox
                     id={`class-${cls.id}`}
@@ -143,7 +144,6 @@ export default function AssignBillDialog({
                   <Label
                     htmlFor={`class-${cls.id}`}
                     className="flex items-center cursor-pointer flex-1"
-                    onClick={() => handleToggleClass(cls.id)}
                   >
                     <span className="text-xl mr-2">{cls.emoji}</span>
                     <span>{cls.name}</span>

@@ -535,49 +535,93 @@ useEffect(() => {
                         <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
                       </div>
                     ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
                         {Array.from({ length: 12 }, (_, i) => {
                           const date = new Date(selectedYear, i, 1);
                           const monthName = date.toLocaleString('default', { month: 'long' });
+                          const monthAbbr = date.toLocaleString('default', { month: 'short' }).toUpperCase() + '.';
                           const currentDate = new Date();
                           const isFuture = date > currentDate;
                           // Check if we have this in our available statements
                           const isAvailable = availableStatements[monthName];
                           const isDisabled = isFuture || !isAvailable;
-                          const isDownloading = isDownloadingStatement === i;
+                          const isLoading = isDownloadingStatement === i;
                           
                           return (
                             <div 
                               key={i}
-                              className={`border rounded-lg overflow-hidden ${
-                                isDisabled ? 'bg-gray-50 opacity-60 pointer-events-none' : 'bg-white hover:bg-gray-50 cursor-pointer'
-                              }`}
-                              onClick={() => !isDisabled && !isDownloading && downloadStatement(monthName, i)}
+                              className={`relative w-[140px] h-[125px] mx-auto group ${isDisabled ? 'opacity-1' : 'cursor-pointer hover:scale-105 transition-all'}`}
+                              onClick={() => !isDisabled && !isLoading && downloadStatement(monthName, i)}
                             >
-                              <div className="border-b px-4 py-3 flex items-center justify-between">
-                                <div className="flex items-center">
-                                  <Calendar className={`h-4 w-4 mr-2 ${isDisabled ? 'text-gray-400' : 'text-green-600'}`} />
-                                  <span className="font-medium">{monthName}</span>
-                                </div>
-                                <span className="text-sm text-gray-500">{selectedYear}</span>
-                              </div>
-                              
-                              <div className="px-4 py-3">
-                                <div className="text-sm text-gray-600 mb-1">
-                                  {getAccountTypeByID(selectedAccountId)} Statement
+                              {/* Main container with proper folder shape */}
+                              <div className="w-full h-full relative bg-transparent">
+                                {/* Folder back - the dark green part with tab */}
+                                <div className="absolute top-0 left-0 w-full h-full">
+                                  {/* Tab part */}
+                                  <div 
+                                    className="absolute top-0 left-0 w-[40px] h-[26px] rounded-xl"
+                                    style={{ background: '#075D31' }}
+                                  />
+                                  
+                                  {/* Main back part extending to right */}
+                                  <div 
+                                    className="absolute top-4 left-[40px] right-0 w-[100px] h-[30px] rounded-xl"
+                                    style={{ background: '#075D31' }}
+                                  />
+
+                                  <svg className="w-full h-20 rounded-xl" viewBox="0 0 200 40" preserveAspectRatio="none">
+                                    <path
+                                      d="M0,0 
+                                        H50 
+                                        C70,0 90,30 110,30 
+                                        H200 
+                                        V40 
+                                        H0 
+                                        Z"
+                                      fill="#075D31"
+                                    />
+                                  </svg>
                                 </div>
                                 
-                                <div className="flex justify-between items-center mt-2">
-                                  <div className="text-xs text-gray-500">
-                                    {isFuture ? 'Not yet available' : 
-                                      isAvailable ? 'Generated on the 27th' : 'No transactions'}
-                                  </div>
-                                  {isDownloading ? (
-                                    <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                                {/* Front folder - the light green part that covers most of the folder */}
+                                <div 
+                                  className="absolute top-[24px] left-0 right-0 bottom-0 rounded-xl"
+                                  style={{ 
+                                    background: 'linear-gradient(180deg, #72E2AD 0%, #3FCD89 100%)',
+                                    boxShadow: 'inset 0px -32px 128px rgba(0, 133, 70, 0.30), inset 0px 6px 8px rgba(255, 255, 255, 0.30)'
+                                  }}
+                                />
+                                
+                                {/* Shadow only below the folder */}
+                                <div className="absolute -bottom-3 left-0 right-0 h-6 rounded-full bg-black/20 blur-md -z-10" />
+                                
+                                {/* Horizontal line shadows at bottom */}
+                                <div className="absolute bottom-[15px] left-0 right-0 h-[1px] bg-gradient-to-b from-black/5 to-transparent" />
+                                <div className="absolute bottom-[10px] left-0 right-0 h-[1px] bg-gradient-to-b from-black/5 to-transparent" />
+                                <div className="absolute bottom-[5px] left-0 right-0 h-[1px] bg-gradient-to-b from-black/5 to-transparent" />
+                                
+                                {/* Month text - top left aligned */}
+                                <div className="absolute top-[34px] left-[22px] text-left text-white text-2xl font-medium">
+                                  {monthAbbr}
+                                </div>
+                                
+                                {/* Download icon - centered and below month text */}
+                                <div className="absolute inset-x-0 bottom-[25px] flex justify-center items-center">
+                                  {isLoading ? (
+                                    <Loader2 className="h-10 w-10 text-white animate-spin" />
                                   ) : (
-                                    isAvailable && <Download className="h-4 w-4 text-blue-600" />
+                                    <Download className="h-10 w-10 text-white" strokeWidth={1.5} />
                                   )}
                                 </div>
+                                
+                                {/* Hover overlay for disabled states */}
+                                {isDisabled && (
+                                  <div className="absolute inset-0 bg-gray-800 bg-opacity-0 rounded-md flex items-center justify-center opacity-0 group-hover:bg-opacity-50 group-hover:opacity-100 transition-all">
+                                    <div className="bg-white/80 px-3 py-1 rounded-md text-sm font-medium text-gray-800">
+                                      {isFuture ? 'Not Available' : 'No Data'}
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           );
