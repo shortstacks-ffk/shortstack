@@ -28,7 +28,7 @@ export default function StudentDashboardHeader({
       <div className="flex items-center gap-3">
         <button
           onClick={onMobileMenuToggle}
-          className="p-1.5 rounded-md hover:bg-gray-100 md:hidden"
+          className="p-1.5 rounded-md hover:bg-gray-100 lg:hidden"
           aria-label="Toggle menu"
         >
           <Menu className="h-5 w-5 text-gray-700" />

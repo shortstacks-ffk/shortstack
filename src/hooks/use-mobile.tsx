@@ -1,6 +1,7 @@
 import * as React from "react"
 
-const MOBILE_BREAKPOINT = 768
+// Change from 768 to 1024 or even 1366 to include tablets and small laptops
+const MOBILE_BREAKPOINT = 1024; // or 1366 for wider coverage
 
 export function useIsMobile() {
   const [isMobile, setIsMobile] = React.useState<boolean | undefined>(undefined)

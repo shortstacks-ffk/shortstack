@@ -170,9 +170,8 @@ export default function StudentClassesPage() {
   }
 
   return (
-    <div className="container mx-auto p-4 max-w-6xl">
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+    <div className="container mx-auto p-4 max-w-6xl gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-4 gap-4">
         {classes.length > 0 ? (
           classes.map((cls) => (
             <StudentClassCard

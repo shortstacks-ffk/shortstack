@@ -204,9 +204,9 @@ function BankAccountsContent() {
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col min-h-screen bg-gray-50">
       <div className="flex-1 overflow-auto">
-        <div className="w-full">
+        <div className="w-full bg-gray-50 pb-8">
           <p className="text-gray-500 mb-4">
             View and manage student bank accounts for your classes
           </p>
@@ -281,9 +281,9 @@ function BankAccountsContent() {
             </div>
           </div>
           
-          <Card className="min-h-auto">
+          <Card className="min-h-auto w-full overflow-hidden">
             <CardContent className="p-0">
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto w-full">
                 <table className="w-full">
                   <thead>
                     <tr className="bg-orange-500 text-white">

@@ -232,8 +232,8 @@ export default function PayBillDialog({
   
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[500px] p-4 max-h-[90vh] overflow-hidden">
+        <DialogHeader className="pb-2">
           <DialogTitle>Pay Bills</DialogTitle>
           <DialogDescription>
             Pay your outstanding bills using your bank accounts.
@@ -241,194 +241,198 @@ export default function PayBillDialog({
           </DialogDescription>
         </DialogHeader>
         
-        {paymentStep === 'select' ? (
-          <div className="space-y-4 py-3">
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                You can only pay one bill at a time
-              </AlertDescription>
-            </Alert>
-            
-            <div className="mt-4">
-              <h3 className="text-sm font-medium mb-2">Unpaid Bills</h3>
+        <div className="overflow-y-auto pr-1" style={{ maxHeight: "calc(90vh - 180px)" }}>
+          {paymentStep === 'select' ? (
+            <div className="space-y-4 py-3">
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  You can only pay one bill at a time
+                </AlertDescription>
+              </Alert>
               
-              {isLoading ? (
-                <div className="flex justify-center py-8">
-                  <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-                </div>
-              ) : error ? (
-                <Alert variant="destructive" className="mt-4">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              ) : bills.length === 0 ? (
-                <p className="text-center py-8 text-gray-500">No unpaid bills found</p>
-              ) : (
-                <div className="space-y-3">
-                  {bills.map((bill) => {
-                    const remainingAmount = bill.amount - (bill.paidAmount || 0);
-                    return (
-                      <div 
-                        key={bill.id} 
-                        className="flex justify-between items-center p-4 border rounded-md hover:bg-gray-50 cursor-pointer"
-                        onClick={() => handleSelectBill(bill)}
-                      >
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xl">{bill.emoji}</span>
-                            <span className="font-medium">{bill.title}</span>
-                          </div>
-                          <p className="text-sm text-gray-500 mt-1">
-                            {bill.className} • Due: {formatDate(bill.dueDate)}
-                          </p>
-                          {bill.paidAmount && bill.paidAmount > 0 ? (
-                            <p className="text-xs text-amber-600 mt-1">
-                              Partially paid: {formatCurrency(bill.paidAmount)} of {formatCurrency(bill.amount)}
-                            </p>
-                          ) : (
-                            <p className="text-xs text-gray-500 mt-1">
-                              No payments yet
-                            </p>
-                          )}
-                        </div>
-                        <div>
-                          {remainingAmount > 0 ? (
-                            <>
-                              <p className="font-medium text-right">
-                                {formatCurrency(remainingAmount)}
+              <div className="mt-4">
+                <h3 className="text-sm font-medium mb-2">Unpaid Bills</h3>
+                
+                {isLoading ? (
+                  <div className="flex justify-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                  </div>
+                ) : error ? (
+                  <Alert variant="destructive" className="mt-4">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                ) : bills.length === 0 ? (
+                  <p className="text-center py-8 text-gray-500">No unpaid bills found</p>
+                ) : (
+                  <div className="max-h-[350px] overflow-y-auto pr-1">
+                    <div className="space-y-3">
+                      {bills.map((bill) => {
+                        const remainingAmount = bill.amount - (bill.paidAmount || 0);
+                        return (
+                          <div 
+                            key={bill.id} 
+                            className="flex justify-between items-center p-4 border rounded-md hover:bg-gray-50 cursor-pointer"
+                            onClick={() => handleSelectBill(bill)}
+                          >
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xl">{bill.emoji}</span>
+                                <span className="font-medium">{bill.title}</span>
+                              </div>
+                              <p className="text-sm text-gray-500 mt-1">
+                                {bill.className} • Due: {formatDate(bill.dueDate)}
                               </p>
-                              <p className="text-xs text-gray-500">remaining</p>
-                            </>
-                          ) : (
-                            <p className="font-medium text-right text-green-600">Paid in Full</p>
-                          )}
-                        </div>
+                              {bill.paidAmount && bill.paidAmount > 0 ? (
+                                <p className="text-xs text-amber-600 mt-1">
+                                  Partially paid: {formatCurrency(bill.paidAmount)} of {formatCurrency(bill.amount)}
+                                </p>
+                              ) : (
+                                <p className="text-xs text-gray-500 mt-1">
+                                  No payments yet
+                                </p>
+                              )}
+                            </div>
+                            <div>
+                              {remainingAmount > 0 ? (
+                                <>
+                                  <p className="font-medium text-right">
+                                    {formatCurrency(remainingAmount)}
+                                  </p>
+                                  <p className="text-xs text-gray-500">remaining</p>
+                                </>
+                              ) : (
+                                <p className="font-medium text-right text-green-600">Paid in Full</p>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4 py-3">
+              {selectedBill && (
+                <>
+                  <div className="bg-gray-50 p-4 rounded-md">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-xl">{selectedBill.emoji}</span>
+                      <h3 className="font-medium">{selectedBill.title}</h3>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div>
+                        <p className="text-gray-500">Class:</p>
+                        <p>{selectedBill.className}</p>
                       </div>
-                    );
-                  })}
-                </div>
+                      <div>
+                        <p className="text-gray-500">Due date:</p>
+                        <p>{formatDate(selectedBill.dueDate)}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500">Total amount:</p>
+                        <p>{formatCurrency(selectedBill.amount)}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500">Remaining:</p>
+                        <p className="font-medium">{formatCurrency(getRemainingAmount())}</p>
+                      </div>
+                    </div>
+                    
+                    {selectedBill.description && (
+                      <div className="mt-2">
+                        <p className="text-gray-500 text-sm">Description:</p>
+                        <p className="text-sm">{selectedBill.description}</p>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label>Pay from account</Label>
+                    <Select 
+                      value={selectedAccountId} 
+                      onValueChange={setSelectedAccountId}
+                      disabled={isSubmitting}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select account" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {accounts.map(account => (
+                          <SelectItem key={account.id} value={account.id}>
+                            {account.accountType === "CHECKING" ? "Checking" : "Savings"} ({formatCurrency(account.balance)})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    <Label>Payment amount</Label>
+                    <RadioGroup 
+                      value={paymentMode} 
+                      onValueChange={(value) => setPaymentMode(value as PaymentMode)}
+                      className="space-y-2"
+                      disabled={isSubmitting}
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="full" id="full" />
+                        <Label htmlFor="full" className="cursor-pointer">
+                          Full payment ({formatCurrency(getRemainingAmount())})
+                        </Label>
+                      </div>
+                      
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="partial" id="partial" />
+                        <Label htmlFor="partial" className="cursor-pointer">
+                          Partial payment ({formatCurrency(getRemainingAmount() / 2)})
+                        </Label>
+                      </div>
+                      
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="custom" id="custom" />
+                        <Label htmlFor="custom" className="cursor-pointer">
+                          Custom amount
+                        </Label>
+                      </div>
+                    </RadioGroup>
+                    
+                    {paymentMode === "custom" && (
+                      <div className="pt-2">
+                        <Input
+                          type="number"
+                          placeholder="Enter amount"
+                          value={customAmount}
+                          onChange={(e) => setCustomAmount(e.target.value)}
+                          min={0.01}
+                          max={getRemainingAmount()}
+                          step={0.01}
+                          disabled={isSubmitting}
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Enter an amount between $0.01 and {formatCurrency(getRemainingAmount())}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="pt-2">
+                    <Alert>
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        Payment amount: <strong>{formatCurrency(getPaymentAmount())}</strong>
+                      </AlertDescription>
+                    </Alert>
+                  </div>
+                </>
               )}
             </div>
-          </div>
-        ) : (
-          <div className="space-y-4 py-3">
-            {selectedBill && (
-              <>
-                <div className="bg-gray-50 p-4 rounded-md">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-xl">{selectedBill.emoji}</span>
-                    <h3 className="font-medium">{selectedBill.title}</h3>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div>
-                      <p className="text-gray-500">Class:</p>
-                      <p>{selectedBill.className}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-500">Due date:</p>
-                      <p>{formatDate(selectedBill.dueDate)}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-500">Total amount:</p>
-                      <p>{formatCurrency(selectedBill.amount)}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-500">Remaining:</p>
-                      <p className="font-medium">{formatCurrency(getRemainingAmount())}</p>
-                    </div>
-                  </div>
-                  
-                  {selectedBill.description && (
-                    <div className="mt-2">
-                      <p className="text-gray-500 text-sm">Description:</p>
-                      <p className="text-sm">{selectedBill.description}</p>
-                    </div>
-                  )}
-                </div>
-                
-                <div className="space-y-2">
-                  <Label>Pay from account</Label>
-                  <Select 
-                    value={selectedAccountId} 
-                    onValueChange={setSelectedAccountId}
-                    disabled={isSubmitting}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select account" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {accounts.map(account => (
-                        <SelectItem key={account.id} value={account.id}>
-                          {account.accountType === "CHECKING" ? "Checking" : "Savings"} ({formatCurrency(account.balance)})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-3">
-                  <Label>Payment amount</Label>
-                  <RadioGroup 
-                    value={paymentMode} 
-                    onValueChange={(value) => setPaymentMode(value as PaymentMode)}
-                    className="space-y-2"
-                    disabled={isSubmitting}
-                  >
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="full" id="full" />
-                      <Label htmlFor="full" className="cursor-pointer">
-                        Full payment ({formatCurrency(getRemainingAmount())})
-                      </Label>
-                    </div>
-                    
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="partial" id="partial" />
-                      <Label htmlFor="partial" className="cursor-pointer">
-                        Partial payment ({formatCurrency(getRemainingAmount() / 2)})
-                      </Label>
-                    </div>
-                    
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="custom" id="custom" />
-                      <Label htmlFor="custom" className="cursor-pointer">
-                        Custom amount
-                      </Label>
-                    </div>
-                  </RadioGroup>
-                  
-                  {paymentMode === "custom" && (
-                    <div className="pt-2">
-                      <Input
-                        type="number"
-                        placeholder="Enter amount"
-                        value={customAmount}
-                        onChange={(e) => setCustomAmount(e.target.value)}
-                        min={0.01}
-                        max={getRemainingAmount()}
-                        step={0.01}
-                        disabled={isSubmitting}
-                      />
-                      <p className="text-xs text-gray-500 mt-1">
-                        Enter an amount between $0.01 and {formatCurrency(getRemainingAmount())}
-                      </p>
-                    </div>
-                  )}
-                </div>
-                
-                <div className="pt-2">
-                  <Alert>
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>
-                      Payment amount: <strong>{formatCurrency(getPaymentAmount())}</strong>
-                    </AlertDescription>
-                  </Alert>
-                </div>
-              </>
-            )}
-          </div>
-        )}
+          )}
+        </div>
         
         <DialogFooter>
           {paymentStep === 'select' ? (

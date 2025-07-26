@@ -65,7 +65,7 @@ export const StudentInvitation: React.FC<StudentInvitationProps> = ({
           <Section style={header}>
             <Img
               // src={`${appUrl}/assets/img/logo simple - greenldpi.png`}
-              src='https://tskrok7zgyvtkooz.public.blob.vercel-storage.com/email-img/Primary%20Logo%20-%20Colorful%20Orangeldpi-0tET7Jj9hBKRsLSSOV9e6gX1F4vuDv.png'
+              src='https://tskrok7zgyvtkooz.public.blob.vercel-storage.com/email-img/Primary%20Logo%20-%20Colorfu%20Black%20Orangeldpi-4LlRu3ItvFCMttoohEZINDEOi3aaNh.png'
               width="150"
               height="40"
               alt="ShortStack Education"
