@@ -2,15 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardFooter,
-} from "@/src/components/ui/card";
 import { useToast } from "@/src/hooks/use-toast";
-import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
 import {
   AlertDialog,
@@ -21,8 +13,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/src/components/ui/alert-dialog";
-import { ShoppingBag, AlertCircle, DollarSign, CheckCircle } from "lucide-react";
+import { ShoppingBag, CheckCircle } from "lucide-react"; // Removed AlertCircle, DollarSign
 import { formatCurrency } from "@/src/lib/utils";
+import { StudentStoreItemCard } from "@/src/components/storefront/StudentStoreItemCard";
+import { PurchaseStoreItemDialog } from "@/src/components/storefront/PurchaseStoreItemDialog";
 
 interface StoreItem {
   id: string;
@@ -39,24 +33,21 @@ interface StoreItem {
   }[];
 }
 
-interface InsufficientFundsData {
-  itemName: string;
-  itemPrice: number;
-  currentBalance: number;
-  needed: number;
-}
+// Removed InsufficientFundsData interface since it's no longer needed
 
 export default function StudentStoreFrontPage() {
   const [loading, setLoading] = useState(true);
   const [storeItems, setStoreItems] = useState<StoreItem[]>([]);
   const [purchasing, setPurchasing] = useState<string | null>(null);
-  const [insufficientFunds, setInsufficientFunds] =
-    useState<InsufficientFundsData | null>(null);
+  // Removed insufficientFunds state
   const [purchaseSuccess, setPurchaseSuccess] = useState<{
     itemName: string;
     itemEmoji: string;
     newBalance: number;
   } | null>(null);
+  const [PurchaseStoreItemDialogOpen, setPurchaseStoreItemDialogOpen] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<StoreItem | null>(null);
+  
   const router = useRouter();
   const { toast } = useToast();
 
@@ -89,11 +80,15 @@ export default function StudentStoreFrontPage() {
     fetchStoreItems();
   }, [router, toast]);
 
-  const handlePurchase = async (itemId: string) => {
-    const item = storeItems.find((i) => i.id === itemId);
-    if (!item) return;
+  const handlePurchaseClick = (item: StoreItem) => {
+    setSelectedItem(item);
+    setPurchaseStoreItemDialogOpen(true);
+  };
 
-    setPurchasing(itemId);
+  const handleConfirmPurchase = async (quantity: number, accountId: string) => {
+    if (!selectedItem) return;
+
+    setPurchasing(selectedItem.id);
 
     try {
       const response = await fetch("/api/student/storefront/purchase", {
@@ -101,26 +96,18 @@ export default function StudentStoreFrontPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ itemId, quantity: 1 }),
+        body: JSON.stringify({ 
+          itemId: selectedItem.id, 
+          quantity,
+          accountId 
+        }),
       });
 
       const result = await response.json();
 
       if (!response.ok) {
-        // Check if it's an insufficient funds error
-        if (
-          result.error === "Insufficient balance to purchase this item" &&
-          result.details
-        ) {
-          setInsufficientFunds({
-            itemName: item.name,
-            itemPrice: item.price,
-            currentBalance: result.details.currentBalance,
-            needed: result.details.needed,
-          });
-          return;
-        }
-
+        // Let the PurchaseStoreItemDialog handle insufficient funds
+        // Just throw the error and let the dialog handle it
         throw new Error(result.error || "Failed to purchase item");
       }
 
@@ -129,15 +116,18 @@ export default function StudentStoreFrontPage() {
 
       // Set success state for dialog
       setPurchaseSuccess({
-        itemName: item.name,
-        itemEmoji: item.emoji,
+        itemName: selectedItem.name,
+        itemEmoji: selectedItem.emoji,
         newBalance: result.newBalance,
       });
 
-      // Also try the toast
+      // Close purchase dialog
+      setPurchaseStoreItemDialogOpen(false);
+
+      // Show success toast
       toast({
         title: "Purchase Successful! 🎉",
-        description: `${item.emoji} ${item.name} purchased successfully!`,
+        description: `${selectedItem.emoji} ${selectedItem.name} (${quantity}x) purchased successfully!`,
         duration: 4000,
       });
 
@@ -159,6 +149,7 @@ export default function StudentStoreFrontPage() {
       setPurchasing(null);
     }
   };
+
 
   return (
     <>
@@ -189,133 +180,36 @@ export default function StudentStoreFrontPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
             {storeItems.map((item) => (
-              <Card
+              <StudentStoreItemCard
                 key={item.id}
-                className="overflow-hidden hover:shadow-md transition-shadow flex flex-col h-[250px]"
-              >
-                <CardHeader className="pb-3 flex-shrink-0">
-                  <div className="flex justify-between items-start">
-                    <div className="flex items-center">
-                      <span className="text-3xl mr-3">{item.emoji}</span>
-                      <CardTitle className="text-lg leading-tight">
-                        {item.name}
-                      </CardTitle>
-                    </div>
-                    <Badge variant="secondary" className="flex-shrink-0">
-                      {formatCurrency(item.price)}
-                    </Badge>
-                  </div>
-                </CardHeader>
-
-                <CardContent className="flex-grow flex flex-col justify-between py-2">
-                  <div className="flex-grow">
-                    {item.description && (
-                      <p className="text-gray-600 text-sm line-clamp-3 mb-3">
-                        {item.description}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Fixed height container for the quantity warning */}
-                  <div className="h-6 flex items-center">
-                    {item.quantity < 5 && item.quantity > 0 && (
-                      <div className="flex items-center text-amber-600 text-sm">
-                        <AlertCircle className="h-4 w-4 mr-1 flex-shrink-0" />
-                        <span>Only {item.quantity} left!</span>
-                      </div>
-                    )}
-                    {item.quantity === 0 && (
-                      <div className="flex items-center text-red-600 text-sm">
-                        <AlertCircle className="h-4 w-4 mr-1 flex-shrink-0" />
-                        <span>Out of stock</span>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-
-                <CardFooter className="pt-3 pb-4 flex-shrink-0">
-                  <Button
-                    className="w-full"
-                    onClick={() => handlePurchase(item.id)}
-                    disabled={item.quantity === 0 || purchasing === item.id}
-                    variant={item.quantity === 0 ? "secondary" : "default"}
-                  >
-                    {purchasing === item.id ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                        Processing...
-                      </>
-                    ) : item.quantity === 0 ? (
-                      "Out of Stock"
-                    ) : (
-                      "Purchase"
-                    )}
-                  </Button>
-                </CardFooter>
-              </Card>
+                id={item.id}
+                name={item.name}
+                emoji={item.emoji}
+                price={item.price}
+                description={item.description}
+                quantity={item.quantity}
+                isAvailable={item.isAvailable}
+                backgroundColor="bg-white"
+                classes={item.class}
+                onPurchaseClick={() => handlePurchaseClick(item)}
+                purchasing={purchasing === item.id}
+              />
             ))}
           </div>
         )}
       </div>
 
-      {/* Insufficient Funds Alert Dialog */}
-      <AlertDialog
-        open={!!insufficientFunds}
-        onOpenChange={() => setInsufficientFunds(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center">
-              <DollarSign className="h-5 w-5 text-red-500 mr-2" />
-              Insufficient Funds
-            </AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-3">
-                <p>
-                  You don't have enough money in your checking account to
-                  purchase{" "}
-                  <span className="font-medium">
-                    {insufficientFunds?.itemName}
-                  </span>
-                  .
-                </p>
-
-                <div className="bg-gray-50 p-4 rounded-lg space-y-2">
-                  <div className="flex justify-between">
-                    <span>Item cost:</span>
-                    <span className="font-medium">
-                      {formatCurrency(insufficientFunds?.itemPrice || 0)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Your balance:</span>
-                    <span className="font-medium">
-                      {formatCurrency(insufficientFunds?.currentBalance || 0)}
-                    </span>
-                  </div>
-                  <hr className="my-2" />
-                  <div className="flex justify-between text-red-600">
-                    <span>Amount needed:</span>
-                    <span className="font-bold">
-                      {formatCurrency(insufficientFunds?.needed || 0)}
-                    </span>
-                  </div>
-                </div>
-
-                <p className="text-sm text-muted-foreground">
-                  Complete assignments or participate in class activities to
-                  earn more money.
-                </p>
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setInsufficientFunds(null)}>
-              Got it
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Purchase Dialog */}
+      <PurchaseStoreItemDialog
+        isOpen={PurchaseStoreItemDialogOpen}
+        onClose={() => {
+          setPurchaseStoreItemDialogOpen(false);
+          setSelectedItem(null);
+        }}
+        item={selectedItem}
+        onConfirmPurchase={handleConfirmPurchase}
+        purchasing={!!purchasing}
+      />
 
       {/* Success Purchase Dialog */}
       <AlertDialog

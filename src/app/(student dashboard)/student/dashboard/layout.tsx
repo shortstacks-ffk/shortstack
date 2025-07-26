@@ -153,6 +153,7 @@ export default function StudentDashboardLayout({ children }: { children: React.R
       
       {/* Mobile Sidebar - Show on tablets too */}
       <div 
+
         className={`fixed inset-y-0 left-0 w-72 bg-[#f1faf3] shadow-lg transform transition-transform duration-300 ease-in-out z-40 lg:hidden ${
           isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
@@ -161,35 +162,35 @@ export default function StudentDashboardLayout({ children }: { children: React.R
           {/* X close button */}
           <button
             onClick={closeMobileSidebar}
-            className="absolute top-4 right-4 p-2 rounded-full hover:bg-gray-100 transition-colors z-50"
+            className="absolute top-3 right-3 p-2 rounded-full hover:bg-gray-100 transition-colors z-50"
             aria-label="Close sidebar"
             type="button"
           >
-            <X className="h-6 w-6 text-gray-600" />
+            <X className="h-5 w-5 text-gray-600" />
           </button>
           
           {/* Mobile NavLogo with padding to avoid overlap with close button */}
-          <div className="px-4 pt-4 pb-2 flex justify-center mt-10">
+          <div className="px-4 pt-4 pb-2 flex justify-center mt-8">
             <NavLogo items={studentDashboardData.dashLogo} />
           </div>
           
           {/* Navigation items */}
-          <nav className="mt-6 px-3">
-            <ul className="space-y-2">
+          <nav className="mt-4 px-3">
+            <ul className="space-y-1">
               {navItems.map((item) => (
                 <li key={item.href}>
                   <Link
                     href={item.href}
                     className={cn(
-                      "flex items-center gap-3 px-3 py-2 rounded-md transition-colors",
+                      "flex items-center gap-3 px-3 py-3 rounded-md transition-colors text-sm",
                       isNavItemActive(item.href, item.exact)
                         ? "bg-[#c2e8cf] text-gray-800 font-medium"
                         : "text-gray-700 hover:bg-gray-100"
                     )}
                     onClick={closeMobileSidebar}
                   >
-                    <item.icon className="h-5 w-5" />
-                    <span>{item.label}</span>
+                    <item.icon className="h-5 w-5 flex-shrink-0" />
+                    <span className="truncate">{item.label}</span>
                   </Link>
                 </li>
               ))}
@@ -207,7 +208,7 @@ export default function StudentDashboardLayout({ children }: { children: React.R
         {/* Collapse button */}
         <button
           onClick={() => setIsDesktopSidebarCollapsed(!isDesktopSidebarCollapsed)}
-          className="absolute bottom-4 right-4"
+          className="absolute bottom-4 right-3 p-1.5 rounded-full hover:bg-gray-100 transition-colors"
           aria-label={isDesktopSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
           {isDesktopSidebarCollapsed ? (
@@ -220,14 +221,14 @@ export default function StudentDashboardLayout({ children }: { children: React.R
         {/* Content */}
         <div className="flex flex-col h-full">
           {/* Header */}
-          <div className={`px-4 py-4 flex ${isDesktopSidebarCollapsed ? "justify-center" : ""}`}>
+          <div className={`px-3 py-3 flex ${isDesktopSidebarCollapsed ? "justify-center" : ""}`}>
             {isDesktopSidebarCollapsed ? (
               <div className="flex justify-center">
                 <Image
                   src="/assets/img/Mascout 9ldpi.png"
                   alt="ShortStacks Mascot"
-                  width={32}
-                  height={32}
+                  width={28}
+                  height={28}
                   className="mascot-image"
                 />
               </div>
@@ -237,22 +238,22 @@ export default function StudentDashboardLayout({ children }: { children: React.R
           </div>
 
           {/* Navigation */}
-          <nav className="mt-6 px-3 flex-1">
-            <ul className="space-y-2">
+          <nav className="mt-4 px-2 flex-1">
+            <ul className="space-y-1">
               {navItems.map((item) => (
                 <li key={item.href}>
                   <Link
                     href={item.href}
                     className={cn(
-                      "flex items-center gap-3 px-3 py-2 rounded-md transition-colors",
+                      "flex items-center gap-3 px-3 py-2.5 rounded-md transition-colors text-sm",
                       isNavItemActive(item.href, item.exact)
                         ? "bg-[#c2e8cf] text-gray-800 font-medium"
                         : "text-gray-700 hover:bg-green-100"
                     )}
                     title={isDesktopSidebarCollapsed ? item.label : undefined}
                   >
-                    <item.icon className="h-5 w-5" />
-                    {!isDesktopSidebarCollapsed && <span>{item.label}</span>}
+                    <item.icon className="h-5 w-5 flex-shrink-0" />
+                    {!isDesktopSidebarCollapsed && <span className="truncate">{item.label}</span>}
                   </Link>
                 </li>
               ))}
@@ -282,6 +283,7 @@ export default function StudentDashboardLayout({ children }: { children: React.R
           style={{ height: `calc(100vh - ${HEADER_HEIGHT}px)` }}
         >
           <div className={`mx-auto w-full ${isCalendarPage ? 'p-0 max-w-none' : 'max-w-7xl px-2 sm:px-4 md:px-6 py-2 md:py-4'}`}>
+
             {children}
           </div>
         </div>

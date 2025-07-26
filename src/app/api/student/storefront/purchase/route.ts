@@ -1,65 +1,31 @@
-import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/src/lib/auth/config";
+import { NextRequest, NextResponse } from "next/server";
+import { getAuthSession } from "@/src/lib/auth";
 import { db } from "@/src/lib/db";
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    console.log("🔄 Starting purchase process...");
+    const session = await getAuthSession();
 
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user?.id || session.user.role !== "STUDENT") {
-      console.log("❌ Unauthorized access attempt");
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: "Not authenticated" },
+        { status: 401 }
+      );
     }
 
-    const body = await request.json();
-    const { itemId, quantity = 1 } = body;
+    const { itemId, quantity, accountId } = await request.json();
 
-    console.log("📦 Purchase request:", {
-      itemId,
-      quantity,
-      userId: session.user.id,
-    });
-
-    if (!itemId) {
+    if (!itemId || !quantity || !accountId) {
       return NextResponse.json(
-        { error: "Item ID is required" },
+        { error: "Missing required fields" },
         { status: 400 }
       );
     }
 
-    // 1. Get the student with proper lookup
+    // Get the student profile
     const student = await db.student.findFirst({
-      where: {
-        OR: [
-          { userId: session.user.id },
-          ...(session.user.email ? [{ schoolEmail: session.user.email }] : []),
-          { id: session.user.id },
-        ],
-      },
-      include: {
-        bankAccounts: {
-          where: {
-            accountType: "CHECKING",
-          },
-        },
-        enrollments: {
-          where: {
-            enrolled: true,
-          },
-          select: {
-            classId: true,
-          },
-        },
-      },
+      where: { userId: session.user.id },
     });
-
-    console.log(
-      "👤 Student lookup result:",
-      student ? `Found: ${student.id}` : "Not found"
-    );
 
     if (!student) {
       return NextResponse.json(
@@ -68,194 +34,122 @@ export async function POST(request: Request) {
       );
     }
 
-    // Get checking account
-    const checkingAccount = student.bankAccounts[0];
-    console.log(
-      "🏦 Checking account:",
-      checkingAccount
-        ? `Found: Balance ${checkingAccount.balance}`
-        : "Not found"
-    );
-
-    if (!checkingAccount) {
-      return NextResponse.json(
-        { error: "Checking account not found" },
-        { status: 400 }
-      );
-    }
-
-    // Get enrolled class IDs
-    const classIds = student.enrollments.map((e) => e.classId);
-    console.log("📚 Enrolled classes:", classIds);
-
-    // 2. Check if the item exists and is available in student's classes
-    // Update to use new schema relationships
-    const item = await db.storeItem.findFirst({
+    // Verify the account belongs to the student
+    const account = await db.bankAccount.findFirst({
       where: {
-        id: itemId,
-        isAvailable: true,
-        quantity: { gte: quantity },
-        classes: {
-          some: {
-            id: { in: classIds },
-          },
-        },
-      },
-    });
-
-    console.log(
-      "🛍️ Item lookup:",
-      item
-        ? `Found: ${item.name}, Price: ${item.price}, Qty: ${item.quantity}`
-        : "Not found"
-    );
-
-    if (!item) {
-      return NextResponse.json(
-        { error: "Item not available for purchase" },
-        { status: 400 }
-      );
-    }
-
-    // 3. Check if student has enough balance
-    const totalPrice = item.price * quantity;
-    console.log("💰 Price check:", {
-      totalPrice,
-      balance: checkingAccount.balance,
-      sufficient: checkingAccount.balance >= totalPrice,
-    });
-
-    if (checkingAccount.balance < totalPrice) {
-      return NextResponse.json(
-        {
-          error: "Insufficient balance to purchase this item",
-          details: {
-            currentBalance: checkingAccount.balance,
-            needed: totalPrice - checkingAccount.balance,
-            itemPrice: totalPrice,
-          },
-        },
-        { status: 400 }
-      );
-    }
-
-    // 3.5. Check for existing purchase (due to unique constraint)
-    const existingPurchase = await db.studentPurchase.findFirst({
-      where: {
-        itemId: item.id,
+        id: accountId,
         studentId: student.id,
       },
     });
 
-    console.log(
-      "🔍 Existing purchase check:",
-      existingPurchase ? "Found existing purchase" : "No existing purchase"
-    );
+    if (!account) {
+      return NextResponse.json(
+        { error: "Bank account not found or doesn't belong to you" },
+        { status: 404 }
+      );
+    }
 
-    if (existingPurchase) {
-      // Update existing purchase instead of creating new one
-      console.log("📝 Updating existing purchase...");
+    // Get the store item
+    const storeItem = await db.storeItem.findUnique({
+      where: { id: itemId },
+    });
 
-      const [updatedPurchase, updatedItem, updatedAccount, transaction] =
-        await db.$transaction([
-          // Update existing purchase
-          db.studentPurchase.update({
-            where: {
-              id: existingPurchase.id,
-            },
-            data: {
-              quantity: existingPurchase.quantity + quantity,
-              totalPrice: existingPurchase.totalPrice + totalPrice,
-              status: "PAID",
-              updatedAt: new Date(),
-            },
-          }),
+    if (!storeItem) {
+      return NextResponse.json(
+        { error: "Store item not found" },
+        { status: 404 }
+      );
+    }
 
-          // Update item quantity
-          db.storeItem.update({
-            where: { id: item.id },
-            data: { quantity: item.quantity - quantity },
-          }),
+    if (!storeItem.isAvailable) {
+      return NextResponse.json(
+        { error: "This item is not available for purchase" },
+        { status: 400 }
+      );
+    }
 
-          // Update checking account balance
-          db.bankAccount.update({
-            where: { id: checkingAccount.id },
-            data: { balance: checkingAccount.balance - totalPrice },
-          }),
+    if (storeItem.quantity < quantity) {
+      return NextResponse.json(
+        { error: "Not enough items in stock" },
+        { status: 400 }
+      );
+    }
 
-          // Create transaction record
-          db.transaction.create({
-            data: {
-              accountId: checkingAccount.id,
-              transactionType: "WITHDRAWAL",
-              amount: totalPrice,
-              description: `Purchase: ${item.emoji} ${item.name} (${quantity}x)`,
-            },
-          }),
-        ]);
+    // Calculate total cost
+    const totalCost = storeItem.price * quantity;
 
-      console.log("✅ Purchase updated successfully");
+    // Check if account has sufficient funds
+    if (account.balance < totalCost) {
+      return NextResponse.json(
+        {
+          error: "Insufficient balance to purchase this item",
+          details: {
+            currentBalance: account.balance,
+            needed: totalCost - account.balance,
+          },
+        },
+        { status: 400 }
+      );
+    }
 
-      return NextResponse.json({
-        success: true,
-        purchase: updatedPurchase,
-        newBalance: updatedAccount.balance,
+    // Use a transaction to ensure data consistency
+    const result = await db.$transaction(async (tx) => {
+      // 1. Create the purchase record
+      const purchase = await tx.studentPurchase.create({
+        data: {
+          itemId: storeItem.id,
+          studentId: student.id,
+          quantity,
+          totalPrice: totalCost,
+          status: "PAID", // Changed from "COMPLETED" to "PAID"
+        },
       });
-    } else {
-      // 4. Process the purchase in a transaction (new purchase)
-      console.log("🆕 Creating new purchase...");
 
-      const [purchase, updatedItem, updatedAccount, transaction] =
-        await db.$transaction([
-          // Create purchase record
-          db.studentPurchase.create({
-            data: {
-              studentId: student.id,
-              itemId: item.id,
-              quantity,
-              totalPrice,
-              status: "PAID",
-            },
-          }),
+      // 2. Update the item quantity
+      await tx.storeItem.update({
+        where: { id: itemId },
+        data: {
+          quantity: {
+            decrement: quantity,
+          },
+        },
+      });
 
-          // Update item quantity
-          db.storeItem.update({
-            where: { id: item.id },
-            data: { quantity: item.quantity - quantity },
-          }),
+      // 3. Deduct money from the specific account
+      const updatedAccount = await tx.bankAccount.update({
+        where: { id: accountId },
+        data: {
+          balance: {
+            decrement: totalCost,
+          },
+        },
+      });
 
-          // Update checking account balance
-          db.bankAccount.update({
-            where: { id: checkingAccount.id },
-            data: { balance: checkingAccount.balance - totalPrice },
-          }),
+      // 4. Create a transaction record
+      await tx.transaction.create({
+        data: {
+          amount: -totalCost,
+          description: `Purchased ${quantity}x ${storeItem.name}`,
+          transactionType: "WITHDRAWAL", // Make sure this matches your TransactionType enum
+          accountId: accountId,
+        },
+      });
 
-          // Create transaction record
-          db.transaction.create({
-            data: {
-              accountId: checkingAccount.id,
-              transactionType: "WITHDRAWAL",
-              amount: totalPrice,
-              description: `Purchase: ${item.emoji} ${item.name} (${quantity}x)`,
-            },
-          }),
-        ]);
-
-      console.log("✅ New purchase created successfully");
-
-      return NextResponse.json({
-        success: true,
+      return {
         purchase,
         newBalance: updatedAccount.balance,
-      });
-    }
-  } catch (error) {
-    console.error("❌ Error processing purchase:", error);
+      };
+    });
 
+    return NextResponse.json({
+      success: true,
+      message: "Item purchased successfully",
+      newBalance: result.newBalance,
+    });
+  } catch (error) {
+    console.error("Error purchasing store item:", error);
     return NextResponse.json(
-      {
-        error: "Failed to process purchase",
-      },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }
