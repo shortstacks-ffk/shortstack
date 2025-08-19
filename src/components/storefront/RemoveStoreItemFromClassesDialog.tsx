@@ -177,21 +177,25 @@ export default function RemoveStoreItemFromClassesDialog({
                   {assignedClasses.map(cls => (
                     <div
                       key={cls.id}
-                      className={`flex items-center gap-2 p-2 rounded cursor-pointer mb-1 ${
+                      className={`flex items-center gap-2 p-2 rounded mb-1 ${
                         selectedClassIds.includes(cls.id) ? "bg-gray-100" : "hover:bg-gray-50"
                       }`}
-                      onClick={() => handleToggleClass(cls.id)}
                     >
                       <Checkbox
                         checked={selectedClassIds.includes(cls.id)}
                         onCheckedChange={() => handleToggleClass(cls.id)}
-                        className="h-4 w-4"
+                        className="h-4 w-4 cursor-pointer"
                       />
-                      <span className="text-xl mr-1">{cls.emoji}</span>
-                      <span>{cls.name}</span>
-                      <span className="text-xs text-gray-500 ml-auto">
-                        {cls.code}
-                      </span>
+                      <div 
+                        className="flex items-center gap-2 flex-1 cursor-pointer"
+                        onClick={() => handleToggleClass(cls.id)}
+                      >
+                        <span className="text-xl mr-1">{cls.emoji}</span>
+                        <span>{cls.name}</span>
+                        <span className="text-xs text-gray-500 ml-auto">
+                          {cls.code}
+                        </span>
+                      </div>
                     </div>
                   ))}
                 </div>

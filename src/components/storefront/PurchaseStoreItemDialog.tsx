@@ -29,6 +29,7 @@ interface StoreItem {
   price: number;
   quantity: number;
   isAvailable: boolean;
+  description?: string;
 }
 
 interface Account {
@@ -83,7 +84,9 @@ export function PurchaseStoreItemDialog({
         const data = await response.json();
         setAccounts(data);
         // Auto-select checking account if available
-        const checkingAccount = data.find((acc: Account) => acc.type === "CHECKING");
+        const checkingAccount = data.find(
+          (acc: Account) => acc.type === "CHECKING"
+        );
         if (checkingAccount) {
           setSelectedAccount(checkingAccount.id);
         }
@@ -109,8 +112,12 @@ export function PurchaseStoreItemDialog({
   };
 
   const totalCost = (item?.price || 0) * quantity;
-  const selectedAccountData = accounts.find(acc => acc.id === selectedAccount);
-  const canAfford = selectedAccountData ? selectedAccountData.balance >= totalCost : false;
+  const selectedAccountData = accounts.find(
+    (acc) => acc.id === selectedAccount
+  );
+  const canAfford = selectedAccountData
+    ? selectedAccountData.balance >= totalCost
+    : false;
 
   if (!item) return null;
 
@@ -119,13 +126,20 @@ export function PurchaseStoreItemDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center">
-            Purchase: 
+            Purchase:
             <span className="text-2xl mr-2">{item.emoji}</span> {item.name}
           </DialogTitle>
           <DialogDescription>
             Choose the quantity and payment method for your purchase.
           </DialogDescription>
         </DialogHeader>
+
+        {item.description && (
+          <div className="space-y-2">
+            <Label>Description</Label>
+            <p className="text-sm text-gray-700">{item.description}</p>
+          </div>
+        )}
 
         <div className="space-y-6">
           {/* Item Info */}
@@ -179,7 +193,10 @@ export function PurchaseStoreItemDialog({
                 <span className="ml-2 text-sm">Loading accounts...</span>
               </div>
             ) : (
-              <Select value={selectedAccount} onValueChange={setSelectedAccount}>
+              <Select
+                value={selectedAccount}
+                onValueChange={setSelectedAccount}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select an account" />
                 </SelectTrigger>
@@ -236,7 +253,9 @@ export function PurchaseStoreItemDialog({
           </Button>
           <Button
             onClick={handleConfirm}
-            disabled={!selectedAccount || !canAfford || purchasing || loadingAccounts}
+            disabled={
+              !selectedAccount || !canAfford || purchasing || loadingAccounts
+            }
           >
             {purchasing ? (
               <>
