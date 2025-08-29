@@ -63,7 +63,11 @@ export default function StudentStoreFrontPage() {
       }
 
       const data = await response.json();
-      setStoreItems(data);
+      // Sort alphabetically by name
+      const sortedData = data.sort((a: StoreItem, b: StoreItem) => 
+        a.name.localeCompare(b.name)
+      );
+      setStoreItems(sortedData);
     } catch (error) {
       console.error("❌ Client error fetching store items:", error);
       toast({
@@ -106,35 +110,34 @@ export default function StudentStoreFrontPage() {
       const result = await response.json();
 
       if (!response.ok) {
-        // Let the PurchaseStoreItemDialog handle insufficient funds
-        // Just throw the error and let the dialog handle it
         throw new Error(result.error || "Failed to purchase item");
       }
 
-      // SUCCESS: Show both toast and success state
-      console.log("✅ Purchase successful");
+      // SUCCESS: Update local state instead of refetching
+      setStoreItems(prevItems => 
+        prevItems.map(item => 
+          item.id === selectedItem.id 
+            ? { ...item, quantity: item.quantity - quantity }
+            : item
+        ).filter(item => item.quantity > 0) // Remove items with 0 quantity
+      );
 
-      // Set success state for dialog
       setPurchaseSuccess({
         itemName: selectedItem.name,
         itemEmoji: selectedItem.emoji,
         newBalance: result.newBalance,
       });
 
-      // Close purchase dialog
       setPurchaseStoreItemDialogOpen(false);
 
-      // Show success toast
       toast({
         title: "Purchase Successful! 🎉",
         description: `${selectedItem.emoji} ${selectedItem.name} (${quantity}x) purchased successfully!`,
         duration: 4000,
       });
 
-      // Refresh items after a delay
-      setTimeout(() => {
-        fetchStoreItems();
-      }, 1000);
+      // Remove the setTimeout and fetchStoreItems call
+
     } catch (error) {
       console.error("Error purchasing item:", error);
       toast({
@@ -181,7 +184,7 @@ export default function StudentStoreFrontPage() {
           <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
             {storeItems.map((item) => (
               <StudentStoreItemCard
-                key={item.id}
+                key={`${item.id}-${item.quantity}`} // Stable key that includes quantity
                 id={item.id}
                 name={item.name}
                 emoji={item.emoji}
