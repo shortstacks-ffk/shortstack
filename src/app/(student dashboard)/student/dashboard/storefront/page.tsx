@@ -114,12 +114,7 @@ export default function StudentStoreFrontPage() {
       }
 
       // SUCCESS: Update local state instead of refetching
-      setStoreItems(prevItems => 
-        prevItems.map(item => 
-          item.id === selectedItem.id 
-            ? { ...item, quantity: item.quantity - quantity }
-            : item
-        ).filter(item => item.quantity > 0) // Remove items with 0 quantity
+        )
       );
 
       setPurchaseSuccess({
