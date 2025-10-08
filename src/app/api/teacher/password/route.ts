@@ -86,7 +86,7 @@ export async function PUT(request: Request) {
 
     // Send password change email notification
     try {
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+      const appUrl = process.env.VERCEL_URL || 'http://localhost:3000';
       
       // Use the internal email API
       await fetch(`${appUrl}/api/email`, {

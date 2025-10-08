@@ -6,6 +6,7 @@ import { getAuthSession } from "@/src/lib/auth";
 import * as bcrypt from 'bcryptjs';
 import { setupBankAccountsForStudent } from "@/src/lib/banking";
 import { Prisma, Role } from "@prisma/client";
+import { getBaseUrl } from "@/src/lib/utils/url";
 
 // Utility function to generate random passwords (unchanged)
 function generateRandomPassword(): string {
@@ -296,7 +297,7 @@ export async function createStudent(formData: FormData, classCode: string) {
     
     try {
       // Use direct fetch to our email API endpoint
-      const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/email`, {
+      const response = await fetch(`${getBaseUrl()}/api/email`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -411,7 +412,7 @@ export async function addExistingStudentToClass(studentId: string, classCode: st
 
     // Send email notification asynchronously - don't await the result
     // This allows the function to return quicker
-    const emailPromise = fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/email`, {
+    const emailPromise = await fetch(`${getBaseUrl()}/api/email`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -696,7 +697,7 @@ export async function updateStudent(formData: FormData, classCode: string, stude
     // Send email notification if password was updated
     if (password) {
       try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/email`, {
+        const response = await fetch(`${getBaseUrl()}/api/email`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
