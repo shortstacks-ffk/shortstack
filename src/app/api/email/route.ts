@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import StudentInvitation from '@/src/components/emails/StudentInvitation';
 import PasswordResetNotification from '@/src/components/emails/PasswordResetNotification';
+import { getBaseUrl } from '@/src/lib/utils/url';
 
 // Define the email payload interface
 export interface EmailPayload {
@@ -80,7 +81,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Determine the right subject based on all email types
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    // const appUrl = process.env.VERCEL_URL || 'http://localhost:3000';
+    const appUrl = getBaseUrl();
     const subject = isPasswordReset
       ? `Important: Your ShortStack Password Has Been Changed`
       : isNewStudent
@@ -103,7 +105,8 @@ export async function POST(request: NextRequest) {
           password,
           isNewStudent,
           isPasswordReset,
-          appUrl: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+          appUrl,
+          // appUrl: process.env.VERCEL_URL || 'http://localhost:3000',
         });
 
     // Send the email using the appropriate template

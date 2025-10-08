@@ -2,11 +2,17 @@ import { NextResponse } from 'next/server';
 import { db } from '@/src/lib/db';
 import { Resend } from 'resend';
 import ForgotPasswordEmail from '@/src/components/emails/ForgotPasswordEmail';
+import { getBaseUrl } from '@/src/lib/utils/url';
 
 // Generate a random 7-digit verification code
 function generateVerificationCode(): string {
   return Math.floor(1000000 + Math.random() * 9000000).toString();
 }
+
+// Get base URL from environment variables or use default
+// function getBaseUrl() {
+//   return process.env.VERCEL_URL || 'http://localhost:3000';
+// }
 
 export async function POST(req: Request) {
   try {
@@ -57,7 +63,7 @@ export async function POST(req: Request) {
         react: await ForgotPasswordEmail({
           firstName,
           verificationCode,
-          appUrl: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+          appUrl: getBaseUrl()
         }),
       });
     }

@@ -3,6 +3,11 @@ import { db } from '@/src/lib/db';
 import bcrypt from 'bcryptjs';
 import { Resend } from 'resend';
 import PasswordResetNotification from '@/src/components/emails/PasswordResetNotification';
+import { getBaseUrl } from "@/src/lib/utils/url";
+
+// function getBaseUrl() {
+//   return process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000';
+// }
 
 export async function POST(req: Request) {
   try {
@@ -81,7 +86,7 @@ export async function POST(req: Request) {
         react: await PasswordResetNotification({ 
           firstName,
           lastName,
-          appUrl: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+          appUrl: getBaseUrl()
         }),
       });
     } catch (emailError) {
