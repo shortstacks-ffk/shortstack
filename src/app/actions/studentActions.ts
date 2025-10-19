@@ -295,7 +295,7 @@ export async function createStudent(formData: FormData, classCode: string) {
     // Send invitation email using our API
     const isNewStudent = student.createdAt > new Date(Date.now() - 5000);
     
-    try {
+      try {
       // Use direct fetch to our email API endpoint
       const response = await fetch(`${getBaseUrl()}/api/email`, {
         method: 'POST',
@@ -314,6 +314,14 @@ export async function createStudent(formData: FormData, classCode: string) {
         }),
       });
       
+      // First check if response is OK before trying to parse JSON
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Email API error (${response.status}):`, errorText);
+        throw new Error(`Email API returned status ${response.status}`);
+      }
+      
+      // Only now try to parse as JSON
       const result = await response.json();
       
       if (!result.success) {
@@ -412,29 +420,42 @@ export async function addExistingStudentToClass(studentId: string, classCode: st
 
     // Send email notification asynchronously - don't await the result
     // This allows the function to return quicker
-    const emailPromise = await fetch(`${getBaseUrl()}/api/email`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        to: student.schoolEmail,
-        firstName: student.firstName,
-        lastName: student.lastName,
-        className: classData.name,
-        classCode: classCode,
-        email: student.schoolEmail,
-        isNewStudent: false,
-        isPasswordReset: false
-      }),
-    }).catch(emailError => {
-      console.error("Failed to send class addition email:", emailError);
-      // We're handling this asynchronously, so we don't need to return anything
-    });
+    try {
+        const response = await fetch(`${getBaseUrl()}/api/email`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            to: student.schoolEmail,
+            firstName: student.firstName,
+            lastName: student.lastName,
+            className: classData.name,
+            classCode: classCode,
+            email: student.schoolEmail,
+            isNewStudent: false,
+            isPasswordReset: false
+          }),
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`Email API error (${response.status}):`, errorText);
+          console.error(`Base URL used: ${getBaseUrl()}`);
+        } else {
+          const result = await response.json();
+          if (!result.success) {
+            console.error("Email API error:", result.error);
+          }
+        }
+      } catch (emailError) {
+        console.error("Failed to send class addition email:", emailError);
+        console.error("Error details:", emailError instanceof Error ? emailError.message : String(emailError));
+      }
 
-    // Don't await the email - we'll handle any errors on the client
-    revalidatePath(`/teacher/dashboard/classes/${classCode}`);
-    return { success: true, data: enrollment };
+      // Don't await the email - we've already handled any errors
+      revalidatePath(`/teacher/dashboard/classes/${classCode}`);
+      return { success: true, data: enrollment };
 
   } catch (error: any) {
     console.error("Add existing student error:", error);
@@ -709,19 +730,25 @@ export async function updateStudent(formData: FormData, classCode: string, stude
             className: classDetails?.name || "your class",
             classCode,
             email: schoolEmail,
-            password: password, // Include the new password
+            password: password,
             isNewStudent: false,
             isPasswordReset: true
           }),
         });
         
-        const result = await response.json();
-        
-        if (!result.success) {
-          console.error("Email API error:", result.error);
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`Email API error (${response.status}):`, errorText);
+          console.error(`Base URL used: ${getBaseUrl()}`);
+        } else {
+          const result = await response.json();
+          if (!result.success) {
+            console.error("Email API error:", result.error);
+          }
         }
       } catch (emailError) {
         console.error("Failed to send password update email:", emailError);
+        console.error("Error details:", emailError instanceof Error ? emailError.message : String(emailError));
       }
     }
     
