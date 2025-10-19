@@ -32,7 +32,7 @@ const nextConfig: NextConfig = {
   },
   // Optional: Enable experimental features if needed
   experimental: {
-    // serverActions: true, // Already enabled by default in 15.2.3
+    serverActions: {}, // Using empty object to enable with default settings
     // typedRoutes: true,
   }
 };

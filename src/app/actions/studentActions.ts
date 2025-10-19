@@ -7,6 +7,7 @@ import * as bcrypt from 'bcryptjs';
 import { setupBankAccountsForStudent } from "@/src/lib/banking";
 import { Prisma, Role } from "@prisma/client";
 import { getBaseUrl } from "@/src/lib/utils/url";
+import { sendEmail } from '@/src/lib/email/sendEmail';
 
 // Utility function to generate random passwords (unchanged)
 function generateRandomPassword(): string {
@@ -296,36 +297,20 @@ export async function createStudent(formData: FormData, classCode: string) {
     const isNewStudent = student.createdAt > new Date(Date.now() - 5000);
     
       try {
-      // Use direct fetch to our email API endpoint
-      const response = await fetch(`${getBaseUrl()}/api/email`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          to: schoolEmail,
-          firstName,
-          lastName,
-          className: classData.name,
-          classCode,
-          email: schoolEmail,
-          password: isNewStudent ? finalPassword : undefined,
-          isNewStudent
-        }),
+      // Use direct email sending instead of fetch
+      const emailResult = await sendEmail({
+        to: schoolEmail,
+        firstName,
+        lastName,
+        className: classData.name,
+        classCode,
+        email: schoolEmail,
+        password: isNewStudent ? finalPassword : undefined,
+        isNewStudent
       });
       
-      // First check if response is OK before trying to parse JSON
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`Email API error (${response.status}):`, errorText);
-        throw new Error(`Email API returned status ${response.status}`);
-      }
-      
-      // Only now try to parse as JSON
-      const result = await response.json();
-      
-      if (!result.success) {
-        console.error("Email API error:", result.error);
+      if (!emailResult.success) {
+        console.error("Email sending error:", emailResult.error);
         revalidatePath(`/teacher/dashboard/classes/${classCode}`);
         return { 
           success: true, 
@@ -421,41 +406,28 @@ export async function addExistingStudentToClass(studentId: string, classCode: st
     // Send email notification asynchronously - don't await the result
     // This allows the function to return quicker
     try {
-        const response = await fetch(`${getBaseUrl()}/api/email`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            to: student.schoolEmail,
-            firstName: student.firstName,
-            lastName: student.lastName,
-            className: classData.name,
-            classCode: classCode,
-            email: student.schoolEmail,
-            isNewStudent: false,
-            isPasswordReset: false
-          }),
-        });
-        
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error(`Email API error (${response.status}):`, errorText);
-          console.error(`Base URL used: ${getBaseUrl()}`);
-        } else {
-          const result = await response.json();
-          if (!result.success) {
-            console.error("Email API error:", result.error);
-          }
-        }
-      } catch (emailError) {
-        console.error("Failed to send class addition email:", emailError);
-        console.error("Error details:", emailError instanceof Error ? emailError.message : String(emailError));
-      }
+  const emailResult = await sendEmail({
+    to: student.schoolEmail,
+    firstName: student.firstName,
+    lastName: student.lastName,
+    className: classData.name,
+    classCode: classCode,
+    email: student.schoolEmail,
+    isNewStudent: false,
+    isPasswordReset: false
+  });
+  
+  if (!emailResult.success) {
+    console.error("Email sending error:", emailResult.error);
+  }
+} catch (emailError) {
+  console.error("Failed to send class addition email:", emailError);
+  console.error("Error details:", emailError instanceof Error ? emailError.message : String(emailError));
+}
 
-      // Don't await the email - we've already handled any errors
-      revalidatePath(`/teacher/dashboard/classes/${classCode}`);
-      return { success: true, data: enrollment };
+// Don't await the email - we've already handled any errors
+revalidatePath(`/teacher/dashboard/classes/${classCode}`);
+return { success: true, data: enrollment };
 
   } catch (error: any) {
     console.error("Add existing student error:", error);
@@ -718,33 +690,20 @@ export async function updateStudent(formData: FormData, classCode: string, stude
     // Send email notification if password was updated
     if (password) {
       try {
-        const response = await fetch(`${getBaseUrl()}/api/email`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            to: schoolEmail,
-            firstName,
-            lastName,
-            className: classDetails?.name || "your class",
-            classCode,
-            email: schoolEmail,
-            password: password,
-            isNewStudent: false,
-            isPasswordReset: true
-          }),
+        const emailResult = await sendEmail({
+          to: schoolEmail,
+          firstName,
+          lastName,
+          className: classDetails?.name || "your class",
+          classCode,
+          email: schoolEmail,
+          password: password,
+          isNewStudent: false,
+          isPasswordReset: true
         });
         
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error(`Email API error (${response.status}):`, errorText);
-          console.error(`Base URL used: ${getBaseUrl()}`);
-        } else {
-          const result = await response.json();
-          if (!result.success) {
-            console.error("Email API error:", result.error);
-          }
+        if (!emailResult.success) {
+          console.error("Password reset email error:", emailResult.error);
         }
       } catch (emailError) {
         console.error("Failed to send password update email:", emailError);
@@ -1047,9 +1006,6 @@ export async function getStudentClasses() {
     return { success: true, data: classes };
   } catch (error) {
     console.error("Get student classes error:", error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : "Failed to fetch student classes" 
-    };
+    return { success: false, error: "Failed to fetch student classes" };
   }
 }

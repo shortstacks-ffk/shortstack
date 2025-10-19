@@ -11,6 +11,8 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { FileText, RefreshCcw, ArrowRight, ArrowRightLeft, FileSignature, Loader2 } from "lucide-react"
 import { format } from "date-fns"
 
+export const dynamic = 'force-dynamic';
+
 const StudentBank = () => {
   const { data: session } = useSession()
   const [accounts, setAccounts] = useState<any[]>([])
@@ -21,6 +23,8 @@ const StudentBank = () => {
   const [isPayBillOpen, setIsPayBillOpen] = useState(false)
   const [showTransactions, setShowTransactions] = useState(false)
   const [showStatements, setShowStatements] = useState(false)
+
+  
 
   const fetchAccounts = async () => {
     try {
