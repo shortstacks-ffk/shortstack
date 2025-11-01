@@ -10,7 +10,6 @@
     "postinstall": "prisma generate",
     "deploy-db": "prisma generate && prisma migrate deploy",
     "create-super-user": "npx tsx scripts/create-super-user.ts"
-
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

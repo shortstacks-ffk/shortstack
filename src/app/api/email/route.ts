@@ -1,28 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Resend } from 'resend';
-import StudentInvitation from '@/src/components/emails/StudentInvitation';
-import PasswordResetNotification from '@/src/components/emails/PasswordResetNotification';
-import { getBaseUrl } from '@/src/lib/utils/url';
-
-// Define the email payload interface
-export interface EmailPayload {
-  to: string;
-  firstName: string;
-  lastName: string;
-  className: string;
-  classCode: string;
-  email?: string; // Optional as it might be the same as 'to'
-  password?: string; // Optional for existing students
-  isNewStudent: boolean;
-  isPasswordReset?: boolean; // Add this field
-}
+import { sendEmail, EmailPayload as SendEmailPayload } from '@/src/lib/email/sendEmail';
 
 // Main email sending endpoint - POST /api/email
 export async function POST(request: NextRequest) {
-  const resend = new Resend(process.env.RESEND_API_KEY);
-  
-  let payload: EmailPayload;
-  
+  let payload: SendEmailPayload;
+
   try {
     // Try to parse the request body with better error handling
     try {
@@ -50,11 +32,10 @@ export async function POST(request: NextRequest) {
       lastName, 
       className, 
       classCode, 
-      email,
       password,
       isNewStudent,
       isPasswordReset = false // Extract with default value
-    } = payload;
+    } = payload as any;
     
     // Validate required fields
     if (!to || !firstName || !lastName) {
@@ -80,54 +61,20 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Determine the right subject based on all email types
-    // const appUrl = process.env.VERCEL_URL || 'http://localhost:3000';
-    const appUrl = getBaseUrl();
-    const subject = isPasswordReset
-      ? `Important: Your ShortStack Password Has Been Changed`
-      : isNewStudent
-        ? `Welcome to ${className} - Your Login Information`
-        : `You've Been Added to ${className}`;
+    // Use server-side helper (calls Resend directly on the server)
+    const result = await sendEmail(payload);
 
-    // Choose the correct email template
-    const emailTemplate = isPasswordReset
-      ? await PasswordResetNotification({ 
-          firstName,
-          lastName,
-          appUrl
-        })
-      : await StudentInvitation({ 
-          firstName,
-          lastName,
-          className, 
-          classCode,
-          email: email || to,
-          password,
-          isNewStudent,
-          isPasswordReset,
-          appUrl,
-          // appUrl: process.env.VERCEL_URL || 'http://localhost:3000',
-        });
-
-    // Send the email using the appropriate template
-    const { data, error } = await resend.emails.send({
-      from: `ShortStacks Education <${process.env.RESEND_FROM_EMAIL || 'access@shortstacksffk.com'}>`,
-      to: [to],
-      subject: subject,
-      react: emailTemplate,
-    });
-
-    if (error) {
-      console.error('Failed to send email with Resend:', error);
+    if (!result.success) {
+      console.error('Failed to send email via helper:', result.error);
       return NextResponse.json({ 
         success: false, 
-        error: error.message 
+        error: result.error || 'Failed to send email' 
       }, { status: 500 });
     }
 
     return NextResponse.json({ 
       success: true, 
-      data 
+      data: result.data 
     });
   } catch (error: any) {
     console.error('Error sending email:', error);
