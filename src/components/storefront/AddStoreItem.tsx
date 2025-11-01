@@ -169,8 +169,8 @@ const AddStoreItem = ({ isOpen = false, onClose, onSuccess }: AddStoreItemProps)
           </div>
 
          <div className="py-2 text-gray-600 text-sm">
-                     <p>This bill will be created without assigning to any class or student.</p>
-                     <p className="mt-1">You can assign it to classes or students later from the bill details page.</p>
+                     <p>This item will be created without assigning to any class or student.</p>
+                     <p className="mt-1">You can assign it to classes or students later from the item details page.</p>
                    </div>
          
                    <DialogFooter className="pt-2 border-t">

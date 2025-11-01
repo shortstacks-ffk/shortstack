@@ -1,4 +1,4 @@
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 import { getAllStoreItems } from "@/src/app/actions/storeFrontActions";
 import { StoreItemCard } from "@/src/components/storefront/StoreItemCard";
@@ -17,13 +17,17 @@ interface ItemClass {
 async function StoreItemsContent() {
   const getColumnColor = (index: number) => {
     switch (index % 3) {
-      case 0: return "bg-blue-100";
-      case 1: return "bg-green-100";
-      case 2: return "bg-yellow-100";
-      default: return "bg-blue-100";
+      case 0:
+        return "bg-blue-100";
+      case 1:
+        return "bg-green-100";
+      case 2:
+        return "bg-yellow-100";
+      default:
+        return "bg-blue-100";
     }
   };
-  
+
   const response = await getAllStoreItems({ includeUnassigned: true });
   if (!response.success || !response.data) {
     return <div>Failed to load storeItems</div>;
@@ -35,7 +39,7 @@ async function StoreItemsContent() {
   console.log("Store items:", sortedStoreItems.length); // Debug
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+    <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6 p-4 sm:p-6 bg-gray-50">
       {sortedStoreItems.map((storeItem, index) => (
         <StoreItemCard
           key={storeItem.id}

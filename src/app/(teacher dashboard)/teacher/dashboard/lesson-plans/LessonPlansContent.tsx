@@ -53,19 +53,25 @@ interface LessonPlansContentProps {
 export default function LessonPlansContent({
   initialUserPlans,
   initialGenericPlans,
-  isSuperUser
+  isSuperUser,
 }: LessonPlansContentProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  
+
   // Get initial tab from URL params or default based on user type
-  const initialTab = searchParams.get('tab') as 'my-plans' | 'templates' || (isSuperUser ? "templates" : "my-plans");
-  const initialGrade = searchParams.get('grade') as GradeLevel || "all";
-  
-  const [activeTab, setActiveTab] = useState<"my-plans" | "templates">(initialTab);
-  const [templateGradeTab, setTemplateGradeTab] = useState<GradeLevel>(initialGrade);
+  const initialTab =
+    (searchParams.get("tab") as "my-plans" | "templates") ||
+    (isSuperUser ? "templates" : "my-plans");
+  const initialGrade = (searchParams.get("grade") as GradeLevel) || "all";
+
+  const [activeTab, setActiveTab] = useState<"my-plans" | "templates">(
+    initialTab
+  );
+  const [templateGradeTab, setTemplateGradeTab] =
+    useState<GradeLevel>(initialGrade);
   const [isGenericDialogOpen, setIsGenericDialogOpen] = useState(false);
-  const [selectedGenericPlan, setSelectedGenericPlan] = useState<LessonPlan | null>(null);
+  const [selectedGenericPlan, setSelectedGenericPlan] =
+    useState<LessonPlan | null>(null);
 
   // Handle lesson plan creation success - refresh the page like bills
   const handleLessonPlanCreated = () => {
@@ -142,16 +148,20 @@ export default function LessonPlansContent({
 
   const getColumnColor = (index: number) => {
     switch (index % 3) {
-      case 0: return "bg-blue-100";
-      case 1: return "bg-green-100";
-      case 2: return "bg-yellow-100";
-      default: return "bg-blue-100";
+      case 0:
+        return "bg-blue-100";
+      case 1:
+        return "bg-green-100";
+      case 2:
+        return "bg-yellow-100";
+      default:
+        return "bg-blue-100";
     }
   };
 
   // Filter templates by grade
-  const filteredGenericPlans = initialGenericPlans.filter(plan => 
-    templateGradeTab === 'all' || plan.gradeLevel === templateGradeTab
+  const filteredGenericPlans = initialGenericPlans.filter(
+    (plan) => templateGradeTab === "all" || plan.gradeLevel === templateGradeTab
   );
 
   return (
@@ -170,19 +180,22 @@ export default function LessonPlansContent({
         <>
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-2xl font-bold">Lesson Templates</h1>
-            <Button onClick={() => setIsGenericDialogOpen(true)} className="bg-orange-500 hover:bg-orange-600">
+            <Button
+              onClick={() => setIsGenericDialogOpen(true)}
+              className="bg-orange-500 hover:bg-orange-600"
+            >
               <PlusCircle className="h-4 w-4 mr-2" />
               Create Template
             </Button>
           </div>
 
-          <TemplateGradeTabs 
-            activeGrade={templateGradeTab} 
-            onChange={setTemplateGradeTab} 
+          <TemplateGradeTabs
+            activeGrade={templateGradeTab}
+            onChange={setTemplateGradeTab}
           />
-          
+
           <div className="min-h-full bg-gray-50">
-            <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 p-4 sm:p-6 bg-gray-50">
+            <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6 p-4 sm:p-6 bg-gray-50">
               {filteredGenericPlans.map((plan, index) => (
                 <TemplateLessonPlanCard
                   key={plan.id}
@@ -209,25 +222,25 @@ export default function LessonPlansContent({
             setActiveTab(value as "my-plans" | "templates");
             // Update URL to preserve tab state
             const url = new URL(window.location.href);
-            url.searchParams.set('tab', value);
-            if (value === 'templates' && templateGradeTab !== 'all') {
-              url.searchParams.set('grade', templateGradeTab);
+            url.searchParams.set("tab", value);
+            if (value === "templates" && templateGradeTab !== "all") {
+              url.searchParams.set("grade", templateGradeTab);
             } else {
-              url.searchParams.delete('grade');
+              url.searchParams.delete("grade");
             }
-            window.history.replaceState({}, '', url.toString());
+            window.history.replaceState({}, "", url.toString());
           }}
           className="lesson-plan-tabs"
         >
           <TabsList className="mb-6 bg-orange-100">
-            <TabsTrigger 
-              value="my-plans" 
+            <TabsTrigger
+              value="my-plans"
               className="data-[state=active]:bg-orange-500 data-[state=active]:text-white"
             >
               My Lesson Plans
             </TabsTrigger>
-            <TabsTrigger 
-              value="templates" 
+            <TabsTrigger
+              value="templates"
               className="data-[state=active]:bg-orange-500 data-[state=active]:text-white"
             >
               Lesson Templates
@@ -237,7 +250,7 @@ export default function LessonPlansContent({
           {/* My Plans tab content */}
           <TabsContent value="my-plans">
             <div className="min-h-full bg-gray-50">
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 p-8 sm:p-4 bg-gray-50">
+              <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6 p-4 sm:p-6 bg-gray-50">
                 {initialUserPlans.map((plan, index) => (
                   <LessonPlanCard
                     key={plan.id}
@@ -248,9 +261,9 @@ export default function LessonPlansContent({
                     onUpdate={() => router.refresh()}
                   />
                 ))}
-                
-                <AddAnything 
-                  title="Create a Lesson" 
+
+                <AddAnything
+                  title="Create a Lesson"
                   FormComponent={AddLessonPlanDialog}
                 />
               </div>
@@ -259,23 +272,23 @@ export default function LessonPlansContent({
 
           {/* Templates tab content for regular teachers */}
           <TabsContent value="templates">
-            <TemplateGradeTabs 
-              activeGrade={templateGradeTab} 
+            <TemplateGradeTabs
+              activeGrade={templateGradeTab}
               onChange={(grade) => {
                 setTemplateGradeTab(grade);
                 // Update URL to preserve grade filter
                 const url = new URL(window.location.href);
-                url.searchParams.set('tab', 'templates');
-                if (grade !== 'all') {
-                  url.searchParams.set('grade', grade);
+                url.searchParams.set("tab", "templates");
+                if (grade !== "all") {
+                  url.searchParams.set("grade", grade);
                 } else {
-                  url.searchParams.delete('grade');
+                  url.searchParams.delete("grade");
                 }
-                window.history.replaceState({}, '', url.toString());
+                window.history.replaceState({}, "", url.toString());
               }}
             />
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mt-4">
+
+            <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6 p-4 sm:p-6 bg-gray-50">
               {filteredGenericPlans.map((plan, index) => (
                 <TemplateLessonPlanCard
                   key={plan.id}
@@ -288,7 +301,11 @@ export default function LessonPlansContent({
 
               {filteredGenericPlans.length === 0 && (
                 <div className="col-span-full text-center py-8 text-gray-500">
-                  No templates available for {templateGradeTab === "all" ? "any grade level" : `grades ${templateGradeTab}`}.
+                  No templates available for{" "}
+                  {templateGradeTab === "all"
+                    ? "any grade level"
+                    : `grades ${templateGradeTab}`}
+                  .
                 </div>
               )}
             </div>

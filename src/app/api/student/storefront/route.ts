@@ -59,8 +59,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json([]);
     }
 
-    // Step 3: Find ALL store items for these classes
-    // Updated to use the new schema's relationship structure
+    // Step 3: Find ALL store items for these classes - REMOVED filtering logic here
     const allStoreItemsInClasses = await db.storeItem.findMany({
       where: {
         classes: {
@@ -85,14 +84,19 @@ export async function GET(req: NextRequest) {
       console.log(`- Item: ${item.name}, Available: ${item.isAvailable}, Quantity: ${item.quantity}`);
     });
 
-    // Step 4: Apply filters
+    // Step 4: Apply ONLY availability and quantity filters (NOT purchase history)
     const availableItems = allStoreItemsInClasses.filter(item => 
       item.isAvailable && item.quantity > 0
     );
     
-    console.log("Available items after filtering:", availableItems.length);
+    // Sort alphabetically by name
+    const sortedItems = availableItems.sort((a, b) => 
+      a.name.localeCompare(b.name)
+    );
     
-    return NextResponse.json(availableItems);
+    console.log("Available items after filtering:", sortedItems.length);
+    
+    return NextResponse.json(sortedItems);
     
   } catch (error) {
     console.error("❌ Error in student storefront API:", error);

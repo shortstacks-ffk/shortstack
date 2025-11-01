@@ -9,7 +9,7 @@ interface DashboardHeaderProps {
   teacherName: string;
   onLogout: () => void;
   onMobileMenuToggle: () => void;
-  profileVersion?: number; // Add this prop
+  profileVersion?: number;
 }
 
 export default function DashboardHeader({
@@ -19,15 +19,16 @@ export default function DashboardHeader({
   teacherName,
   onLogout,
   onMobileMenuToggle,
-  profileVersion = 0 // Default value
+  profileVersion = 0
 }: DashboardHeaderProps) {
   return (
     <header className="bg-white border-b sticky top-0 z-20 px-4 py-3 flex items-center justify-between shadow-sm">
       {/* Left side - Title and mobile menu button */}
       <div className="flex items-center gap-3">
+        {/* Mobile/Tablet Menu Button - Hide on lg screens and above (iPad Pro+) */}
         <button
           onClick={onMobileMenuToggle}
-          className="p-1.5 rounded-md hover:bg-gray-100 md:hidden"
+          className="p-1.5 rounded-md hover:bg-gray-100 lg:hidden"
           aria-label="Toggle menu"
         >
           <Menu className="h-5 w-5 text-gray-700" />
@@ -37,13 +38,12 @@ export default function DashboardHeader({
       
       {/* Right side - Notifications and user dropdown */}
       <div className="flex items-center gap-3">
-        {/* <Notification /> */}
         <UserDropdown
           teacherImage={teacherImage}
           teacherInitial={teacherInitial}
           teacherName={teacherName}
           onLogout={onLogout}
-          profileVersion={profileVersion} // Pass the version
+          profileVersion={profileVersion}
         />
       </div>
     </header>

@@ -189,7 +189,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <SidebarProvider>
-      {/* Mobile Sidebar Overlay - Show on tablets too */}
+      {/* Mobile/Tablet Sidebar Overlay - Show up to lg screens (1024px) */}
       {isMobileSidebarOpen && (
         <div 
           className="fixed inset-0 bg-black/30 z-30 lg:hidden"
@@ -198,39 +198,45 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         />
       )}
       
-      {/* Mobile Sidebar - Show on tablets too */}
+      {/* Mobile/Tablet Sidebar - Show up to lg screens, responsive width */}
       <div 
-        className={`fixed inset-y-0 left-0 w-72 bg-[#f1faf3] shadow-lg transform transition-transform duration-300 ease-in-out z-40 lg:hidden ${
+        className={`fixed inset-y-0 left-0 bg-[#f1faf3] shadow-lg transform transition-transform duration-300 ease-in-out z-40 lg:hidden ${
           isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
+        } w-64 sm:w-72 md:w-80`}
       >
         <div className="h-full overflow-y-auto">
+          {/* Close button - responsive sizing */}
           <button
             onClick={closeMobileSidebar}
-            className="absolute top-4 right-4 p-2 rounded-full hover:bg-gray-100 transition-colors z-50"
+            className="absolute top-3 right-3 sm:top-4 sm:right-4 p-2 rounded-full hover:bg-gray-100 transition-colors z-50"
             aria-label="Close sidebar"
             type="button"
           >
-            <X className="h-6 w-6 text-gray-600" />
+            <X className="h-5 w-5 sm:h-6 sm:w-6 text-gray-600" />
           </button>
           
-          <div className="px-4 pt-4 pb-2 border-b flex justify-center mt-10">
+          {/* Logo section - responsive spacing */}
+          <div className="px-3 sm:px-4 pt-4 pb-2 border-b flex justify-center mt-8 sm:mt-10">
             <NavLogo items={dashboardData.dashLogo} />
           </div>
           
-          <div className="px-2 py-4 space-y-1">
-            <NavMain items={dashboardData.navMain} />
+          {/* Navigation - responsive spacing */}
+          <div className="px-1 sm:px-2 py-3 sm:py-4 space-y-1">
+            <NavMain items={filteredNavItems} />
           </div>
         </div>
       </div>
       
-      {/* Desktop Sidebar - Only show on large screens */}
+      {/* Desktop Sidebar - Show on lg screens and above (1024px+) - iPad Pro and Desktop */}
       <div className="hidden lg:block">
         <SidebarLeft filteredNavItems={filteredNavItems} />
       </div>
       
-      {/* Main content - No margin for tablets */}
-      <SidebarInset className="relative flex flex-col h-screen">
+      {/* Main content - Responsive margin adjustment */}
+      <SidebarInset className={`relative flex flex-col h-screen ${
+        // No left margin on mobile/tablet (up to lg), add margin on lg+ when desktop sidebar is visible
+        'lg:ml-0'
+      }`}>
         {/* Header Component */}
         <DashboardHeader
           pageTitle={pageTitle}
@@ -244,10 +250,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         
         {/* Main content area */}
         <div 
-          className="flex-1 bg-gray-50"
+          className="flex-1 bg-gray-50 overflow-auto"
           style={{ height: `calc(100vh - ${HEADER_HEIGHT}px)` }}
         >
-          <div className={`mx-auto min-h-screen min-w-screen ${isCalendarPage ? 'p-0 max-w-none bg-gray-50' : 'max-w-7xl px-2 sm:px-4 md:px-6 py-2 md:py-4 bg-gray-50'}`}>
+          <div className={`mx-auto min-h-full ${
+            isCalendarPage 
+              ? 'p-0 max-w-none bg-gray-50' 
+              : 'max-w-7xl px-2 sm:px-4 md:px-6 lg:px-8 py-2 md:py-4 bg-gray-50'
+          }`}>
             {children}
           </div>
         </div>
