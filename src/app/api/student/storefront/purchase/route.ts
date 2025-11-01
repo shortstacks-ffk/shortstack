@@ -94,16 +94,36 @@ export async function POST(request: NextRequest) {
 
     // Use a transaction to ensure data consistency
     const result = await db.$transaction(async (tx) => {
-      // 1. Create the purchase record
-      const purchase = await tx.studentPurchase.create({
-        data: {
+      // 1. Check if a purchase already exists
+      const existingPurchase = await tx.studentPurchase.findFirst({
+        where: {
           itemId: storeItem.id,
           studentId: student.id,
-          quantity,
-          totalPrice: totalCost,
-          status: "PAID", // Changed from "COMPLETED" to "PAID"
         },
       });
+
+      let purchase;
+      if (existingPurchase) {
+        // Update existing purchase
+        purchase = await tx.studentPurchase.update({
+          where: { id: existingPurchase.id },
+          data: {
+            quantity: existingPurchase.quantity + quantity,
+            totalPrice: existingPurchase.totalPrice + totalCost,
+          },
+        });
+      } else {
+        // Create new purchase record
+        purchase = await tx.studentPurchase.create({
+          data: {
+            itemId: storeItem.id,
+            studentId: student.id,
+            quantity,
+            totalPrice: totalCost,
+            status: "PAID",
+          },
+        });
+      }
 
       // 2. Update the item quantity
       await tx.storeItem.update({

@@ -54,12 +54,6 @@ export function StudentStoreItemCard({
           </div>
         </div>
 
-        {description && (
-          <p className="text-sm text-gray-600 mb-3 line-clamp-2">
-            {description}
-          </p>
-        )}
-
         <div className="space-y-1 text-sm">
           <p>
             <span className="font-medium">Quantity:</span> {quantity}
