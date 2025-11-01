@@ -7,74 +7,70 @@ export interface EmailPayload {
   to: string;
   firstName: string;
   lastName: string;
-  className: string;
-  classCode: string;
+  className?: string;
+  classCode?: string;
   email?: string;
   password?: string;
-  isNewStudent: boolean;
+  isNewStudent?: boolean;
   isPasswordReset?: boolean;
 }
 
 export async function sendEmail(payload: EmailPayload) {
+  if (typeof window !== 'undefined') {
+    return { success: false, error: 'sendEmail must be called from server-side' };
+  }
+
+  const key = process.env.RESEND_API_KEY;
+  if (!key) return { success: false, error: 'Missing RESEND_API_KEY on server' };
+
+  const resend = new Resend(key);
+
   try {
-    const resend = new Resend(process.env.RESEND_API_KEY);
+    const {
+      to,
+      firstName,
+      lastName,
+      className = '',
+      classCode = '',
+      email,
+      password,
+      isNewStudent = false,
+      isPasswordReset = false
+    } = payload;
+
     const appUrl = getBaseUrl();
-    
-    // Validate required fields
-    if (!payload.to || !payload.firstName || !payload.lastName) {
-      return { success: false, error: 'Missing required fields' };
-    }
-    
-    // For non-password reset emails, validate class info
-    if (!payload.isPasswordReset && (!payload.className || !payload.classCode)) {
-      return { success: false, error: 'Missing class information' };
-    }
-
-    // Determine the right subject
-    const subject = payload.isPasswordReset
+    const subject = isPasswordReset
       ? `Important: Your ShortStack Password Has Been Changed`
-      : payload.isNewStudent
-        ? `Welcome to ${payload.className} - Your Login Information`
-        : `You've Been Added to ${payload.className}`;
+      : isNewStudent
+        ? `Welcome to ${className} - Your Login Information`
+        : `You've Been Added to ${className}`;
 
-    // Choose the correct email template
-    const emailTemplate = payload.isPasswordReset
-      ? await PasswordResetNotification({ 
-          firstName: payload.firstName,
-          lastName: payload.lastName,
+    const reactTemplate = isPasswordReset
+      ? await PasswordResetNotification({ firstName, lastName, appUrl })
+      : await StudentInvitation({
+          firstName,
+          lastName,
+          className,
+          classCode,
+          email: email || to,
+          password,
+          isNewStudent,
+          isPasswordReset,
           appUrl
-        })
-      : await StudentInvitation({ 
-          firstName: payload.firstName,
-          lastName: payload.lastName,
-          className: payload.className, 
-          classCode: payload.classCode,
-          email: payload.email || payload.to,
-          password: payload.password,
-          isNewStudent: payload.isNewStudent,
-          isPasswordReset: payload.isPasswordReset || false,
-          appUrl,
         });
 
-    // Send the email
-    const { data, error } = await resend.emails.send({
-      from: `ShortStacks Education <${process.env.RESEND_FROM_EMAIL || 'access@shortstacksffk.com'}>`,
-      to: [payload.to],
-      subject: subject,
-      react: emailTemplate,
+    const res = await resend.emails.send({
+      from: process.env.RESEND_FROM_EMAIL ? `ShortStacks Education <${process.env.RESEND_FROM_EMAIL}>` : 'ShortStacks Education <access@shortstacksffk.com>',
+      to: [to],
+      subject,
+      react: reactTemplate
     });
 
-    if (error) {
-      console.error('Email sending failed:', error);
-      return { success: false, error: error.message };
-    }
-
-    return { success: true, data };
-  } catch (error) {
-    console.error('Error in sendEmail:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Unknown error sending email' 
-    };
+    return { success: true, data: res };
+  } catch (err: any) {
+    // Prefer structured error info if Resend returns it
+    const message = err?.message || String(err);
+    console.error('sendEmail error:', err);
+    return { success: false, error: message };
   }
 }

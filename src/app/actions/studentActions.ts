@@ -309,8 +309,8 @@ export async function createStudent(formData: FormData, classCode: string) {
         isNewStudent
       });
       
-      if (!emailResult.success) {
-        console.error("Email sending error:", emailResult.error);
+      if (!emailResult?.success) {
+        console.error("Email sending error:", emailResult?.error);
         revalidatePath(`/teacher/dashboard/classes/${classCode}`);
         return { 
           success: true, 
