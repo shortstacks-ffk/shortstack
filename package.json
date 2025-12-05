@@ -1,6 +1,6 @@
 {
   "name": "shortstack",
-  "version": "0.11.5",
+  "version": "0.15.9",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -9,7 +9,9 @@
     "lint": "next lint",
     "postinstall": "prisma generate",
     "deploy-db": "prisma generate && prisma migrate deploy",
-    "create-super-user": "npx tsx scripts/create-super-user.ts"
+    "create-super-user": "npx tsx scripts/create-super-user.ts",
+    "type-check": "tsc --noEmit",
+    "test": "echo \"No tests yet\" && exit 0"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

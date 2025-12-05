@@ -1,0 +1,23 @@
+name: Check Database Migrations
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  check-migrations:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - run: npm ci
+      
+      - name: Check for pending migrations
+        run: npx prisma migrate status
+        continue-on-error: true
