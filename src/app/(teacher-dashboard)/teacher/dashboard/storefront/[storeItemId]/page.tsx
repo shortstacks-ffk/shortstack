@@ -1,4 +1,3 @@
-import React, { useState, useEffect } from "react";
 import { getStoreItem } from "@/src/app/actions/storeFrontActions";
 import { notFound } from "next/navigation";
 import { StoreItemDetailClient } from "./StoreItemDetailClient";
