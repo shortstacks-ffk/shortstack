@@ -2,12 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuthSession } from "@/src/lib/auth"; // Use the wrapper function
 import { uploadFileToDrive } from '@/src/lib/googleDrive';
 
-export const config = {
-    api: {
-      bodyParser: false, // Disable built-in parser for file uploads
-      responseLimit: false, // Remove response size limit
-    },
-  };
+
+// Modern Next.js 16 route segment config
+export const runtime = 'nodejs';
+export const maxDuration = 60; // seconds
 
 export async function POST(request: NextRequest) {
   try {
