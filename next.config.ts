@@ -1,7 +1,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Turbopack is default in Next.js 16
   turbopack: {},
   
   images: {
@@ -15,14 +14,14 @@ const nextConfig: NextConfig = {
   
   experimental: {
     serverActions: {
-      bodySizeLimit: '2mb',
+      bodySizeLimit: '50mb', // Match your upload limit
     },
   },
   
   staticPageGenerationTimeout: 120,
   
-  // Only needed if you're building standalone
-  output: process.env.BUILD_STANDALONE ? 'standalone' : undefined,
+  // Remove output: 'standalone' for Vercel deployments
+  // Vercel handles this automatically
 };
 
 export default nextConfig;
